@@ -13,3 +13,4 @@ torch
 tensordict
 torchrl
 tqdm
+vmas # TODO: this is a dependency needed at runtime, most likely to be removed in our own implementation

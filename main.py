@@ -17,6 +17,12 @@ def parse_args() -> argparse.Namespace:
         help=f"Examples available: {", ".join(examples)}"
     )
 
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Only for quick testing"
+    )
+
     # Example of number parsing:
     # parser.add_argument(
     #     "--number",
@@ -37,6 +43,10 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
+
+    if args.test:
+        PyADRL.examples.gridworld.py_torch_tutorial()
+        return;
 
     if args.verbose:
         print("Verbose mode enabled")
