@@ -11,6 +11,7 @@ pkgs.mkShell {
         pettingzoo
         grpcio
         grpcio-tools
+        ruff
       ]
     ))
   ];

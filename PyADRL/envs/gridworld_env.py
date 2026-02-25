@@ -3,15 +3,18 @@
 from pettingzoo import ParallelEnv
 import grpc
 import grid_world_pb2, grid_world_pb2_grpc
-from utils.gridworld_client import GridWorldClient
+from ..utils.protobuf_utils import rand_action
+from ..utils.gridworld_client import GridWorldClient
 from gymnasium.spaces import Discrete, MultiDiscrete
+
 
 class Drone:
     def __init__(self, id: int, x: int, y: int, is_evader: bool):
-        self.id : int = id
+        self.id: int = id
         self.x = x
         self.y = y
         self.is_evader = is_evader
+
 
 class GridWorldEnvironment(ParallelEnv):
     metadata = {
@@ -19,13 +22,16 @@ class GridWorldEnvironment(ParallelEnv):
     }
 
     def __init__(self, channel: grpc.Channel):
-        self.id: int = None
+        self.id: int | None = None
         self.client = GridWorldClient(channel)
         self.target_x: int = 5
         self.target_y: int = 5
         self.pursuer: list[Drone] = []
-        self.evader: Drone = None
+        self.evader: Drone | None = None
         self.timestep: int = 0
+
+    def close(self):
+        self.client.Close(grid_world_pb2.GWCloseRequest(id=self.id))
 
     def reset(self, seed=None, options=None):
         state = None
@@ -42,19 +48,23 @@ class GridWorldEnvironment(ParallelEnv):
             if drone_state.is_evader:
                 self.evader = Drone(drone_state.id, drone_state.x, drone_state.y, True)
             else:
-                self.pursuer.append(Drone(drone_state.id, drone_state.x, drone_state.y, False))
+                self.pursuer.append(
+                    Drone(drone_state.id, drone_state.x, drone_state.y, False)
+                )
 
-    def step(self, actions : list[grid_world_pb2.GWDroneAction]):
+    def step(self, actions: list[grid_world_pb2.GWDroneAction]):
         pursuer_reward = 0
         evader_reward = 0
         terminated = False
         truncated = False
 
-        response = self.client.DoStep(grid_world_pb2.GWActionRequest(id=self.id, actions=actions))
-        if response.WhichOneof("state_or_error")=="state":
+        response = self.client.DoStep(
+            grid_world_pb2.GWActionRequest(id=self.id, drone_actions=actions)
+        )
+        if response.WhichOneof("state_or_error") == "state":
             state = response.state
             for drone_state in state.drone_states:
-                if drone_state.destroyed and drone_state.is_evader==False:
+                if drone_state.destroyed and drone_state.is_evader == False:
                     self.pursuer = [p for p in self.pursuer if p.id != drone_state.id]
                     pursuer_reward -= 10
                 if drone_state.is_evader:
@@ -67,19 +77,26 @@ class GridWorldEnvironment(ParallelEnv):
                             pursuer.y = drone_state.y
         else:
             raise ValueError("Error in step")
-        
 
         if response.state.terminated:
             if self.evader.x == self.target_x and self.evader.y == self.target_y:
                 evader_reward += 100
                 terminated = True
                 print("Evader reached target!")
-            elif any(pursuer.x == self.evader.x and pursuer.y == self.evader.y for pursuer in self.pursuer):
+            elif any(
+                pursuer.x == self.evader.x and pursuer.y == self.evader.y
+                for pursuer in self.pursuer
+            ):
                 evader_reward -= 100
                 pursuer_reward += 100
                 terminated = True
                 print("Evader caught by pursuer!")
-            elif self.evader.x > 10 or self.evader.y > 10 or self.evader.x < 0 or self.evader.y < 0:
+            elif (
+                self.evader.x > 10
+                or self.evader.y > 10
+                or self.evader.x < 0
+                or self.evader.y < 0
+            ):
                 evader_reward -= 10
                 terminated = True
                 print("Evader out of bounds!")
@@ -99,7 +116,7 @@ class GridWorldEnvironment(ParallelEnv):
         pass
 
     def observation_space(self, agent):
-        return MultiDiscrete([11*11]*(2+len(self.pursuer)))
+        return MultiDiscrete([11 * 11] * (2 + len(self.pursuer)))
 
     def action_space(self, agent):
         return Discrete(5)  # 5 possible actions: up, down, left, right, stay
