@@ -37,3 +37,36 @@ def gridworld_example():
             print(f"  Pursuer {p.id} pos: ({p.x}, {p.y})")
 
     env.close()
+
+# Torch
+import torch
+
+# Tensordict modules
+from tensordict.nn import set_composite_lp_aggregate, TensorDictModule
+from tensordict.nn.distributions import NormalParamExtractor
+from torch import multiprocessing
+
+# Data collection
+from torchrl.collectors import SyncDataCollector
+from torchrl.data.replay_buffers import ReplayBuffer
+from torchrl.data.replay_buffers.samplers import SamplerWithoutReplacement
+from torchrl.data.replay_buffers.storages import LazyTensorStorage
+
+# Env
+from torchrl.envs import RewardSum, TransformedEnv
+from torchrl.envs.libs.vmas import VmasEnv
+from torchrl.envs.utils import check_env_specs
+
+# Multi-agent network
+from torchrl.modules import MultiAgentMLP, ProbabilisticActor, TanhNormal
+
+# Loss
+from torchrl.objectives import ClipPPOLoss, ValueEstimators
+
+# Utils
+torch.manual_seed(0)
+from matplotlib import pyplot as plt
+from tqdm import tqdm
+
+def py_torch_tutorial():
+    pass
