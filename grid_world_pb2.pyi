@@ -15,6 +15,7 @@ class GWAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     RIGHT: _ClassVar[GWAction]
     UP: _ClassVar[GWAction]
     DOWN: _ClassVar[GWAction]
+
 UNKNOWN: GWAction
 NOTHING: GWAction
 LEFT: GWAction
@@ -34,7 +35,14 @@ class GWDroneState(_message.Message):
     y: int
     destroyed: bool
     is_evader: bool
-    def __init__(self, id: _Optional[int] = ..., x: _Optional[int] = ..., y: _Optional[int] = ..., destroyed: bool = ..., is_evader: bool = ...) -> None: ...
+    def __init__(
+        self,
+        id: _Optional[int] = ...,
+        x: _Optional[int] = ...,
+        y: _Optional[int] = ...,
+        destroyed: bool = ...,
+        is_evader: bool = ...,
+    ) -> None: ...
 
 class GWState(_message.Message):
     __slots__ = ("terminated", "drone_states")
@@ -42,7 +50,11 @@ class GWState(_message.Message):
     DRONE_STATES_FIELD_NUMBER: _ClassVar[int]
     terminated: bool
     drone_states: _containers.RepeatedCompositeFieldContainer[GWDroneState]
-    def __init__(self, terminated: bool = ..., drone_states: _Optional[_Iterable[_Union[GWDroneState, _Mapping]]] = ...) -> None: ...
+    def __init__(
+        self,
+        terminated: bool = ...,
+        drone_states: _Optional[_Iterable[_Union[GWDroneState, _Mapping]]] = ...,
+    ) -> None: ...
 
 class GWDroneAction(_message.Message):
     __slots__ = ("id", "action")
@@ -50,7 +62,9 @@ class GWDroneAction(_message.Message):
     ACTION_FIELD_NUMBER: _ClassVar[int]
     id: int
     action: GWAction
-    def __init__(self, id: _Optional[int] = ..., action: _Optional[_Union[GWAction, str]] = ...) -> None: ...
+    def __init__(
+        self, id: _Optional[int] = ..., action: _Optional[_Union[GWAction, str]] = ...
+    ) -> None: ...
 
 class GWActionRequest(_message.Message):
     __slots__ = ("id", "drone_actions")
@@ -58,7 +72,11 @@ class GWActionRequest(_message.Message):
     DRONE_ACTIONS_FIELD_NUMBER: _ClassVar[int]
     id: int
     drone_actions: _containers.RepeatedCompositeFieldContainer[GWDroneAction]
-    def __init__(self, id: _Optional[int] = ..., drone_actions: _Optional[_Iterable[_Union[GWDroneAction, _Mapping]]] = ...) -> None: ...
+    def __init__(
+        self,
+        id: _Optional[int] = ...,
+        drone_actions: _Optional[_Iterable[_Union[GWDroneAction, _Mapping]]] = ...,
+    ) -> None: ...
 
 class GWActionResponse(_message.Message):
     __slots__ = ("state", "error_message")
@@ -66,7 +84,11 @@ class GWActionResponse(_message.Message):
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     state: GWState
     error_message: str
-    def __init__(self, state: _Optional[_Union[GWState, _Mapping]] = ..., error_message: _Optional[str] = ...) -> None: ...
+    def __init__(
+        self,
+        state: _Optional[_Union[GWState, _Mapping]] = ...,
+        error_message: _Optional[str] = ...,
+    ) -> None: ...
 
 class GWResetRequest(_message.Message):
     __slots__ = ("id",)
@@ -100,4 +122,8 @@ class GWNewResponse(_message.Message):
     STATE_FIELD_NUMBER: _ClassVar[int]
     id: int
     state: GWState
-    def __init__(self, id: _Optional[int] = ..., state: _Optional[_Union[GWState, _Mapping]] = ...) -> None: ...
+    def __init__(
+        self,
+        id: _Optional[int] = ...,
+        state: _Optional[_Union[GWState, _Mapping]] = ...,
+    ) -> None: ...

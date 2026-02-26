@@ -3,6 +3,7 @@ from PyADRL.utils.protobuf_utils import rand_action
 import grid_world_pb2
 from ..envs.gridworld_env import GridWorldEnvironment
 
+
 def gridworld_example():
     # Connect to your gRPC server
     channel = grpc.insecure_channel("localhost:50051")
@@ -19,7 +20,9 @@ def gridworld_example():
         actions = []
 
         # Action for evader
-        actions.append(grid_world_pb2.GWDroneAction(id=env.evader.id, action=rand_action()))
+        actions.append(
+            grid_world_pb2.GWDroneAction(id=env.evader.id, action=rand_action())
+        )
 
         # Actions for each pursuer
         for pursuer in env.pursuer:
