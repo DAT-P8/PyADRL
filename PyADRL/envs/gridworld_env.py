@@ -2,8 +2,7 @@
 
 from pettingzoo import ParallelEnv
 import grpc
-import grid_world_pb2, grid_world_pb2_grpc
-from ..utils.protobuf_utils import rand_action
+import grid_world_pb2
 from ..utils.gridworld_client import GridWorldClient
 from gymnasium.spaces import Discrete, MultiDiscrete
 
@@ -64,7 +63,7 @@ class GridWorldEnvironment(ParallelEnv):
         if response.WhichOneof("state_or_error") == "state":
             state = response.state
             for drone_state in state.drone_states:
-                if drone_state.destroyed and drone_state.is_evader == False:
+                if drone_state.destroyed and not drone_state.is_evader:
                     self.pursuer = [p for p in self.pursuer if p.id != drone_state.id]
                     pursuer_reward -= 10
                 if drone_state.is_evader:
