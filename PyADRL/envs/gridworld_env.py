@@ -24,9 +24,10 @@ class GridWorldEnvironment(ParallelEnv):
         "name": "gridworld_environment_v0",
     }
 
-    def __init__(self, channel: grpc.Channel):
+    def __init__(self, channel: grpc.Channel, step_delay: float = 0.0):
         self.id: int | None = None
         self.client = GridWorldClient(channel)
+        self.step_delay = step_delay # Delay to slow down steps for visualization
         self.target_x: int = 5
         self.target_y: int = 5
         self.pursuer: list[Drone] = []
@@ -84,6 +85,8 @@ class GridWorldEnvironment(ParallelEnv):
         return observations, infos
 
     def step(self, actions: dict[str, int]):
+        if self.step_delay > 0:
+            time.sleep(self.step_delay)
         pursuer_reward = 0
         evader_reward = 0
         terminations = {a: False for a in self.possible_agents}

@@ -34,7 +34,7 @@ def gridworld_train():
             num_envs_per_env_runner=5,
         )
         .training(
-            train_batch_size=10000,      # Larger batches = more stable gradients
+            train_batch_size=10000,     # Larger batches = more stable gradients
             minibatch_size=512,
             num_epochs=10,              # More SGD passes per batch
             lr=3e-4,
@@ -51,7 +51,7 @@ def gridworld_train():
 
     rewards = []
     
-    for i in range(100):
+    for i in range(250):
         result = algo.train()
 
         checkpoint_dir = os.path.abspath(f"./checkpoints/iter_{i + 1}")
@@ -83,13 +83,13 @@ def gridworld_train():
     plt.show()
 
 # for some reason this function creates 2 enviorments?
-def gridworld_test(checkpoint_path: str, num_episodes: int = 1):
+def gridworld_test(checkpoint_path: str):
     # Load the algorithm from checkpoint
     ray.init()
     
     register_env(
         "gridworld",
-        lambda cfg: ParallelPettingZooEnv(GridWorldEnvironment(channel=grpc.insecure_channel("localhost:50051"))),
+        lambda cfg: ParallelPettingZooEnv(GridWorldEnvironment(channel=grpc.insecure_channel("localhost:50051"), step_delay=0.2)),
     )
 
     config: PPOConfig = (
