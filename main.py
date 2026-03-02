@@ -24,6 +24,10 @@ def parse_args() -> argparse.Namespace:
     # Example of flag argument:
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 
+    parser.add_argument(
+        "--test", action="store_true", help="Slow down simulation for testing/debugging"
+    )
+
     return parser.parse_args()
 
 
@@ -36,7 +40,7 @@ def main():
     if args.example:
         if args.example == GRIDWORLD:
             print("Running gridworld example:")
-            PyADRL.examples.gridworld.gridworld_example()
+            PyADRL.examples.gridworld.gridworld_example(test=args.test)
 
     if args.number is not None:
         print(f"Number argument: {args.number}")
