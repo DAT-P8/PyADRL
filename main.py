@@ -6,10 +6,9 @@ GRIDWORLD = "gridworld"
 
 examples = [GRIDWORLD]
 
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Example CLI parser"
-    )
+    parser = argparse.ArgumentParser(description="Example CLI parser")
 
     parser.add_argument(
         "--train",
@@ -22,7 +21,7 @@ def parse_args() -> argparse.Namespace:
         "--test",
         type=str,
         required=False,
-        help=f"Examples available: {", ".join(examples)}"
+        help=f"Examples available: {', '.join(examples)}",
     )
 
     # Example of number parsing:
