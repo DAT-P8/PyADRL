@@ -14,6 +14,7 @@ def rand_action() -> gwpb.GWAction:
     )
     return action
 
+
 def get_action(action: int) -> gwpb.GWAction:
     if action == 0:
         return gwpb.GWAction.NOTHING
