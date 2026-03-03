@@ -14,7 +14,18 @@ dependencies = [
   "gymnasium",
   "numpy",
   "protobuf",
+  "ray",
+  "dm-tree",
+  "fsspec",
+  "pandas",
+  "torch",
+  "pyarrow",
+  "pydantic",
+  "scipy",
 ]
+
+[project.optional-dependencies]
+dev = ["ruff"]
 
 [tool.ruff]
 line-length = 88
