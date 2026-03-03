@@ -1,5 +1,5 @@
 import random
-import grid_world_pb2 as gwpb
+from .. import grid_world_pb2 as gwpb
 
 
 def rand_action() -> gwpb.GWAction:

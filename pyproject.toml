@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "PyADRL"
+version = "0.0.1"
+description = "Python Area Defence Reinforcement Learning"
+requires-python = ">=3.12"
+dependencies = [
+  "pettingzoo",
+  "grpcio",
+  "grpcio-tools",
+  "gymnasium",
+  "numpy",
+  "protobuf",
+]
+
+[tool.ruff]
+line-length = 88
+

@@ -1,6 +1,6 @@
 import grpc
 from PyADRL.utils.protobuf_utils import rand_action
-import grid_world_pb2
+from .. import grid_world_pb2
 from ..envs.gridworld_env import GridWorldEnvironment
 
 
