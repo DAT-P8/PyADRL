@@ -40,7 +40,7 @@ def gridworld_train():
             num_epochs=10,  # More SGD passes per batch
             lr=3e-4,
             gamma=0.99,
-            lambda_=0.95,  # GAE lambda
+            lambda_=0.95,
             clip_param=0.2,
             vf_loss_coeff=0.5,
             entropy_coeff=0.01,  # Encourage exploration

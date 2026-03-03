@@ -38,7 +38,7 @@ class GridWorldEnvironment(ParallelEnv):
 
     def _get_obs(self):
         if self.evader is None or len(self.pursuer) == 0:
-            raise ValueError("Environment not properly initialized")
+            raise ValueError("Pursuer or evader not initialized")
 
         obs = []
         for p in self.pursuer:
@@ -50,7 +50,7 @@ class GridWorldEnvironment(ParallelEnv):
         result = {}
         for i, agent in enumerate(self.possible_agents):
             # Add one-hot agent ID so shared policy can distinguish roles
-            agent_id = np.zeros(len(self.possible_agents), dtype=np.float32)
+            agent_id = np.zeros(len(self.possible_agents), dtype=np.int32)
             agent_id[i] = 1.0
             result[agent] = np.concatenate([obs_array, agent_id])
         return result
@@ -89,7 +89,7 @@ class GridWorldEnvironment(ParallelEnv):
 
     def step(self, actions: dict[str, int]):
         if self.evader is None or len(self.pursuer) == 0:
-            raise ValueError("Environment not properly initialized")
+            raise ValueError("Pursuer or evader not initialized")
 
         if self.step_delay > 0:
             time.sleep(self.step_delay)
@@ -98,7 +98,7 @@ class GridWorldEnvironment(ParallelEnv):
         terminations = {a: False for a in self.possible_agents}
         truncations = {a: False for a in self.possible_agents}
 
-        # Create the list of actions to send to the godot
+        # Create the list of actions to send to the godot server
         actions_send = [
             grid_world_pb2.GWDroneAction(
                 id=self.evader.id, action=get_action(actions["evader"])
