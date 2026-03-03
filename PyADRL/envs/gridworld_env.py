@@ -2,7 +2,7 @@
 
 from pettingzoo import ParallelEnv
 import grpc
-import grid_world_pb2
+from .. import grid_world_pb2
 from ..utils.protobuf_utils import get_action
 from ..utils.gridworld_client import GridWorldClient
 from gymnasium.spaces import Box, Discrete

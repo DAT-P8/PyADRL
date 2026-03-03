@@ -1,6 +1,6 @@
 import grpc
-import grid_world_pb2
-import grid_world_pb2_grpc
+from .. import grid_world_pb2
+from .. import grid_world_pb2_grpc
 
 
 class GridWorldClient:
