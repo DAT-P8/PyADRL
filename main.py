@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
         "--checkpoint",
         type=str,
         required=False,
-        help=f"Example: ./checkpoint/iter_100",
+        help="Example: ./checkpoint/iter_100",
     )
 
     # Example of number parsing:
