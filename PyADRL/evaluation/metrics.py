@@ -1,16 +1,14 @@
 """Metrics for evaluating pursuit-evasion episodes.
 
-Inspired by Ray RLlib's custom metrics pattern
-(ray/rllib/examples/metrics/custom_metrics_in_env_runners.py).
 
 Each metric class accumulates per-episode outcomes over a sliding window
-and exposes a ``compute()`` method that returns the current aggregate value.
+and exposes a compute() method that returns the current aggregate value.
 """
 
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 # ---------------------------------------------------------------------------
