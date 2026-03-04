@@ -1,5 +1,8 @@
 import argparse
 import os
+
+from sympy import true
+
 import PyADRL.examples.gridworld
 
 GRIDWORLD = "gridworld"
@@ -28,6 +31,7 @@ def parse_args() -> argparse.Namespace:
         "--checkpoint",
         type=str,
         required=False,
+        default="./checkpoints/iter_100",
         help="Example: ./checkpoint/iter_100",
     )
 
@@ -57,9 +61,6 @@ def main():
         if args.test == GRIDWORLD:
 
             checkpoint = args.checkpoint
-
-            if checkpoint is None:
-                print("You must provide --checkpoint when using --test")
 
             print("Testing gridworld example:")
             PyADRL.examples.gridworld.gridworld_test(
