@@ -87,14 +87,14 @@ class GridWorldEnvironment(ParallelEnv):
 
         return observations, infos
 
-    def step(self, actions: dict[str, int]):
+    def step(self, actions: dict[str, float]):
         if self.evader is None or len(self.pursuer) == 0:
             raise ValueError("Pursuer or evader not initialized")
 
         if self.step_delay > 0:
             time.sleep(self.step_delay)
-        pursuer_reward = 0
-        evader_reward = 0
+        pursuer_reward: float = 0
+        evader_reward: float = 0
         terminations = {a: False for a in self.possible_agents}
         truncations = {a: False for a in self.possible_agents}
 
@@ -172,7 +172,7 @@ class GridWorldEnvironment(ParallelEnv):
 
         observations = self._get_obs()
 
-        rewards = {a: 0 for a in self.possible_agents}
+        rewards: dict[str, float] = {a: 0 for a in self.possible_agents}
         rewards["pursuer_0"] = pursuer_reward
         rewards["pursuer_1"] = pursuer_reward
         rewards["evader"] = evader_reward

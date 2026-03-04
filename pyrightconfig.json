@@ -1,0 +1,4 @@
+{
+  "reportAttributeAccessIssue": "none",
+  "ignore": ["**/grid_world_pb2.py", "**/grid_world_pb2_grpc.py"]
+}
