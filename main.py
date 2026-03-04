@@ -24,6 +24,13 @@ def parse_args() -> argparse.Namespace:
         help=f"Examples available: {', '.join(examples)}",
     )
 
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        required=False,
+        help=f"Example: ./checkpoint/iter_100",
+    )
+
     # Example of number parsing:
     parser.add_argument(
         "--number", type=int, required=False, help="An optional integer argument"
@@ -48,9 +55,15 @@ def main():
 
     if args.test:
         if args.test == GRIDWORLD:
+
+            checkpoint = args.checkpoint
+
+            if checkpoint is None:
+                print("You must provide --checkpoint when using --test")
+
             print("Testing gridworld example:")
             PyADRL.examples.gridworld.gridworld_test(
-                checkpoint_path=os.path.abspath("./checkpoints/iter_100")
+                checkpoint_path=os.path.abspath(checkpoint)
             )
 
     if args.number is not None:
