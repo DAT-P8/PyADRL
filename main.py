@@ -1,8 +1,5 @@
 import argparse
 import os
-
-from sympy import true
-
 import PyADRL.examples.gridworld
 
 GRIDWORLD = "gridworld"
