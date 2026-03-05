@@ -6,6 +6,7 @@ from ..envs.gridworld_env import GridWorldEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
 from pprint import pprint
+import matplotlib.pyplot as plt
 
 
 def gridworld_train(checkpoint_path: str | None = None):
@@ -64,9 +65,6 @@ def gridworld_train(checkpoint_path: str | None = None):
 
         mean = result["env_runners"]["agent_episode_returns_mean"]
         rewards.append(mean)
-
-    # temporarily plot rewards to verify learning
-    import matplotlib.pyplot as plt
 
     iterations = list(range(1, len(rewards) + 1))
     evader_rewards = [r["evader"] for r in rewards]
