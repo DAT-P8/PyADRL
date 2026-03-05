@@ -5,6 +5,7 @@ import grpc
 from .. import grid_world_pb2
 from ..utils.protobuf_utils import get_action
 from ..utils.gridworld_client import GridWorldClient
+from ..evaluation.metrics import EpisodeOutcome
 from gymnasium.spaces import Box, Discrete
 import numpy as np
 import time
@@ -24,7 +25,7 @@ class GridWorldEnvironment(ParallelEnv):
         "name": "gridworld_environment_v0",
     }
 
-    def __init__(self, channel: grpc.Channel, step_delay: float = 0.0):
+    def __init__(self, channel: grpc.Channel, step_delay: float = 0.0, max_episode_length: int = 100):
         self.id: int | None = None
         self.client = GridWorldClient(channel)
         self.step_delay = step_delay  # Delay to slow down steps for visualization
@@ -33,6 +34,7 @@ class GridWorldEnvironment(ParallelEnv):
         self.pursuer: list[Drone] = []
         self.evader: Drone | None = None
         self.timestep: int = 0
+        self.max_episode_length: int = max_episode_length
         self.possible_agents = ["pursuer_0", "pursuer_1", "evader"]
         self.agents = self.possible_agents.copy()
 
@@ -128,9 +130,10 @@ class GridWorldEnvironment(ParallelEnv):
                         if pursuer.id == drone_state.id:
                             pursuer.destroyed = True
                     pursuer_reward -= 100
-                if drone_state.is_evader:  # Update evader position
+                if drone_state.is_evader:  # Update evader state
                     self.evader.x = drone_state.x
                     self.evader.y = drone_state.y
+                    self.evader.destroyed = drone_state.destroyed
                 else:
                     for pursuer in self.pursuer:  # Update pursuer position
                         if pursuer.id == drone_state.id:
@@ -139,30 +142,40 @@ class GridWorldEnvironment(ParallelEnv):
         else:
             raise ValueError("Error in step")
 
+        outcome = EpisodeOutcome(episode_length=self.timestep + 1)
+
         if response.state.terminated:
-            if (
-                self.evader.x == self.target_x and self.evader.y == self.target_y
-            ):  # Evader reached target
-                evader_reward += 1000
-                pursuer_reward -= 100
-                terminations = {a: True for a in self.possible_agents}
-            elif any(
-                pursuer.x == self.evader.x and pursuer.y == self.evader.y
-                for pursuer in self.pursuer
-            ):  # Evader caught by pursuer
-                evader_reward -= 10
-                pursuer_reward += 1000
-                terminations = {a: True for a in self.possible_agents}
-            elif (
+            out_of_bounds = (
                 self.evader.x > 10
                 or self.evader.y > 10
                 or self.evader.x < 0
                 or self.evader.y < 0
-            ):  # Evader out of bounds
+            )
+            breached = (
+                self.evader.x == self.target_x and self.evader.y == self.target_y
+            )
+            captured = self.evader.destroyed and not out_of_bounds
+            if out_of_bounds:
                 evader_reward -= 1000
                 terminations = {a: True for a in self.possible_agents}
+            elif captured:
+                evader_reward -= 10
+                pursuer_reward += 1000
+                terminations = {a: True for a in self.possible_agents}
+                outcome.captured = True
+                outcome.capture_step = self.timestep + 1
+            elif breached:
+                evader_reward += 1000
+                pursuer_reward -= 100
+                terminations = {a: True for a in self.possible_agents}
+                outcome.breached = True
+            elif out_of_bounds:
+                evader_reward -= 1000
+                terminations = {a: True for a in self.possible_agents}
+            else:
+                terminations = {a: True for a in self.possible_agents}
 
-        if self.timestep >= 100:  # Max timesteps reached
+        if self.timestep >= self.max_episode_length:  # Max timesteps reached
             truncations = {a: True for a in self.possible_agents}
 
         pursuer_reward -= 1
@@ -170,14 +183,25 @@ class GridWorldEnvironment(ParallelEnv):
 
         self.timestep += 1
 
+        infos = {a: {} for a in self.possible_agents}
+
+        is_done = any(terminations.values()) or any(truncations.values())
+        if is_done:
+            episode_metrics = {
+                "captured": 1.0 if outcome.captured else 0.0,
+                "breached": 1.0 if outcome.breached else 0.0,
+                "capture_step": float(outcome.capture_step) if outcome.capture_step is not None else float(self.max_episode_length),
+                "episode_length": float(outcome.episode_length),
+            }
+            for a in self.possible_agents:
+                infos[a]["episode_metrics"] = episode_metrics
+
         observations = self._get_obs()
 
         rewards = {a: 0 for a in self.possible_agents}
         rewards["pursuer_0"] = pursuer_reward
         rewards["pursuer_1"] = pursuer_reward
         rewards["evader"] = evader_reward
-
-        infos = {a: {} for a in self.possible_agents}
 
         return observations, rewards, terminations, truncations, infos
 
