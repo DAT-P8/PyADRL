@@ -10,8 +10,7 @@ from ray.tune.registry import register_env
 from ray.rllib.callbacks.callbacks import RLlibCallback
 
 
-_RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".results")
-_EPISODES_JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "_episodes.jsonl")
+_RESULTS_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".results"))
 
 
 def _metrics_path(prefix: str) -> str:
@@ -30,22 +29,6 @@ def _safe(val):
         return float(val)
     except (TypeError, ValueError):
         return str(val)
-
-
-def _read_episodes() -> list[dict]:
-    episodes = []
-    if os.path.exists(_EPISODES_JSONL_PATH):
-        with open(_EPISODES_JSONL_PATH, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    episodes.append(json.loads(line))
-    return episodes
-
-
-def _clear_episodes():
-    with open(_EPISODES_JSONL_PATH, "w"):
-        pass
 
 
 class MetricsCallback(RLlibCallback):
@@ -80,15 +63,6 @@ class MetricsCallback(RLlibCallback):
         metrics_logger.log_value("capture_rate", metrics["captured"], window=100)
         metrics_logger.log_value("avg_capture_step", metrics["capture_step"], window=100)
         metrics_logger.log_value("breach_rate", metrics["breached"], window=100)
-
-        record = {
-            "captured": bool(metrics["captured"]),
-            "breached": bool(metrics["breached"]),
-            "capture_step": float(metrics["capture_step"]),
-            "episode_length": float(metrics["episode_length"]),
-        }
-        with open(_EPISODES_JSONL_PATH, "a") as f:
-            f.write(json.dumps(record) + "\n")
 
 
 def gridworld_train():
@@ -137,11 +111,8 @@ def gridworld_train():
     metrics_path = _metrics_path("train")
     rewards = []
     iterations_data = []
-    _clear_episodes()
 
     for i in range(250):
-        _clear_episodes()
-
         result = algo.train()
 
         checkpoint_dir = os.path.abspath(f"./checkpoints/iter_{i + 1}")
@@ -150,12 +121,9 @@ def gridworld_train():
         mean = result["env_runners"]["agent_episode_returns_mean"]
         rewards.append(mean)
 
-        episodes = _read_episodes()
-
         iteration_data = {
             "iteration": i + 1,
-            "num_episodes": len(episodes),
-            "episodes": episodes,
+            "num_episodes": int(result["env_runners"].get("num_episodes", 0)),
             "summary": {
                 "capture_rate": _safe(result["env_runners"].get("capture_rate")),
                 "avg_capture_step": _safe(result["env_runners"].get("avg_capture_step")),
@@ -222,15 +190,12 @@ def gridworld_test(checkpoint_path: str):
     algo = config.build()
     algo.restore(checkpoint_path)
 
-    _clear_episodes()
     results = algo.evaluate()
 
     env_runners = results.get("env_runners", {})
-    episodes = _read_episodes()
 
     eval_data = {
-        "num_episodes": len(episodes),
-        "episodes": episodes,
+        "num_episodes": int(env_runners.get("num_episodes", 0)),
         "summary": {
             "capture_rate": _safe(env_runners.get("capture_rate")),
             "avg_capture_step": _safe(env_runners.get("avg_capture_step")),
@@ -243,7 +208,7 @@ def gridworld_test(checkpoint_path: str):
     with open(metrics_path, "w") as f:
         json.dump({"evaluation": eval_data}, f, indent=2)
 
-    print(f"\n--- Evaluation Results ({len(episodes)} episodes) ---")
+    print(f"\n--- Evaluation Results ({eval_data['num_episodes']} episodes) ---")
     for key, val in eval_data["summary"].items():
         print(f"  {key}: {val}")
     print(f"\nMetrics written to {metrics_path}")

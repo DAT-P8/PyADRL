@@ -211,6 +211,5 @@ __marimo__/
 *grid_world_pb2.py
 *grid_world_pb2.pyi
 
-# Metrics results and temp files
+# Metrics results
 .results/
-_episodes.jsonl
