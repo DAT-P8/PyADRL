@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
         "--checkpoint",
         type=str,
         required=False,
-        default= None,
+        default=None,
         help="Example: ./checkpoint/iter_100",
     )
 
@@ -51,21 +51,18 @@ def main():
 
     if args.train:
         if args.train == GRIDWORLD:
-
             checkpoint = args.checkpoint
 
             print("Training gridworld example:")
             if checkpoint:
                 PyADRL.examples.gridworld.gridworld_train(
-                checkpoint_path=os.path.abspath(checkpoint)
+                    checkpoint_path=os.path.abspath(checkpoint)
                 )
             else:
                 PyADRL.examples.gridworld.gridworld_train()
 
-
     if args.test:
         if args.test == GRIDWORLD:
-
             checkpoint = args.checkpoint
 
             if checkpoint is None:
