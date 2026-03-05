@@ -54,6 +54,7 @@ def main():
             print("Training gridworld example:")
             PyADRL.examples.gridworld.gridworld_train()
 
+
     if args.test:
         if args.test == GRIDWORLD:
 
