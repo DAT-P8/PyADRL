@@ -1,8 +1,6 @@
-"""Metrics for evaluating pursuit-evasion episodes.
+"""Each metric class accumulates per-episode outcomes over a sliding window
+and exposes a compute() method that returns the current aggregate value. This might not be the best way but works for now 
 
-
-Each metric class accumulates per-episode outcomes over a sliding window
-and exposes a compute() method that returns the current aggregate value.
 """
 
 from __future__ import annotations
