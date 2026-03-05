@@ -44,7 +44,7 @@ def _read_episodes() -> list[dict]:
 
 
 def _clear_episodes():
-    with open(_EPISODES_JSONL_PATH, "w") as f:
+    with open(_EPISODES_JSONL_PATH, "w"):
         pass
 
 

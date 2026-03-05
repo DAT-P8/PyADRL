@@ -210,3 +210,7 @@ __marimo__/
 *grid_world_pb2_grpc.py
 *grid_world_pb2.py
 *grid_world_pb2.pyi
+
+# Metrics results and temp files
+.results/
+_episodes.jsonl
