@@ -9,7 +9,7 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 
 
-def gridworld_train():
+def gridworld_train(checkpoint_path: str | None = None):
     ray.init(log_to_driver=False)
 
     register_env(
@@ -50,6 +50,10 @@ def gridworld_train():
     )
 
     algo = config.build_algo()
+
+    if checkpoint_path is not None:
+        print("Restoring checkpoint from checkpoint:", checkpoint_path)
+        algo.restore(checkpoint_path)
 
     rewards = []
 
