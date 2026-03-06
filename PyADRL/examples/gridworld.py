@@ -6,9 +6,10 @@ from ..envs.gridworld_env import GridWorldEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
 from pprint import pprint
+import matplotlib.pyplot as plt
 
 
-def gridworld_train():
+def gridworld_train(checkpoint_path: str | None = None):
     ray.init()
 
     register_env(
@@ -50,6 +51,10 @@ def gridworld_train():
 
     algo = config.build_algo()
 
+    if checkpoint_path is not None:
+        print("Restoring checkpoint from checkpoint:", checkpoint_path)
+        algo.restore(checkpoint_path)
+
     rewards = []
 
     for i in range(250):
@@ -60,9 +65,6 @@ def gridworld_train():
 
         mean = result["env_runners"]["agent_episode_returns_mean"]
         rewards.append(mean)
-
-    # temporarily plot rewards to verify learning
-    import matplotlib.pyplot as plt
 
     iterations = list(range(1, len(rewards) + 1))
     evader_rewards = [r["evader"] for r in rewards]

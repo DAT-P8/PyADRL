@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "PyADRL"
+version = "0.0.1"
+description = "Python Area Defence Reinforcement Learning"
+requires-python = ">=3.12"
+dependencies = [
+  "pettingzoo",
+  "grpcio",
+  "grpcio-tools",
+  "gymnasium",
+  "numpy",
+  "protobuf",
+  "ray",
+  "dm-tree",
+  "fsspec",
+  "pandas",
+  "torch",
+  "pyarrow",
+  "pydantic",
+  "scipy",
+  "matplotlib",
+  "lz4",
+]
+
+[project.optional-dependencies]
+dev = ["ruff"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.pyright]
+include = ["PyADRL"]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
