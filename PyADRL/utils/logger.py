@@ -1,7 +1,8 @@
 import logging
 
-class Logger():
-    logger : logging.Logger = logging.getLogger("ray")
+
+class Logger:
+    logger: logging.Logger = logging.getLogger("ray")
 
     @staticmethod
     def debug(msg: str):
@@ -10,7 +11,7 @@ class Logger():
     @staticmethod
     def info(msg: str):
         Logger.logger.info("Info: " + msg)
-    
+
     @staticmethod
     def warning(msg: str):
         Logger.logger.warning("Warning: " + msg)

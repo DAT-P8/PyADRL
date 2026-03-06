@@ -37,7 +37,6 @@ def parse_args() -> argparse.Namespace:
         help=f"Log levels available: {', '.join(log_levels)}",
     )
 
-
     return parser.parse_args()
 
 
@@ -45,7 +44,7 @@ def main():
     args = parse_args()
 
     if args.log_level:
-        if args.log_level.upper() in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+        if args.log_level.upper() in log_levels:
             os.environ["RAY_LOGGER_LEVEL"] = args.log_level.upper()
     else:
         os.environ["RAY_LOGGER_LEVEL"] = "ERROR"
