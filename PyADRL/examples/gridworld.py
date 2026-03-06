@@ -9,7 +9,7 @@ from pprint import pprint
 
 
 def gridworld_train():
-    ray.init(log_to_driver=False)
+    ray.init()
 
     register_env(
         "gridworld",
