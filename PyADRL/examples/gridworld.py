@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 def gridworld_train(checkpoint_path: str | None = None):
-    ray.init(log_to_driver=False)
+    ray.init()
 
     register_env(
         "gridworld",
