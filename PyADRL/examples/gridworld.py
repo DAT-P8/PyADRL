@@ -1,68 +1,21 @@
 import grpc
 import ray
 import os
-import json
-from datetime import datetime
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
 from ..envs.gridworld_env import GridWorldEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
-from ray.rllib.callbacks.callbacks import RLlibCallback
-
-
-_RESULTS_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".results"))
-
-
-def _metrics_path(prefix: str) -> str:
-    os.makedirs(_RESULTS_DIR, exist_ok=True)
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    return os.path.join(_RESULTS_DIR, f"{prefix}_{ts}.json")
-
-
-def _safe(val):
-    """Convert numpy/Ray types to JSON-serializable Python types."""
-    if val is None:
-        return None
-    if isinstance(val, dict):
-        return {k: _safe(v) for k, v in val.items()}
-    try:
-        return float(val)
-    except (TypeError, ValueError):
-        return str(val)
-
-
-class MetricsCallback(RLlibCallback):
-    def __init__(self):
-        super().__init__()
-
-    def on_episode_end(
-        self,
-        *,
-        episode,
-        env_runner,
-        metrics_logger,
-        env,
-        env_index,
-        rl_module,
-        **kwargs,
-    ) -> None:
-        infos = episode.get_infos(-1)
-        metrics = None
-
-        if isinstance(infos, dict):
-            for key, val in infos.items():
-                if isinstance(val, dict) and "episode_metrics" in val:
-                    metrics = val["episode_metrics"]
-                    break
-            if metrics is None and "episode_metrics" in infos:
-                metrics = infos["episode_metrics"]
-
-        if metrics is None:
-            return
-
-        metrics_logger.log_value("capture_rate", metrics["captured"], window=100)
-        metrics_logger.log_value("avg_capture_step", metrics["capture_step"], window=100)
-        metrics_logger.log_value("breach_rate", metrics["breached"], window=100)
+from ..logger.metricslogger import (
+    MetricsCallback,
+    build_eval,
+    build_eval_data,
+    build_train_iteration_data,
+    build_train,
+    metrics_path,
+    print_eval_summary,
+    write_metrics,
+    write_metrics,
+)
 
 
 def gridworld_train():
@@ -108,9 +61,9 @@ def gridworld_train():
 
     algo = config.build_algo()
 
-    metrics_path = _metrics_path("train")
+    train_metrics_path = metrics_path("train")
     rewards = []
-    iterations_data = []
+    episodes_data = []
 
     for i in range(250):
         result = algo.train()
@@ -120,21 +73,19 @@ def gridworld_train():
 
         mean = result["env_runners"]["agent_episode_returns_mean"]
         rewards.append(mean)
+        iteration_data = build_train_iteration_data(result, i + 1)
+        episodes_data.extend(iteration_data.get("episodes", []))
 
-        iteration_data = {
-            "iteration": i + 1,
-            "num_episodes": int(result["env_runners"].get("num_episodes", 0)),
-            "summary": {
-                "capture_rate": _safe(result["env_runners"].get("capture_rate")),
-                "avg_capture_step": _safe(result["env_runners"].get("avg_capture_step")),
-                "breach_rate": _safe(result["env_runners"].get("breach_rate")),
-            },
-            "rewards": _safe(mean),
-        }
-        iterations_data.append(iteration_data)
+        # Keep a live per-episode log while training is in progress.
+        write_metrics_json(train_metrics_path, {"episodes": episodes_data})
 
-        with open(metrics_path, "w") as f:
-            json.dump({"iterations": iterations_data}, f, indent=2)
+    # Add final aggregate summary after all episodes are complete.
+    write_metrics_json(
+        train_metrics_path,
+        build_train_payload(
+            episodes_data, final_rewards=rewards[-1] if rewards else {}
+        ),
+    )
 
     import matplotlib.pyplot as plt
 
@@ -191,26 +142,13 @@ def gridworld_test(checkpoint_path: str):
     algo.restore(checkpoint_path)
 
     results = algo.evaluate()
-
-    env_runners = results.get("env_runners", {})
-
-    eval_data = {
-        "num_episodes": int(env_runners.get("num_episodes", 0)),
-        "summary": {
-            "capture_rate": _safe(env_runners.get("capture_rate")),
-            "avg_capture_step": _safe(env_runners.get("avg_capture_step")),
-            "breach_rate": _safe(env_runners.get("breach_rate")),
-        },
-        "rewards": _safe(env_runners.get("agent_episode_returns_mean", {})),
-    }
-
-    metrics_path = _metrics_path("eval")
-    with open(metrics_path, "w") as f:
-        json.dump({"evaluation": eval_data}, f, indent=2)
-
-    print(f"\n--- Evaluation Results ({eval_data['num_episodes']} episodes) ---")
-    for key, val in eval_data["summary"].items():
-        print(f"  {key}: {val}")
-    print(f"\nMetrics written to {metrics_path}")
+    eval_data = build_eval_data(results)
+    eval_episodes = eval_data.get("episodes", [])
+    eval_metrics_path = metrics_path("eval")
+    write_metrics(
+        eval_metrics_path,
+        build_eval(eval_episodes, fallback_summary=eval_data.get("summary", {})),
+    )
+    print_eval_summary(eval_data, eval_metrics_path)
 
     algo.stop()

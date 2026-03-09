@@ -5,7 +5,7 @@ import grpc
 from .. import grid_world_pb2
 from ..utils.protobuf_utils import get_action
 from ..utils.gridworld_client import GridWorldClient
-from ..evaluation.metrics import EpisodeOutcome
+from ..logger.metricslogger import EpisodeOutcome
 from gymnasium.spaces import Box, Discrete
 import numpy as np
 import time
@@ -25,7 +25,12 @@ class GridWorldEnvironment(ParallelEnv):
         "name": "gridworld_environment_v0",
     }
 
-    def __init__(self, channel: grpc.Channel, step_delay: float = 0.0, max_episode_length: int = 100):
+    def __init__(
+        self,
+        channel: grpc.Channel,
+        step_delay: float = 0.0,
+        max_episode_length: int = 100,
+    ):
         self.id: int | None = None
         self.client = GridWorldClient(channel)
         self.step_delay = step_delay  # Delay to slow down steps for visualization
@@ -151,9 +156,7 @@ class GridWorldEnvironment(ParallelEnv):
                 or self.evader.x < 0
                 or self.evader.y < 0
             )
-            breached = (
-                self.evader.x == self.target_x and self.evader.y == self.target_y
-            )
+            breached = self.evader.x == self.target_x and self.evader.y == self.target_y
             captured = self.evader.destroyed and not out_of_bounds
             if out_of_bounds:
                 evader_reward -= 1000
@@ -190,7 +193,9 @@ class GridWorldEnvironment(ParallelEnv):
             episode_metrics = {
                 "captured": 1.0 if outcome.captured else 0.0,
                 "breached": 1.0 if outcome.breached else 0.0,
-                "capture_step": float(outcome.capture_step) if outcome.capture_step is not None else float(self.max_episode_length),
+                "capture_step": float(outcome.capture_step)
+                if outcome.capture_step is not None
+                else float(self.max_episode_length),
                 "episode_length": float(outcome.episode_length),
             }
             for a in self.possible_agents:
