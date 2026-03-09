@@ -211,5 +211,8 @@ __marimo__/
 *grid_world_pb2.py
 *grid_world_pb2.pyi
 
-# Metrics results
-.results/
+# checkpoints folder
+checkpoints/
+
+#Results
+results/ 

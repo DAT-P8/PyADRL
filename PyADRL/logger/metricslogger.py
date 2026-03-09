@@ -13,7 +13,7 @@ from ray.rllib.callbacks.callbacks import RLlibCallback
 WINDOW_SIZE = 100
 
 _RESULTS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".results")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "results")
 )
 
 
