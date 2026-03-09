@@ -40,6 +40,17 @@ def parse_args() -> argparse.Namespace:
     # Example of flag argument:
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 
+    parser.add_argument(
+        "--tune",
+        type=str,
+        required=False,
+    )
+    parser.add_argument(
+        "--testt",
+        type=str,
+        required=False,
+    )
+
     return parser.parse_args()
 
 
@@ -75,6 +86,15 @@ def main():
 
     if args.number is not None:
         print(f"Number argument: {args.number}")
+
+    if args.tune:
+        if args.tune == GRIDWORLD:
+            PyADRL.examples.gridworld.gridworld_tuner_train()
+
+    if args.testt:
+        PyADRL.examples.gridworld.gridworld_tuner_test(
+            checkpoint=os.path.abspath("./checkpoints/iter_/PPO_gridworld_1/checkpoint_000000")
+        )
 
 
 if __name__ == "__main__":
