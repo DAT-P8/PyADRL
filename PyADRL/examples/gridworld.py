@@ -14,7 +14,6 @@ from ..logger.metricslogger import (
     metrics_path,
     print_eval_summary,
     write_metrics,
-    write_metrics,
 )
 
 
