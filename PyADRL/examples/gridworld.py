@@ -29,7 +29,7 @@ def gridworld_train(checkpoint_path: str | None = None):
             ),
         )
         .learners(
-            num_learners=5,
+            num_learners=4,
         )
         .env_runners(
             num_env_runners=4,
@@ -38,7 +38,7 @@ def gridworld_train(checkpoint_path: str | None = None):
         .training(
             train_batch_size=10000,  # Larger batches = more stable gradients
             minibatch_size=512,
-            num_epochs=10,  # More SGD passes per batch
+            num_epochs=20,  # More SGD passes per batch
             lr=3e-4,
             gamma=0.99,
             lambda_=0.95,
@@ -57,7 +57,7 @@ def gridworld_train(checkpoint_path: str | None = None):
 
     rewards = []
 
-    for i in range(250):
+    for i in range(100):
         result = algo.train()
 
         checkpoint_dir = os.path.abspath(f"./checkpoints/iter_{i + 1}")
