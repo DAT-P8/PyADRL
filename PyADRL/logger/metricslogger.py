@@ -65,13 +65,15 @@ class MetricsCallback(RLlibCallback):
         self,
         *,
         episode,
-        env_runner,
-        metrics_logger,
-        env,
+        env_runner=None,
+        metrics_logger=None,
+        env=None,
         env_index,
-        rl_module,
+        rl_module=None,
         **kwargs,
     ) -> None:
+        if metrics_logger is None:
+            return
         metrics = extract_episode_metrics(episode.get_infos(-1))
         if metrics is None:
             return
@@ -98,7 +100,8 @@ class MetricsCallback(RLlibCallback):
 def build_train_iteration_data(result: dict, iteration: int) -> dict:
     env_runners = result.get("env_runners", {})
     mean_rewards = env_runners.get("agent_episode_returns_mean", {})
-    episodes = safe_json_value(env_runners.get("episode_logs", [])) or []
+    episodes_value = safe_json_value(env_runners.get("episode_logs", []))
+    episodes = episodes_value if isinstance(episodes_value, list) else []
     return {
         "iteration": iteration,
         "num_episodes": len(episodes),
@@ -115,7 +118,8 @@ def build_train_iteration_data(result: dict, iteration: int) -> dict:
 def build_eval_data(results: dict) -> dict:
     """Build a JSON-safe evaluation metrics object from RLlib results."""
     env_runners = results.get("env_runners", {})
-    episodes = safe_json_value(env_runners.get("episode_logs", [])) or []
+    episodes_value = safe_json_value(env_runners.get("episode_logs", []))
+    episodes = episodes_value if isinstance(episodes_value, list) else []
     return {
         "num_episodes": len(episodes),
         "summary": {
