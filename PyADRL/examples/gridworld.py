@@ -15,9 +15,11 @@ from ..logger.metricslogger import (
     print_eval_summary,
     write_metrics,
 )
+from pprint import pprint
+import matplotlib.pyplot as plt
 
 
-def gridworld_train():
+def gridworld_train(checkpoint_path: str | None = None):
     ray.init(log_to_driver=False)
 
     register_env(
@@ -61,6 +63,10 @@ def gridworld_train():
     algo = config.build_algo()
 
     train_metrics_path = metrics_path("train")
+    if checkpoint_path is not None:
+        print("Restoring checkpoint from checkpoint:", checkpoint_path)
+        algo.restore(checkpoint_path)
+
     rewards = []
     episodes_data = []
 
@@ -83,8 +89,6 @@ def gridworld_train():
         train_metrics_path,
         build_train(episodes_data, final_rewards=rewards[-1] if rewards else {}),
     )
-
-    import matplotlib.pyplot as plt
 
     iterations = list(range(1, len(rewards) + 1))
     evader_rewards = [r["evader"] for r in rewards]

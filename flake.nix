@@ -58,6 +58,18 @@
               pythonEnv
               pkgs.ruff
             ];
+
+            shellHook = ''
+              echo "Initializing git submodules..."
+              git submodule init
+              git submodule update
+
+              echo ""
+              echo "Primary commands:"
+              echo "  > sh build.sh # Generate protobuf files"
+              echo "  > python3 main.py --train {name}"
+              echo "  > python3 main.py --test {name} --checkpoints ./checkpoints/iter_{num}"
+            '';
           };
         }
       );
