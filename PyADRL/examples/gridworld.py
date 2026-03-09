@@ -15,7 +15,7 @@ from ..logger.metricslogger import (
     print_eval_summary,
     write_metrics,
 )
-from pprint import pprint
+
 import matplotlib.pyplot as plt
 
 
