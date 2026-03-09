@@ -14,16 +14,16 @@ REWARD_EVADER_TARGET_REACHED = 100
 REWARD_EVADER_CAUGHT = -100
 REWARD_EVADER_OUT_OF_BOUNDS = -1000
 REWARD_EVADER_MAX_TIMESTEPS = 50
-REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target to encourage evader to move towards the target
-REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer to encourage evader to move away from pursuers
+REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
+REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
 
 # Rewards for pursuers
-REWARD_PURSUER_MAX_TIMESTEPS = -100 # Punish pursuers for taking too long to catch the evader
-REWARD_PURSUER_TARGET_REACHED = -100 # Punish pursuers for letting evader reach target
-REWARD_PURSUER_CAUGHT_EVADER_SELF = 100 # Reward for catching the evader yourself
-REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10 # Reward for helping catch the evader
+REWARD_PURSUER_MAX_TIMESTEPS = -100  # Punish pursuers for not catching evader in time
+REWARD_PURSUER_TARGET_REACHED = -100  # Punish pursuers for letting evader reach target
+REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Reward for catching the evader yourself
+REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
 REWARD_PURSUER_DESTROYED = -1000
-REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader to encourage pursuers to move towards the evader
+REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
 
 
 class Drone:
@@ -70,7 +70,7 @@ class GridWorldEnvironment(ParallelEnv):
             agent_id[i] = 1.0
             result[agent] = np.concatenate([obs_array, agent_id])
         return result
-    
+
     def close(self):
         self.client.Close(grid_world_pb2.GWCloseRequest(id=self.id))
 
@@ -95,7 +95,7 @@ class GridWorldEnvironment(ParallelEnv):
                 self.pursuer.append(
                     Drone(drone_state.id, drone_state.x, drone_state.y, False)
                 )
-        
+
         if self.evader is None or len(self.pursuer) == 0:
             raise ValueError("Pursuer or evader not initialized after reset")
         self.agents = [drone.name for drone in self.pursuer] + [self.evader.name]
@@ -192,7 +192,6 @@ class GridWorldEnvironment(ParallelEnv):
                 rewards[pursuer.name] += REWARD_PURSUER_MAX_TIMESTEPS
             truncations = {a: True for a in self.agents}
 
-
         # punish the pursuers for being far from the evader to encourage them to move towards the evader
         for pursuer in self.pursuer:
             distance_to_evader = np.sqrt(
@@ -211,7 +210,9 @@ class GridWorldEnvironment(ParallelEnv):
             np.sqrt((pursuer.x - self.evader.x) ** 2 + (pursuer.y - self.evader.y) ** 2)
             for pursuer in self.pursuer
         )
-        rewards[self.evader.name] += closest_pursuer_distance * REWARD_EVADER_FAR_FROM_PUSUERS
+        rewards[self.evader.name] += (
+            closest_pursuer_distance * REWARD_EVADER_FAR_FROM_PUSUERS
+        )
 
         self.timestep += 1
 
