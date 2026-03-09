@@ -10,6 +10,8 @@ import os
 from ray.rllib.callbacks.callbacks import RLlibCallback
 
 
+WINDOW_SIZE=100
+
 _RESULTS_DIR = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".results")
 )
@@ -47,7 +49,6 @@ def safe_json_value(val):
 
 
 def extract_episode_metrics(infos) -> dict | None:
-    """Extract episode metrics payload from RLlib infos."""
     if not isinstance(infos, dict):
         return None
 
@@ -78,20 +79,22 @@ class MetricsCallback(RLlibCallback):
         if metrics is None:
             return
 
-        metrics_logger.log_value("capture_rate", metrics["captured"], window=100)
-        metrics_logger.log_value(
-            "avg_capture_step", metrics["capture_step"], window=100
-        )
-        metrics_logger.log_value("breach_rate", metrics["breached"], window=100)
+        captured = bool(metrics.get("captured", False))
+        breached = bool(metrics.get("breached", False))
+        capture_step = safe_json_value(metrics.get("capture_step"))
+        episode_length = safe_json_value(metrics.get("episode_length"))
 
-        # Keep per-episode logs as raw records so we can persist every episode.
+        metrics_logger.log_value("capture_rate", captured, window=WINDOW_SIZE)
+        metrics_logger.log_value("avg_capture_step", capture_step, window=WINDOW_SIZE)
+        metrics_logger.log_value("breach_rate", breached, window=WINDOW_SIZE)
+
         metrics_logger.log_value(
             "episode_logs",
             {
-                "captured": bool(metrics.get("captured", 0.0)),
-                "breached": bool(metrics.get("breached", 0.0)),
-                "capture_step": safe_json_value(metrics.get("capture_step")),
-                "episode_length": safe_json_value(metrics.get("episode_length")),
+                "captured": captured,
+                "breached": breached,
+                "capture_step": capture_step,
+                "episode_length": episode_length,
             },
             reduce="item_series",
         )

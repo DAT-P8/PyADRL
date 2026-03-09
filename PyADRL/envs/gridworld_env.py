@@ -172,9 +172,6 @@ class GridWorldEnvironment(ParallelEnv):
                 pursuer_reward -= 100
                 terminations = {a: True for a in self.possible_agents}
                 outcome.breached = True
-            elif out_of_bounds:
-                evader_reward -= 1000
-                terminations = {a: True for a in self.possible_agents}
             else:
                 terminations = {a: True for a in self.possible_agents}
 
