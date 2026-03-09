@@ -77,14 +77,12 @@ def gridworld_train():
         episodes_data.extend(iteration_data.get("episodes", []))
 
         # Keep a live per-episode log while training is in progress.
-        write_metrics_json(train_metrics_path, {"episodes": episodes_data})
+        write_metrics(train_metrics_path, {"episodes": episodes_data})
 
     # Add final aggregate summary after all episodes are complete.
-    write_metrics_json(
+    write_metrics(
         train_metrics_path,
-        build_train_payload(
-            episodes_data, final_rewards=rewards[-1] if rewards else {}
-        ),
+        build_train(episodes_data, final_rewards=rewards[-1] if rewards else {}),
     )
 
     import matplotlib.pyplot as plt
