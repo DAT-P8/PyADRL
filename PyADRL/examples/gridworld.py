@@ -8,6 +8,8 @@ from ray.tune.registry import register_env
 from pprint import pprint
 import matplotlib.pyplot as plt
 
+ALTERNATING_CONST = 5
+
 
 def gridworld_train(checkpoint_path: str | None = None):
     ray.init(log_to_driver=False)
@@ -59,14 +61,40 @@ def gridworld_train(checkpoint_path: str | None = None):
 
     rewards = []
 
-    for i in range(250):
-        result = algo.train()
+    # try/finally ensures Ray always shuts down cleanly even if training crashes
+    try:
+        for i in range(50):
+            # Alternate which policy receives gradient updates each iteration.
+            # The frozen policy still plays in the environment but does not learn/update
+            # This forces each side to improve against a fixed opponent before switching
+            if i % ALTERNATING_CONST == 0:
+                policies_to_train = ["pursuer_policy"]
+                active = "pursuer"
+            else:
+                policies_to_train = ["evader_policy"]
+                active = "evader"
 
-        checkpoint_dir = os.path.abspath(f"./checkpoints/iter_{i + 1}")
-        algo.save(checkpoint_dir=checkpoint_dir)
+            print(f"Iteration {i + 1}: training {active}")
 
-        mean = result["env_runners"]["agent_episode_returns_mean"]
-        rewards.append(mean)
+            # assert is needed because algo.config is typed as `AlgorithmConfig | None`
+            assert algo.config is not None
+            # After build_algo(), RLlib freezes the config as mutation is not intended
+            # Only solution (i found) is to unfreeze it, change the multi-agent config, then freeze it again
+            algo.config._is_frozen = False
+            algo.config.multi_agent(policies_to_train=list(policies_to_train))
+            algo.config._is_frozen = True
+
+            result = algo.train()
+
+            checkpoint_dir = os.path.abspath(f"./checkpoints4/iter_{i + 1}")
+            algo.save(checkpoint_dir=checkpoint_dir)
+
+            mean = result["env_runners"]["agent_episode_returns_mean"]
+            rewards.append(mean)
+
+    finally:
+        algo.stop()
+        ray.shutdown()
 
     iterations = list(range(1, len(rewards) + 1))
     evader_rewards = [r["evader"] for r in rewards]
