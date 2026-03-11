@@ -3,6 +3,7 @@ import grpc
 import ray
 import os
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
+from ray.rllib.core.learner import learner_group
 from ..envs.gridworld_env import GridWorldEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
@@ -22,7 +23,7 @@ def sample_opponent(pool: list[dict]) -> dict:
     if len(pool) == 1:
         return pool[-1]  # most recent
     elif random.random() < P_OLD:
-        return random.choice(pool[:-1])  # Sample from all but the last opponent
+        return random.choice(pool[:-1])  # Sample from all but the last policy
     else:
         return pool[-1]
 
@@ -71,13 +72,20 @@ def gridworld_train(checkpoint_path: str | None = None):
 
     algo = config.build_algo()
 
+    pursuer_pool: list[dict] = []
+    evader_pool: list[dict] = []
+
     if checkpoint_path is not None:
         print("Restoring checkpoint from checkpoint:", checkpoint_path)
         algo.restore(checkpoint_path)
+        assert algo.learner_group is not None
+        weights = algo.learner_group.get_weights()
+        pursuer_pool.append(weights["pursuer_policy"])
+        evader_pool.append(weights["evader_policy"])
 
     rewards = []
-    pursuer_pool: list[dict] = []
-    evader_pool: list[dict] = []
+
+    # TODO: make sure that the if checkpoint is provided, stage will start from here
 
     # try/finally ensures Ray always shuts down cleanly even if training crashes
     try:
