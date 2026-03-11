@@ -5,7 +5,17 @@ from ray.rllib.algorithms.ppo.ppo import PPOConfig
 from ..envs.gridworld_env import GridWorldEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
-from pprint import pprint
+from ..logger.metricslogger import (
+    MetricsCallback,
+    build_eval,
+    build_eval_data,
+    build_train_iteration_data,
+    build_train,
+    metrics_path,
+    print_eval_summary,
+    write_metrics,
+)
+
 import matplotlib.pyplot as plt
 
 
@@ -46,6 +56,7 @@ def gridworld_train(checkpoint_path: str | None = None):
             vf_loss_coeff=0.5,  # Weight of the value function loss in the total loss
             entropy_coeff=0.01,  # Encourage exploration
         )
+        .callbacks(MetricsCallback)
         .evaluation(
             evaluation_num_env_runners=0
         )  # No separate evaluation environments. >0 = parallel evaluation of policy while training
@@ -53,11 +64,13 @@ def gridworld_train(checkpoint_path: str | None = None):
 
     algo = config.build_algo()
 
+    train_metrics_path = metrics_path("train")
     if checkpoint_path is not None:
         print("Restoring checkpoint from checkpoint:", checkpoint_path)
         algo.restore(checkpoint_path)
 
     rewards = []
+    episodes_data = []
 
     for i in range(250):
         result = algo.train()
@@ -67,6 +80,17 @@ def gridworld_train(checkpoint_path: str | None = None):
 
         mean = result["env_runners"]["agent_episode_returns_mean"]
         rewards.append(mean)
+        iteration_data = build_train_iteration_data(result, i + 1)
+        episodes_data.extend(iteration_data.get("episodes", []))
+
+        # Keep a live per-episode log while training is in progress.
+        write_metrics(train_metrics_path, {"episodes": episodes_data})
+
+    # Add final aggregate summary after all episodes are complete.
+    write_metrics(
+        train_metrics_path,
+        build_train(episodes_data, final_rewards=rewards[-1] if rewards else {}),
+    )
 
     iterations = list(range(1, len(rewards) + 1))
     evader_rewards = [r["evader"] for r in rewards]
@@ -89,9 +113,7 @@ def gridworld_train(checkpoint_path: str | None = None):
     plt.show()
 
 
-# for some reason this function creates 2 enviorments?
 def gridworld_test(checkpoint_path: str):
-    # Load the algorithm from checkpoint
     ray.init()
 
     register_env(
@@ -115,11 +137,21 @@ def gridworld_test(checkpoint_path: str):
         .env_runners(
             num_env_runners=1,
         )
+        .callbacks(MetricsCallback)
         .evaluation(evaluation_num_env_runners=1)
     )
 
     algo = config.build()
     algo.restore(checkpoint_path)
+
     results = algo.evaluate()
-    pprint(results)
+    eval_data = build_eval_data(results)
+    eval_episodes = eval_data.get("episodes", [])
+    eval_metrics_path = metrics_path("eval")
+    write_metrics(
+        eval_metrics_path,
+        build_eval(eval_episodes, fallback_summary=eval_data.get("summary", {})),
+    )
+    print_eval_summary(eval_data, eval_metrics_path)
+
     algo.stop()
