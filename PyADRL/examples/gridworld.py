@@ -39,25 +39,27 @@ def gridworld_train(checkpoint_path: str | None = None):
             ),
         )
         .learners(
-            num_learners=5,
+            num_learners=2,  # Number of parallel learner processes for computing gradients
         )
         .env_runners(
-            num_env_runners=4,
-            num_envs_per_env_runner=5,
+            num_env_runners=4,  # Number of processes/threads that run the environment in parallel
+            num_envs_per_env_runner=5,  # Number of environments per env_runner
         )
         .training(
-            train_batch_size=10000,  # Larger batches = more stable gradients
-            minibatch_size=512,
-            num_epochs=10,  # More SGD passes per batch
-            lr=3e-4,
-            gamma=0.99,
-            lambda_=0.95,
-            clip_param=0.2,
-            vf_loss_coeff=0.5,
+            train_batch_size=10000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
+            minibatch_size=512,  # Size of each mini batch for each SGD update
+            num_epochs=10,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
+            lr=3e-4,  # Learning rate for optimization
+            gamma=0.99,  # Discount factor: future rewards are multiplied by gamma
+            lambda_=0.95,  # Balances short-term, low-variance estimates against long-term, high-variance returns in GAE (General Advantage Estimation)
+            clip_param=0.2,  # The PPO clip parameter: Limits how much the policy can change in one update
+            vf_loss_coeff=0.5,  # Weight of the value function loss in the total loss
             entropy_coeff=0.01,  # Encourage exploration
         )
         .callbacks(MetricsCallback)
-        .evaluation(evaluation_num_env_runners=0)
+        .evaluation(
+            evaluation_num_env_runners=0
+        )  # No separate evaluation environments. >0 = parallel evaluation of policy while training
     )
 
     algo = config.build_algo()
