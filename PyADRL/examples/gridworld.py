@@ -1,3 +1,4 @@
+import random
 import grpc
 import ray
 import os
@@ -8,7 +9,22 @@ from ray.tune.registry import register_env
 from pprint import pprint
 import matplotlib.pyplot as plt
 
-ALTERNATING_CONST = 5
+# Probability of sampling an old opponent policy
+P_OLD = 0.3
+
+# Number of alternating stages and PPO iterations per stage
+N_STAGES = 4
+ITERS_PER_STAGE = 20
+
+
+def sample_opponent(pool: list[dict]) -> dict:
+    """With prob P_OLD sample a random old policy, otherwise use the latest."""
+    if len(pool) == 1:
+        return pool[-1]  # most recent
+    elif random.random() < P_OLD:
+        return random.choice(pool[:-1])  # Sample from all but the last opponent
+    else:
+        return pool[-1]
 
 
 def gridworld_train(checkpoint_path: str | None = None):
@@ -60,40 +76,61 @@ def gridworld_train(checkpoint_path: str | None = None):
         algo.restore(checkpoint_path)
 
     rewards = []
+    pursuer_pool: list[dict] = []
+    evader_pool: list[dict] = []
 
     # try/finally ensures Ray always shuts down cleanly even if training crashes
     try:
-        for i in range(50):
-            # Alternate which policy receives gradient updates each iteration.
-            # The frozen policy still plays in the environment but does not learn/update
-            # This forces each side to improve against a fixed opponent before switching
-            if i % ALTERNATING_CONST == 0:
-                policies_to_train = ["pursuer_policy"]
-                active = "pursuer"
-            else:
-                policies_to_train = ["evader_policy"]
-                active = "evader"
+        for k in range(N_STAGES):
+            # for every stage the evader trains against a frozen pursuer, then the pursuer trains against a frozen evader
+            for training_policy, frozen_policy, label, pool, opp_pool in [
+                (
+                    "evader_policy",
+                    "pursuer_policy",
+                    "evader",
+                    evader_pool,
+                    pursuer_pool,
+                ),
+                (
+                    "pursuer_policy",
+                    "evader_policy",
+                    "pursuer",
+                    pursuer_pool,
+                    evader_pool,
+                ),
+            ]:
+                print(f"\nStage {k + 1}: training {label}")
 
-            print(f"Iteration {i + 1}: training {active}")
+                # assert is needed because algo.config is typed as `AlgorithmConfig | None`
+                assert algo.config is not None
+                # Once the algorithm is built using build_algo(), RLlib locks the config as direct mutation is not intended.
+                # Only solution (i found) is to unfreeze it, change the multi-agent config, then refreeze it
+                algo.config._is_frozen = False
+                algo.config.multi_agent(policies_to_train=[training_policy])
+                algo.config._is_frozen = True
 
-            # assert is needed because algo.config is typed as `AlgorithmConfig | None`
-            assert algo.config is not None
-            # After build_algo(), RLlib freezes the config as mutation is not intended
-            # Only solution (i found) is to unfreeze it, change the multi-agent config, then freeze it again
-            algo.config._is_frozen = False
-            algo.config.multi_agent(policies_to_train=list(policies_to_train))
-            algo.config._is_frozen = True
+                for i in range(ITERS_PER_STAGE):
+                    # If pool has past policies, sample and load into frozen policy.
+                    if opp_pool:
+                        opp_weights = sample_opponent(opp_pool)
+                        assert algo.learner_group is not None
+                        algo.learner_group.set_weights({frozen_policy: opp_weights})
 
-            result = algo.train()
+                    result = algo.train()
+                    mean = result["env_runners"]["agent_episode_returns_mean"]
+                    rewards.append(mean)
+                    print(f"  iter {i + 1}: {mean}")
 
-            checkpoint_dir = os.path.abspath(f"./checkpoints4/iter_{i + 1}")
-            algo.save(checkpoint_dir=checkpoint_dir)
+                assert algo.learner_group is not None
+                # put the current training policy weights into the pool for future sampling
+                pool.append(algo.learner_group.get_weights()[training_policy])
 
-            mean = result["env_runners"]["agent_episode_returns_mean"]
-            rewards.append(mean)
-
+                check = os.path.abspath(f"./checkpoints/stage_{k + 1}_{label}")
+                algo.save(checkpoint_dir=check)
     finally:
+        print("Stopping algo")
         algo.stop()
+        print("Shutting down Ray")
         ray.shutdown()
 
     iterations = list(range(1, len(rewards) + 1))
