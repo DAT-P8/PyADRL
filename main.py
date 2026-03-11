@@ -5,6 +5,7 @@ import PyADRL.examples.gridworld
 GRIDWORLD = "gridworld"
 
 examples = [GRIDWORLD]
+log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,8 +38,12 @@ def parse_args() -> argparse.Namespace:
         "--number", type=int, required=False, help="An optional integer argument"
     )
 
-    # Example of flag argument:
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        required=False,
+        help=f"Log levels available: {', '.join(log_levels)}",
+    )
 
     return parser.parse_args()
 
@@ -46,8 +51,11 @@ def parse_args() -> argparse.Namespace:
 def main():
     args = parse_args()
 
-    if args.verbose:
-        print("Verbose mode enabled")
+    if args.log_level:
+        if args.log_level.upper() in log_levels:
+            os.environ["RAY_LOGGER_LEVEL"] = args.log_level.upper()
+    else:
+        os.environ["RAY_LOGGER_LEVEL"] = "ERROR"
 
     if args.train:
         if args.train == GRIDWORLD:
