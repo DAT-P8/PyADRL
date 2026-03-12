@@ -5,9 +5,27 @@ import grpc
 from .. import grid_world_pb2
 from ..utils.protobuf_utils import get_action
 from ..utils.gridworld_client import GridWorldClient
+from ..logger.metricslogger import EpisodeOutcome
 from gymnasium.spaces import Box, Discrete
 import numpy as np
 import time
+
+# Rewards for evader
+REWARD_EVADER_TARGET_REACHED = 100
+REWARD_EVADER_CAUGHT = -100
+REWARD_EVADER_OUT_OF_BOUNDS = -1000
+REWARD_EVADER_MAX_TIMESTEPS = 50
+REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
+REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
+
+# Rewards for pursuers
+REWARD_PURSUER_MAX_TIMESTEPS = -100  # Punish pursuers for not catching evader in time
+REWARD_PURSUER_TARGET_REACHED = -100  # Punish pursuers for letting evader reach target
+REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Reward for catching the evader yourself
+REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
+REWARD_PURSUER_DESTROYED = -1000
+REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
+
 
 # Rewards for evader
 REWARD_EVADER_TARGET_REACHED = 100
@@ -157,6 +175,7 @@ class GridWorldEnvironment(ParallelEnv):
         else:
             raise ValueError("Error in step")
 
+        outcome = EpisodeOutcome(episode_length=self.timestep + 1)
         if response.state.terminated:
             if (
                 self.evader.x == self.target_x and self.evader.y == self.target_y
@@ -165,6 +184,7 @@ class GridWorldEnvironment(ParallelEnv):
                 for pursuer in self.pursuer:
                     rewards[pursuer.name] += REWARD_PURSUER_TARGET_REACHED
                 terminations = {a: True for a in self.agents}
+                outcome.breached = True
             elif any(
                 pursuer.x == self.evader.x and pursuer.y == self.evader.y
                 for pursuer in self.pursuer
@@ -177,6 +197,8 @@ class GridWorldEnvironment(ParallelEnv):
                     else:
                         rewards[pursuer.name] += REWARD_PURSUER_CAUGHT_EVADER_OTHERS
                 terminations = {a: True for a in self.agents}
+                outcome.captured = True
+                outcome.capture_step = self.timestep + 1
             elif (
                 self.evader.x > 10
                 or self.evader.y > 10
@@ -216,9 +238,22 @@ class GridWorldEnvironment(ParallelEnv):
 
         self.timestep += 1
 
-        observations = self._get_obs()
-
         infos = {a: {} for a in self.agents}
+
+        is_done = any(terminations.values()) or any(truncations.values())
+        if is_done:
+            episode_metrics = {
+                "captured": 1.0 if outcome.captured else 0.0,
+                "breached": 1.0 if outcome.breached else 0.0,
+                "capture_step": float(outcome.capture_step)
+                if outcome.capture_step is not None
+                else 100.0,
+                "episode_length": float(outcome.episode_length),
+            }
+            for a in self.agents:
+                infos[a]["episode_metrics"] = episode_metrics
+
+        observations = self._get_obs()
 
         return observations, rewards, terminations, truncations, infos
 
