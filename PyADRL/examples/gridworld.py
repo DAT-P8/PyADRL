@@ -3,7 +3,6 @@ import grpc
 import ray
 import os
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
-from ray.rllib.core.learner import learner_group
 from ..envs.gridworld_env import GridWorldEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
