@@ -98,8 +98,6 @@ def gridworld_train(checkpoint_path: str | None = None):
     rewards = []
     episodes_data = []
 
-    # TODO: make sure that the if checkpoint is provided, stage will start from here
-
     # try/finally ensures Ray always shuts down cleanly even if training crashes
     try:
         for k in range(N_STAGES):
@@ -140,7 +138,6 @@ def gridworld_train(checkpoint_path: str | None = None):
                     result = algo.train()
                     mean = result["env_runners"]["agent_episode_returns_mean"]
                     rewards.append(mean)
-                    print(f"  iter {i + 1}: {mean}")
                     iteration_data = build_train_iteration_data(result, i + 1)
                     episodes_data.extend(iteration_data.get("episodes", []))
 
@@ -154,9 +151,7 @@ def gridworld_train(checkpoint_path: str | None = None):
                 check = os.path.abspath(f"./checkpoints/stage_{k + 1}_{label}")
                 algo.save(checkpoint_dir=check)
     finally:
-        print("Stopping algo")
         algo.stop()
-        print("Shutting down Ray")
         ray.shutdown()
 
     # Add final aggregate summary after all episodes are complete.
@@ -164,7 +159,6 @@ def gridworld_train(checkpoint_path: str | None = None):
         train_metrics_path,
         build_train(episodes_data, final_rewards=rewards[-1] if rewards else {}),
     )
-
 
     iterations = list(range(1, len(rewards) + 1))
     evader_rewards = [r["evader"] for r in rewards]
