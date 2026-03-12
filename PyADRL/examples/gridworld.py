@@ -1,3 +1,4 @@
+import random
 import grpc
 import ray
 import os
@@ -17,6 +18,23 @@ from ..logger.metricslogger import (
 )
 
 import matplotlib.pyplot as plt
+
+# Probability of sampling an old opponent policy
+P_OLD = 0.3
+
+# Number of alternating stages and PPO iterations per stage
+N_STAGES = 4
+ITERS_PER_STAGE = 20
+
+
+def sample_opponent(pool: list[dict]) -> dict:
+    """With prob P_OLD sample a random old policy, otherwise use the latest."""
+    if len(pool) == 1:
+        return pool[-1]  # most recent
+    elif random.random() < P_OLD:
+        return random.choice(pool[:-1])  # Sample from all but the last policy
+    else:
+        return pool[-1]
 
 
 def gridworld_train(checkpoint_path: str | None = None):
@@ -64,27 +82,76 @@ def gridworld_train(checkpoint_path: str | None = None):
 
     algo = config.build_algo()
 
+    pursuer_pool: list[dict] = []
+    evader_pool: list[dict] = []
+
     train_metrics_path = metrics_path("train")
     if checkpoint_path is not None:
         print("Restoring checkpoint from checkpoint:", checkpoint_path)
         algo.restore(checkpoint_path)
+        assert algo.learner_group is not None
+        weights = algo.learner_group.get_weights()
+        pursuer_pool.append(weights["pursuer_policy"])
+        evader_pool.append(weights["evader_policy"])
 
     rewards = []
     episodes_data = []
 
-    for i in range(250):
-        result = algo.train()
+    # try/finally ensures Ray always shuts down cleanly even if training crashes
+    try:
+        for k in range(N_STAGES):
+            # for every stage the evader trains against a frozen pursuer, then the pursuer trains against a frozen evader
+            for training_policy, frozen_policy, label, pool, opp_pool in [
+                (
+                    "evader_policy",
+                    "pursuer_policy",
+                    "evader",
+                    evader_pool,
+                    pursuer_pool,
+                ),
+                (
+                    "pursuer_policy",
+                    "evader_policy",
+                    "pursuer",
+                    pursuer_pool,
+                    evader_pool,
+                ),
+            ]:
+                print(f"\nStage {k + 1}: training {label}")
 
-        checkpoint_dir = os.path.abspath(f"./checkpoints/iter_{i + 1}")
-        algo.save(checkpoint_dir=checkpoint_dir)
+                # assert is needed because algo.config is typed as `AlgorithmConfig | None`
+                assert algo.config is not None
+                # Once the algorithm is built using build_algo(), RLlib locks the config as direct mutation is not intended.
+                # Only solution (i found) is to unfreeze it, change the multi-agent config, then refreeze it
+                algo.config._is_frozen = False
+                algo.config.multi_agent(policies_to_train=[training_policy])
+                algo.config._is_frozen = True
 
-        mean = result["env_runners"]["agent_episode_returns_mean"]
-        rewards.append(mean)
-        iteration_data = build_train_iteration_data(result, i + 1)
-        episodes_data.extend(iteration_data.get("episodes", []))
+                for i in range(ITERS_PER_STAGE):
+                    # If pool has past policies, sample and load into frozen policy.
+                    if opp_pool:
+                        opp_weights = sample_opponent(opp_pool)
+                        assert algo.learner_group is not None
+                        algo.learner_group.set_weights({frozen_policy: opp_weights})
 
-        # Keep a live per-episode log while training is in progress.
-        write_metrics(train_metrics_path, {"episodes": episodes_data})
+                    result = algo.train()
+                    mean = result["env_runners"]["agent_episode_returns_mean"]
+                    rewards.append(mean)
+                    iteration_data = build_train_iteration_data(result, i + 1)
+                    episodes_data.extend(iteration_data.get("episodes", []))
+
+                    # Keep a live per-episode log while training is in progress.
+                    write_metrics(train_metrics_path, {"episodes": episodes_data})
+
+                assert algo.learner_group is not None
+                # put the current training policy weights into the pool for future sampling
+                pool.append(algo.learner_group.get_weights()[training_policy])
+
+                check = os.path.abspath(f"./checkpoints/stage_{k + 1}_{label}")
+                algo.save(checkpoint_dir=check)
+    finally:
+        algo.stop()
+        ray.shutdown()
 
     # Add final aggregate summary after all episodes are complete.
     write_metrics(
