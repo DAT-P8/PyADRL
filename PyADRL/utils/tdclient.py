@@ -13,8 +13,9 @@ from ..TDF_pb2 import (
     TDFResetRequest,
     TDFResetResponse,
     TDFState,
-    TDFDroneAction
+    TDFDroneAction,
 )
+
 
 class TDDroneAction:
     def __init__(self, id: int, x_f: float, y_f: float, z_f: float) -> None:
@@ -27,8 +28,10 @@ class TDDroneAction:
         return TDFDroneAction(id=self.id, x_f=self.x_f, y_f=self.y_f, z_f=self.z_f)
 
 
-T = TypeVar('T')
-R = TypeVar('R')
+T = TypeVar("T")
+R = TypeVar("R")
+
+
 class Result(Generic[T, R]):
     def __init__(self, ok: T | None = None, notok: R | None = None) -> None:
         super().__init__()
@@ -67,7 +70,7 @@ class TDClient:
         pursuer_dome_radius: float,
         arena_dome_radius: float,
         drone_max_speed: float,
-        seed: int
+        seed: int,
     ) -> Result[TDFState, str]:
         request: TDFNewRequest = TDFNewRequest(
             evader_count=evader_count,
@@ -76,7 +79,7 @@ class TDClient:
             pursuer_dome_radius=pursuer_dome_radius,
             arena_dome_radius=arena_dome_radius,
             drone_max_speed=drone_max_speed,
-            seed=seed
+            seed=seed,
         )
         response: TDFNewResponse = self.stub.New(request)
 
@@ -87,12 +90,12 @@ class TDClient:
             return Result(ok=None, notok=response.error_msg)
         else:
             raise Exception(f"Did not recognize response case: {e}")
-    
 
-    def DoStep(self, id: int, actions: Iterable[TDDroneAction]) -> Result[TDFState, str]:
+    def DoStep(
+        self, id: int, actions: Iterable[TDDroneAction]
+    ) -> Result[TDFState, str]:
         request: TDFDoStepRequest = TDFDoStepRequest(
-            id=id,
-            drone_actions=[a.to_dto() for a in actions]
+            id=id, drone_actions=[a.to_dto() for a in actions]
         )
         response: TDFDoStepResponse = self.stub.DoStep(request)
 
@@ -104,24 +107,18 @@ class TDClient:
         else:
             raise Exception(f"Did not recognize response case: {e}")
 
-
     def Close(self, id: int) -> Result[None, str]:
-        request: TDFCloseRequest = TDFCloseRequest(
-            id=id
-        )
+        request: TDFCloseRequest = TDFCloseRequest(id=id)
         response: TDFCloseResponse = self.stub.Close(request)
         if response.HasField("error_msg"):
             return Result(notok=response.error_msg)
         else:
             return Result(ok=None)
 
-
     def Reset(self, id: int) -> Result[TDFState, str]:
-        request: TDFResetRequest = TDFResetRequest(
-            id=id
-        )
+        request: TDFResetRequest = TDFResetRequest(id=id)
         response: TDFResetResponse = self.stub.Reset(request)
-        
+
         e = response.WhichOneof("error_case")
         if e == "state":
             return Result(ok=response.state)
