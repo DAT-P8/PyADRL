@@ -219,3 +219,6 @@ checkpoints/
 
 #Results
 results/ 
+
+# python version
+/.python-version
