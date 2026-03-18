@@ -91,12 +91,13 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
     train_metrics_path = metrics_path("train")
     if checkpoint is not None:
         print("Restoring checkpoint from checkpoint:", checkpoint)
-        checkpoint_dir, start_iteration = restore_training(algo, checkpoint, pursuer_pool, evader_pool, model_name=model_name)
-        print(f"Resumed training from checkpoint at {checkpoint_dir} starting at iteration {start_iteration}")
+        checkpoint_dir, start_iteration = restore_training(
+            algo, checkpoint, pursuer_pool, evader_pool, model_name=model_name
+        )
     else:
         checkpoint_dir = setup_checkpoint_dir(model_name=model_name)
-        print(f"No checkpoint specified. Starting new training run with checkpoints at {checkpoint_dir}")
-    
+        print(f"No checkpoint specified. Starting new training run at {checkpoint_dir}")
+
     rewards = []
     episodes_data = []
 
@@ -150,9 +151,11 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
                 # put the current training policy weights into the pool for future sampling
                 pool.append(algo.learner_group.get_weights()[training_policy])
 
-                if label == "pursuer":  # Save a checkpoint after each full stage (evader+pursuer training)
-                    print(f"Saving checkpoint stage {k + 1} at location {checkpoint_dir}/cp_{k + 1:05d}")
-                    check = os.path.abspath(f"{checkpoint_dir}/cp_{k + 1:05d}") # :05d for zero padding e.g. CP_00012 instead of CP_12
+                # Save a checkpoint after each full stage (evader+pursuer training)
+                if label == "pursuer":
+                    # {k + 1:05d} for zero padding e.g. CP_00012 instead of CP_12
+                    print(f"Saving stage {k + 1} at {checkpoint_dir}/cp_{k + 1:05d}")
+                    check = os.path.abspath(f"{checkpoint_dir}/cp_{k + 1:05d}")
                     algo.save(checkpoint_dir=check)
     finally:
         algo.stop()
@@ -214,7 +217,7 @@ def gridworld_test(checkpoint_path: str):
     )
 
     algo = config.build()
-    restore_testing(algo, checkpoint_path) 
+    restore_testing(algo, checkpoint_path)
 
     results = algo.evaluate()
     eval_data = build_eval_data(results)
