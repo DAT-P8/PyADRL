@@ -18,6 +18,7 @@ from ..logger.metricslogger import (
 )
 
 import matplotlib.pyplot as plt
+from ..utils.model_save import restore_testing, restore_training, setup_checkpoint_dir
 
 # Probability of sampling an old opponent policy
 P_OLD = 0.3
@@ -37,7 +38,7 @@ def sample_opponent(pool: list[dict]) -> dict:
         return pool[-1]
 
 
-def gridworld_train(checkpoint_path: str | None = None):
+def gridworld_train(checkpoint: str | None = None, model_name: str | None = None):
     ray.init(log_to_driver=False)
 
     register_env(
@@ -64,9 +65,9 @@ def gridworld_train(checkpoint_path: str | None = None):
             num_envs_per_env_runner=5,  # Number of environments per env_runner
         )
         .training(
-            train_batch_size=10000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
-            minibatch_size=512,  # Size of each mini batch for each SGD update
-            num_epochs=10,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
+            train_batch_size=1000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
+            minibatch_size=256,  # Size of each mini batch for each SGD update
+            num_epochs=1,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
             lr=3e-4,  # Learning rate for optimization
             gamma=0.99,  # Discount factor: future rewards are multiplied by gamma
             lambda_=0.95,  # Balances short-term, low-variance estimates against long-term, high-variance returns in GAE (General Advantage Estimation)
@@ -84,22 +85,24 @@ def gridworld_train(checkpoint_path: str | None = None):
 
     pursuer_pool: list[dict] = []
     evader_pool: list[dict] = []
+    start_iteration = 0
+    checkpoint_dir = ""
 
     train_metrics_path = metrics_path("train")
-    if checkpoint_path is not None:
-        print("Restoring checkpoint from checkpoint:", checkpoint_path)
-        algo.restore(checkpoint_path)
-        assert algo.learner_group is not None
-        weights = algo.learner_group.get_weights()
-        pursuer_pool.append(weights["pursuer_policy"])
-        evader_pool.append(weights["evader_policy"])
-
+    if checkpoint is not None:
+        print("Restoring checkpoint from checkpoint:", checkpoint)
+        checkpoint_dir, start_iteration = restore_training(algo, checkpoint, pursuer_pool, evader_pool, model_name=model_name)
+        print(f"Resumed training from checkpoint at {checkpoint_dir} starting at iteration {start_iteration}")
+    else:
+        checkpoint_dir = setup_checkpoint_dir(model_name=model_name)
+        print(f"No checkpoint specified. Starting new training run with checkpoints at {checkpoint_dir}")
+    
     rewards = []
     episodes_data = []
 
     # try/finally ensures Ray always shuts down cleanly even if training crashes
     try:
-        for k in range(N_STAGES):
+        for k in range(start_iteration, start_iteration + N_STAGES):
             # for every stage the evader trains against a frozen pursuer, then the pursuer trains against a frozen evader
             for training_policy, frozen_policy, label, pool, opp_pool in [
                 (
@@ -147,8 +150,10 @@ def gridworld_train(checkpoint_path: str | None = None):
                 # put the current training policy weights into the pool for future sampling
                 pool.append(algo.learner_group.get_weights()[training_policy])
 
-                check = os.path.abspath(f"./checkpoints/stage_{k + 1}_{label}")
-                algo.save(checkpoint_dir=check)
+                if label == "pursuer":  # Save a checkpoint after each full stage (evader+pursuer training)
+                    print(f"Saving checkpoint stage {k + 1} at location {checkpoint_dir}/cp_{k + 1:05d}")
+                    check = os.path.abspath(f"{checkpoint_dir}/cp_{k + 1:05d}") # :05d for zero padding e.g. CP_00012 instead of CP_12
+                    algo.save(checkpoint_dir=check)
     finally:
         algo.stop()
         ray.shutdown()
@@ -209,7 +214,7 @@ def gridworld_test(checkpoint_path: str):
     )
 
     algo = config.build()
-    algo.restore(checkpoint_path)
+    restore_testing(algo, checkpoint_path) 
 
     results = algo.evaluate()
     eval_data = build_eval_data(results)

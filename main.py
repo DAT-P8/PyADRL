@@ -1,5 +1,4 @@
 import argparse
-import os
 import PyADRL.examples.gridworld
 
 GRIDWORLD = "gridworld"
@@ -25,20 +24,22 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--checkpoint",
+        "--restore", "-r",
         type=str,
         required=False,
         default=None,
-        help="Example: ./checkpoint/iter_100",
+        help="Example: ./checkpoint/iter_100 or model_001 (if you have a folder in checkpoints with that name)." \
+        " If specified, the model will be restored from the checkpoint and training/testing will resume from there.",
     )
 
-    # Example of number parsing:
     parser.add_argument(
-        "--number", type=int, required=False, help="An optional integer argument"
+        "--name", "-n",
+        type=str,
+        required=False,
+        default=None,
+        help="Name for folder that will contain checkpoints inside ./checkpoints. Example: model_001. " \
+        "Can be used in combination with --restore to train a new model from an old checkpoint",
     )
-
-    # Example of flag argument:
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 
     return parser.parse_args()
 
@@ -46,36 +47,29 @@ def parse_args() -> argparse.Namespace:
 def main():
     args = parse_args()
 
-    if args.verbose:
-        print("Verbose mode enabled")
-
     if args.train:
         if args.train == GRIDWORLD:
-            checkpoint = args.checkpoint
+            checkpoint = args.restore
+            model_name = args.name if args.name else None
 
             print("Training gridworld example:")
-            if checkpoint:
-                PyADRL.examples.gridworld.gridworld_train(
-                    checkpoint_path=os.path.abspath(checkpoint)
-                )
-            else:
-                PyADRL.examples.gridworld.gridworld_train()
+            PyADRL.examples.gridworld.gridworld_train(checkpoint=checkpoint, model_name=model_name)
+        else:
+            print(f"Unknown train example: {args.train}. Available examples: {', '.join(examples)}")
 
     if args.test:
         if args.test == GRIDWORLD:
-            checkpoint = args.checkpoint
+            checkpoint = args.restore
 
             if checkpoint is None:
-                print("You need to specify a checkpoint with --checkpoint")
+                print("You need to specify a checkpoint with --restore")
             else:
                 print("Testing gridworld example:")
                 PyADRL.examples.gridworld.gridworld_test(
-                    checkpoint_path=os.path.abspath(checkpoint)
+                    checkpoint_path=checkpoint
                 )
-
-    if args.number is not None:
-        print(f"Number argument: {args.number}")
-
+        else:
+            print(f"Unknown test example: {args.test}. Available examples: {', '.join(examples)}")
 
 if __name__ == "__main__":
     main()
