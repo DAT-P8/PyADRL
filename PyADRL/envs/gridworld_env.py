@@ -144,7 +144,7 @@ class GridWorldEnvironment(ParallelEnv):
                     drone_state.destroyed and not drone_state.is_evader
                 ):  # Pursuer destroyed
                     for pursuer in self.pursuer:
-                        if pursuer.id == drone_state.id:
+                        if pursuer.id == drone_state.id and not pursuer.destroyed:
                             pursuer.destroyed = True
                             rewards[pursuer.name] += REWARD_PURSUER_DESTROYED
                 if drone_state.is_evader:  # Update evader position
