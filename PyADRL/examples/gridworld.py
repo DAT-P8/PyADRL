@@ -65,9 +65,9 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
             num_envs_per_env_runner=5,  # Number of environments per env_runner
         )
         .training(
-            train_batch_size=1000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
-            minibatch_size=256,  # Size of each mini batch for each SGD update
-            num_epochs=1,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
+            train_batch_size=10000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
+            minibatch_size=512,  # Size of each mini batch for each SGD update
+            num_epochs=10,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
             lr=3e-4,  # Learning rate for optimization
             gamma=0.99,  # Discount factor: future rewards are multiplied by gamma
             lambda_=0.95,  # Balances short-term, low-variance estimates against long-term, high-variance returns in GAE (General Advantage Estimation)
@@ -153,7 +153,7 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
 
                 # Save a checkpoint after each full stage (evader+pursuer training)
                 if label == "pursuer":
-                    # {k + 1:05d} for zero padding e.g. CP_00012 instead of CP_12
+                    # {k + 1:05d} for zero padding e.g. cp_00012 instead of cp_12
                     print(f"Saving stage {k + 1} at {checkpoint_dir}/cp_{k + 1:05d}")
                     check = os.path.abspath(f"{checkpoint_dir}/cp_{k + 1:05d}")
                     algo.save(checkpoint_dir=check)
