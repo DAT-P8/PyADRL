@@ -38,6 +38,8 @@ def sample_opponent(pool: list[dict]) -> dict:
 
 
 def gridworld_train(checkpoint_path: str | None = None):
+    # If Ray is already initialized from a previous run, shut it down before starting a new one.
+    ray.shutdown()
     ray.init(log_to_driver=False)
 
     register_env(
@@ -119,21 +121,27 @@ def gridworld_train(checkpoint_path: str | None = None):
             ]:
                 print(f"\nStage {k + 1}: training {label}")
 
+                assert algo.learner_group is not None
+
                 # assert is needed because algo.config is typed as `AlgorithmConfig | None`
                 assert algo.config is not None
                 # Once the algorithm is built using build_algo(), RLlib locks the config as direct mutation is not intended.
                 # Only solution (i found) is to unfreeze it, change the multi-agent config, then refreeze it
                 algo.config._is_frozen = False
-                algo.config.multi_agent(policies_to_train=[training_policy])
+                # Update the learn_group config
+                algo.learner_group.foreach_learner(
+                    lambda learner, *args: learner.config.multi_agent(
+                        policies_to_train=[training_policy]
+                    )
+                )
                 algo.config._is_frozen = True
 
-                for i in range(ITERS_PER_STAGE):
-                    # If pool has past policies, sample and load into frozen policy.
-                    if opp_pool:
-                        opp_weights = sample_opponent(opp_pool)
-                        assert algo.learner_group is not None
-                        algo.learner_group.set_weights({frozen_policy: opp_weights})
+                # If pool has past policies, sample and load into frozen policy.
+                if opp_pool:
+                    opp_weights = sample_opponent(opp_pool)
+                    algo.learner_group.set_weights({frozen_policy: opp_weights})
 
+                for i in range(ITERS_PER_STAGE):
                     result = algo.train()
                     mean = result["env_runners"]["agent_episode_returns_mean"]
                     rewards.append(mean)
@@ -145,7 +153,8 @@ def gridworld_train(checkpoint_path: str | None = None):
 
                 assert algo.learner_group is not None
                 # put the current training policy weights into the pool for future sampling
-                pool.append(algo.learner_group.get_weights()[training_policy])
+                updated_weights = algo.learner_group.get_weights()[training_policy]
+                pool.append(updated_weights)
 
                 check = os.path.abspath(f"./checkpoints/stage_{k + 1}_{label}")
                 algo.save(checkpoint_dir=check)
