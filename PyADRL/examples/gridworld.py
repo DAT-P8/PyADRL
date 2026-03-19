@@ -128,6 +128,7 @@ def gridworld_train(checkpoint_path: str | None = None):
                 # Once the algorithm is built using build_algo(), RLlib locks the config as direct mutation is not intended.
                 # Only solution (i found) is to unfreeze it, change the multi-agent config, then refreeze it
                 algo.config._is_frozen = False
+                # Update the learn_group config
                 algo.learner_group.foreach_learner(
                     lambda learner, *args: learner.config.multi_agent(
                         policies_to_train=[training_policy]
