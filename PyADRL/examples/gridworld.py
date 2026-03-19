@@ -126,32 +126,30 @@ def gridworld_train(checkpoint_path: str | None = None):
                 ),
             ]:
                 print(f"\nStage {k + 1}: training {label}")
-        for i in range(10):
-            result = algo.train()
 
-            # assert is needed because algo.config is typed as `AlgorithmConfig | None`
-            assert algo.config is not None
-            # Once the algorithm is built using build_algo(), RLlib locks the config as direct mutation is not intended.
-            # Only solution (i found) is to unfreeze it, change the multi-agent config, then refreeze it
-            algo.config._is_frozen = False
-            algo.config.multi_agent(policies_to_train=[training_policy])
-            algo.config._is_frozen = True
+                # assert is needed because algo.config is typed as `AlgorithmConfig | None`
+                assert algo.config is not None
+                # Once the algorithm is built using build_algo(), RLlib locks the config as direct mutation is not intended.
+                # Only solution (i found) is to unfreeze it, change the multi-agent config, then refreeze it
+                algo.config._is_frozen = False
+                algo.config.multi_agent(policies_to_train=[training_policy])
+                algo.config._is_frozen = True
 
-            for i in range(ITERS_PER_STAGE):
-            # If pool has past policies, sample and load into frozen policy.
-                if opp_pool:
-                    opp_weights = sample_opponent(opp_pool)
-                assert algo.learner_group is not None
-                algo.learner_group.set_weights({frozen_policy: opp_weights})
+                for i in range(ITERS_PER_STAGE):
+                # If pool has past policies, sample and load into frozen policy.
+                    if opp_pool:
+                        opp_weights = sample_opponent(opp_pool)
+                        assert algo.learner_group is not None
+                        algo.learner_group.set_weights({frozen_policy: opp_weights})
 
-                result = algo.train()
-                mean = result["env_runners"]["agent_episode_returns_mean"]
-                rewards.append(mean)
-                iteration_data = build_train_iteration_data(result, i + 1)
-                episodes_data.extend(iteration_data.get("episodes", []))
+                    result = algo.train()
+                    mean = result["env_runners"]["agent_episode_returns_mean"]
+                    rewards.append(mean)
+                    iteration_data = build_train_iteration_data(result, i + 1)
+                    episodes_data.extend(iteration_data.get("episodes", []))
 
-                # Keep a live per-episode log while training is in progress.
-                write_metrics(train_metrics_path, {"episodes": episodes_data})
+                    # Keep a live per-episode log while training is in progress.
+                    write_metrics(train_metrics_path, {"episodes": episodes_data})
 
                 assert algo.learner_group is not None
                 # put the current training policy weights into the pool for future sampling
