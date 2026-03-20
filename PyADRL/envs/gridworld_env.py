@@ -15,15 +15,17 @@ REWARD_EVADER_TARGET_REACHED = 100
 REWARD_EVADER_CAUGHT = -100
 REWARD_EVADER_OUT_OF_BOUNDS = -1000
 REWARD_EVADER_MAX_TIMESTEPS = 50
-REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
+REWARD_EVADER_FAR_FROM_TARGET = -1  # Multiplier for distance to target
 REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
 
 # Rewards for pursuers
+REWARD_PURSUER_TIME_PENALTY = -1  # Punish for taking too long catching the evader
 REWARD_PURSUER_MAX_TIMESTEPS = -100  # Punish pursuers for not catching evader in time
 REWARD_PURSUER_TARGET_REACHED = -100  # Punish pursuers for letting evader reach target
 REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Reward for catching the evader yourself
+REWARD_EVADER_LEFT_AREA = 100  # Evader left or got chased off the map
 REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
-REWARD_PURSUER_DESTROYED = -1000
+REWARD_PURSUER_DESTROYED = -1000  # Punish for crashing/OOB
 REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
 
 
@@ -144,7 +146,14 @@ class GridWorldEnvironment(ParallelEnv):
                     drone_state.destroyed and not drone_state.is_evader
                 ):  # Pursuer destroyed
                     for pursuer in self.pursuer:
-                        if pursuer.id == drone_state.id and not pursuer.destroyed:
+                        if (
+                            pursuer.id == drone_state.id
+                            and not pursuer.destroyed
+                            and not (
+                                pursuer.x == self.evader.x
+                                and pursuer.y == self.evader.y
+                            )
+                        ):
                             pursuer.destroyed = True
                             rewards[pursuer.name] += REWARD_PURSUER_DESTROYED
                 if drone_state.is_evader:  # Update evader position
@@ -155,11 +164,14 @@ class GridWorldEnvironment(ParallelEnv):
                         if pursuer.id == drone_state.id:
                             pursuer.x = drone_state.x
                             pursuer.y = drone_state.y
+                            # Penalise taking time
+                            rewards[pursuer.name] += REWARD_PURSUER_TIME_PENALTY
         else:
             raise ValueError("Error in step")
 
         outcome = EpisodeOutcome(episode_length=self.timestep + 1)
         if response.state.terminated:
+            # TODO: If all pursuers are destroyed, reward evader
             if (
                 self.evader.x == self.target_x and self.evader.y == self.target_y
             ):  # Evader reached target
@@ -183,12 +195,15 @@ class GridWorldEnvironment(ParallelEnv):
                 outcome.captured = True
                 outcome.capture_step = self.timestep + 1
             elif (
+                # TODO: This is hardcoded :(
                 self.evader.x > 10
                 or self.evader.y > 10
                 or self.evader.x < 0
                 or self.evader.y < 0
             ):  # Evader out of bounds
                 rewards[self.evader.name] += REWARD_EVADER_OUT_OF_BOUNDS
+                for pursuer in self.pursuer:
+                    rewards[pursuer.name] += REWARD_EVADER_LEFT_AREA
                 terminations = {a: True for a in self.agents}
 
         if self.timestep >= 100:  # Max timesteps reached
@@ -199,6 +214,7 @@ class GridWorldEnvironment(ParallelEnv):
 
         # punish the pursuers for being far from the evader to encourage them to move towards the evader
         for pursuer in self.pursuer:
+            # TODO: This should be hamiltonian distance to comply with our environment
             distance_to_evader = np.sqrt(
                 (pursuer.x - self.evader.x) ** 2 + (pursuer.y - self.evader.y) ** 2
             )
@@ -206,12 +222,14 @@ class GridWorldEnvironment(ParallelEnv):
 
         # punish the evader for being far from the target to encourage it to move towards the target
         distance_to_target = np.sqrt(
+            # TODO: This should be hamiltonian distance to comply with our environment
             (self.evader.x - self.target_x) ** 2 + (self.evader.y - self.target_y) ** 2
         )
         rewards[self.evader.name] += distance_to_target * REWARD_EVADER_FAR_FROM_TARGET
 
         # reward the evader for being far from the pursuers to encourage it to move away from the pursuers
         closest_pursuer_distance = min(
+            # TODO: This should be hamiltonian distance to comply with our environment
             np.sqrt((pursuer.x - self.evader.x) ** 2 + (pursuer.y - self.evader.y) ** 2)
             for pursuer in self.pursuer
         )
