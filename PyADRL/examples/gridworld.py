@@ -74,7 +74,7 @@ def gridworld_train(checkpoint_path: str | None = None):
             vf_loss_coeff=0.5,  # Weight of the value function loss in the total loss
             entropy_coeff=0.01,  # Encourage exploration
         )
-        .callbacks(MetricsCallback)
+        #.callbacks(MetricsCallback)
         .evaluation(
             evaluation_num_env_runners=0
         )  # No separate evaluation environments. >0 = parallel evaluation of policy while training
@@ -187,7 +187,7 @@ def gridworld_test(checkpoint_path: str):
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
             GridWorldEnvironment(
-                channel=grpc.insecure_channel("localhost:50051"), step_delay=0.2
+                channel=grpc.insecure_channel("localhost:50051"), step_delay=0.2, zero_sum=True
             )
         ),
     )
@@ -204,7 +204,7 @@ def gridworld_test(checkpoint_path: str):
         .env_runners(
             num_env_runners=1,
         )
-        .callbacks(MetricsCallback)
+        #.callbacks(MetricsCallback)
         .evaluation(evaluation_num_env_runners=1)
     )
 

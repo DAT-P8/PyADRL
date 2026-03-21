@@ -13,19 +13,20 @@ import time
 # Rewards for evader
 REWARD_EVADER_TARGET_REACHED = 100
 REWARD_EVADER_CAUGHT = -100
-REWARD_EVADER_OUT_OF_BOUNDS = -1000
+REWARD_EVADER_OUT_OF_BOUNDS = -100
 REWARD_EVADER_MAX_TIMESTEPS = 50
-REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
-REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
+REWARD_EVADER_FAR_FROM_TARGET = -0.1  # Muiltiplier for distance to target
+REWARD_EVADER_FAR_FROM_PUSUERS = 0.1  # Multiplier for distance to closest pursuer
 
 # Rewards for pursuers
 REWARD_PURSUER_MAX_TIMESTEPS = -100  # Punish pursuers for not catching evader in time
 REWARD_PURSUER_TARGET_REACHED = -100  # Punish pursuers for letting evader reach target
 REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Reward for catching the evader yourself
 REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
-REWARD_PURSUER_DESTROYED = -1000
-REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
+REWARD_PURSUER_DESTROYED = -100
+REWARD_PURSUER_FAR_FROM_EVADER = -0.1  # Multiplier for distance to evader
 
+MAX_TIMESTEPS = 100
 
 class Drone:
     def __init__(self, id: int, x: int, y: int, is_evader: bool):
@@ -42,10 +43,16 @@ class GridWorldEnvironment(ParallelEnv):
         "name": "gridworld_environment_v0",
     }
 
-    def __init__(self, channel: grpc.Channel, step_delay: float = 0.0):
+    def __init__(
+            self,
+            channel: grpc.Channel,
+            step_delay: float = 0.0,
+            zero_sum: bool = False
+    ):
         self.id: int | None = None
         self.client = GridWorldClient(channel)
         self.step_delay = step_delay  # Delay to slow down steps for visualization
+        self.zero_sum = zero_sum
         self.target_x: int = 5
         self.target_y: int = 5
         self.pursuer: list[Drone] = []
@@ -123,13 +130,11 @@ class GridWorldEnvironment(ParallelEnv):
                 id=self.evader.id, action=get_action(actions["evader"])
             ),
         ]
-        for i, pursuer in enumerate(
-            self.pursuer
-        ):  # add the pursuer actions if they are not destroyed
+        for pursuer in self.pursuer: # add the pursuer actions if they are not destroyed
             if not pursuer.destroyed:
                 actions_send.append(
                     grid_world_pb2.GWDroneAction(
-                        id=pursuer.id, action=get_action(actions[f"pursuer_{i}"])
+                        id=pursuer.id, action=get_action(actions[pursuer.name])
                     )
                 )
 
@@ -158,6 +163,7 @@ class GridWorldEnvironment(ParallelEnv):
         else:
             raise ValueError("Error in step")
 
+        self.timestep += 1
         outcome = EpisodeOutcome(episode_length=self.timestep + 1)
         if response.state.terminated:
             if (
@@ -191,35 +197,45 @@ class GridWorldEnvironment(ParallelEnv):
                 rewards[self.evader.name] += REWARD_EVADER_OUT_OF_BOUNDS
                 terminations = {a: True for a in self.agents}
 
-        if self.timestep >= 100:  # Max timesteps reached
+        if not any(terminations.values()) and self.timestep >= MAX_TIMESTEPS:
             rewards[self.evader.name] += REWARD_EVADER_MAX_TIMESTEPS
             for pursuer in self.pursuer:
                 rewards[pursuer.name] += REWARD_PURSUER_MAX_TIMESTEPS
             truncations = {a: True for a in self.agents}
 
-        # punish the pursuers for being far from the evader to encourage them to move towards the evader
-        for pursuer in self.pursuer:
-            distance_to_evader = np.sqrt(
-                (pursuer.x - self.evader.x) ** 2 + (pursuer.y - self.evader.y) ** 2
-            )
-            rewards[pursuer.name] += distance_to_evader * REWARD_PURSUER_FAR_FROM_EVADER
+        is_done = any(terminations.values()) or any(truncations.values())
+        if not is_done:
+            for pursuer in self.pursuer:
+                if pursuer.destroyed:
+                    continue
+                distance_to_evader = np.sqrt(
+                    (pursuer.x - self.evader.x) ** 2 + (pursuer.y - self.evader.y) ** 2
+                )
+                rewards[pursuer.name] += distance_to_evader * REWARD_PURSUER_FAR_FROM_EVADER
 
-        # punish the evader for being far from the target to encourage it to move towards the target
-        distance_to_target = np.sqrt(
-            (self.evader.x - self.target_x) ** 2 + (self.evader.y - self.target_y) ** 2
-        )
-        rewards[self.evader.name] += distance_to_target * REWARD_EVADER_FAR_FROM_TARGET
+                # punish the evader for being far from the target to encourage it to move towards the target
+                distance_to_target = np.sqrt(
+                    (self.evader.x - self.target_x) ** 2 + (self.evader.y - self.target_y) ** 2
+                )
+                rewards[self.evader.name] += distance_to_target * REWARD_EVADER_FAR_FROM_TARGET
 
-        # reward the evader for being far from the pursuers to encourage it to move away from the pursuers
-        closest_pursuer_distance = min(
-            np.sqrt((pursuer.x - self.evader.x) ** 2 + (pursuer.y - self.evader.y) ** 2)
-            for pursuer in self.pursuer
-        )
-        rewards[self.evader.name] += (
-            closest_pursuer_distance * REWARD_EVADER_FAR_FROM_PUSUERS
-        )
+                alive_pursuers = [p for p in self.pursuer if not p.destroyed]
+                if alive_pursuers:
+                    # reward the evader for being far from the pursuers to encourage it to move away from the pursuers
+                    closest_pursuer_distance = min(
+                        np.sqrt((pursuer.x - self.evader.x) ** 2 + (pursuer.y - self.evader.y) ** 2)
+                        for pursuer in self.pursuer
+                    )
+                    rewards[self.evader.name] += (
+                        closest_pursuer_distance * REWARD_EVADER_FAR_FROM_PUSUERS
+                    )
 
-        self.timestep += 1
+        # If zero-sum, make pursuer rewards the negative of the evader reward divided by the number of pursuers
+        if self.zero_sum:
+            evader_reward = rewards[self.evader.name]
+            pursuer_share = -evader_reward / max(len(self.pursuer), 1)
+            for pursuer in self.pursuer:
+                rewards[pursuer.name] = pursuer_share
 
         infos = {a: {} for a in self.agents}
 
