@@ -45,7 +45,7 @@ def gridworld_train(checkpoint_path: str | None = None):
     register_env(
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
-            GridWorldEnvironment(channel=grpc.insecure_channel("localhost:50051"))
+            GridWorldEnvironment(channel=grpc.insecure_channel("localhost:50051"),zero_sum=True)
         ),
     )
 
