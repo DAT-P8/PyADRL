@@ -14,7 +14,8 @@ def checkpoint_exists(checkpoint_path: str) -> bool:
 
 def restore_checkpoint(algo, checkpoint_path: str, model_name: str | None = None):
     """ "Restore from checkpoint. If checkpoint_path is the model name e.g "model_001",
-    it will restore newest CP from that model. If it's a file, it will restore from that file."""
+    it will restore newest CP from that model. If it's a path to a checkpoint folder, 
+    e.g. "./checkpoints/model_001/cp_00010", it will restore from that exact checkpoint."""
 
     if os.path.dirname(checkpoint_path):
         print("Restoring checkpoint from file:", checkpoint_path)
