@@ -210,6 +210,9 @@ __marimo__/
 *grid_world_pb2_grpc.py
 *grid_world_pb2.py
 *grid_world_pb2.pyi
+*TDF_pb2.py
+*TDF_pb2.pyi
+*TDF_pb2_grpc.py
 
 # checkpoints folder
 checkpoints/
@@ -219,3 +222,5 @@ results/
 
 # MacOS
 .DS_Store
+# python version
+/.python-version

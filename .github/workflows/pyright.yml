@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-python@v5
         with:
@@ -18,5 +20,8 @@ jobs:
 
       - name: Install dependencies
         run: pip install .
+
+      - name: Run build script
+        run: bash build.sh
 
       - uses: jakebailey/pyright-action@v1

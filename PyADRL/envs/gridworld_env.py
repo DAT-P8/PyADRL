@@ -27,23 +27,6 @@ REWARD_PURSUER_DESTROYED = -1000
 REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
 
 
-# Rewards for evader
-REWARD_EVADER_TARGET_REACHED = 100
-REWARD_EVADER_CAUGHT = -100
-REWARD_EVADER_OUT_OF_BOUNDS = -1000
-REWARD_EVADER_MAX_TIMESTEPS = 50
-REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
-REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
-
-# Rewards for pursuers
-REWARD_PURSUER_MAX_TIMESTEPS = -100  # Punish pursuers for not catching evader in time
-REWARD_PURSUER_TARGET_REACHED = -100  # Punish pursuers for letting evader reach target
-REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Reward for catching the evader yourself
-REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
-REWARD_PURSUER_DESTROYED = -1000
-REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
-
-
 class Drone:
     def __init__(self, id: int, x: int, y: int, is_evader: bool):
         self.id: int = id
@@ -161,7 +144,7 @@ class GridWorldEnvironment(ParallelEnv):
                     drone_state.destroyed and not drone_state.is_evader
                 ):  # Pursuer destroyed
                     for pursuer in self.pursuer:
-                        if pursuer.id == drone_state.id:
+                        if pursuer.id == drone_state.id and not pursuer.destroyed:
                             pursuer.destroyed = True
                             rewards[pursuer.name] += REWARD_PURSUER_DESTROYED
                 if drone_state.is_evader:  # Update evader position
