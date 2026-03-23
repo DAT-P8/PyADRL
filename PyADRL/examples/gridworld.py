@@ -17,6 +17,7 @@ from ..logger.metricslogger import (
     write_metrics,
 )
 
+import torch
 import matplotlib.pyplot as plt
 from ..utils.model_save import restore_testing, restore_training, setup_checkpoint_dir
 
@@ -27,6 +28,12 @@ P_OLD = 0.3
 N_STAGES = 4
 ITERS_PER_STAGE = 20
 
+def get_device():
+    if torch.cuda.is_available():
+        return "cuda"
+    elif torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
 def sample_opponent(pool: list[dict]) -> dict:
     """With prob P_OLD sample a random old policy, otherwise use the latest."""
@@ -50,6 +57,8 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
         ),
     )
 
+    device = get_device()
+
     config: PPOConfig = (
         PPOConfig()
         .environment("gridworld")
@@ -61,6 +70,11 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
         )
         .learners(
             num_learners=2,  # Number of parallel learner processes for computing gradients
+            num_gpus_per_learner=1 if device == "cuda" else 0,
+        )
+        .resources(
+        # Total GPUs available to the algorithm (for CUDA only)
+        num_gpus=torch.cuda.device_count() if device == "cuda" else 0,
         )
         .env_runners(
             num_env_runners=4,  # Number of processes/threads that run the environment in parallel
@@ -77,6 +91,7 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
             vf_loss_coeff=0.5,  # Weight of the value function loss in the total loss
             entropy_coeff=0.01,  # Encourage exploration
         )
+        
         .callbacks(MetricsCallback)
         .evaluation(
             evaluation_num_env_runners=0
