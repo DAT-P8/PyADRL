@@ -90,7 +90,6 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
 
     train_metrics_path = metrics_path("train")
     if checkpoint is not None:
-        print("Restoring checkpoint from checkpoint:", checkpoint)
         checkpoint_dir, start_iteration = restore_training(
             algo, checkpoint, pursuer_pool, evader_pool, model_name=model_name
         )
