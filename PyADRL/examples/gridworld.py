@@ -18,6 +18,7 @@ from ..logger.metricslogger import (
 )
 
 import matplotlib.pyplot as plt
+from ..utils.model_save import restore_testing, restore_training, setup_checkpoint_dir
 
 # Probability of sampling an old opponent policy
 P_OLD = 0.3
@@ -37,7 +38,7 @@ def sample_opponent(pool: list[dict]) -> dict:
         return pool[-1]
 
 
-def gridworld_train(checkpoint_path: str | None = None):
+def gridworld_train(checkpoint: str | None = None, model_name: str | None = None):
     # If Ray is already initialized from a previous run, shut it down before starting a new one.
     ray.shutdown()
     ray.init(log_to_driver=False)
@@ -86,22 +87,24 @@ def gridworld_train(checkpoint_path: str | None = None):
 
     pursuer_pool: list[dict] = []
     evader_pool: list[dict] = []
+    start_iteration = 0
+    checkpoint_dir = ""
 
     train_metrics_path = metrics_path("train")
-    if checkpoint_path is not None:
-        print("Restoring checkpoint from checkpoint:", checkpoint_path)
-        algo.restore(checkpoint_path)
-        assert algo.learner_group is not None
-        weights = algo.learner_group.get_weights()
-        pursuer_pool.append(weights["pursuer_policy"])
-        evader_pool.append(weights["evader_policy"])
+    if checkpoint is not None:
+        checkpoint_dir, start_iteration = restore_training(
+            algo, checkpoint, pursuer_pool, evader_pool, model_name=model_name
+        )
+    else:
+        checkpoint_dir = setup_checkpoint_dir(model_name=model_name)
+        print(f"No checkpoint specified. Starting new training run at {checkpoint_dir}")
 
     rewards = []
     episodes_data = []
 
     # try/finally ensures Ray always shuts down cleanly even if training crashes
     try:
-        for k in range(N_STAGES):
+        for k in range(start_iteration, start_iteration + N_STAGES):
             # for every stage the evader trains against a frozen pursuer, then the pursuer trains against a frozen evader
             for training_policy, frozen_policy, label, pool, opp_pool in [
                 (
@@ -156,8 +159,12 @@ def gridworld_train(checkpoint_path: str | None = None):
                 updated_weights = algo.learner_group.get_weights()[training_policy]
                 pool.append(updated_weights)
 
-                check = os.path.abspath(f"./checkpoints/stage_{k + 1}_{label}")
-                algo.save(checkpoint_dir=check)
+                # Save a checkpoint after each full stage (evader+pursuer training)
+                if label == "pursuer":
+                    # {k + 1:05d} for zero padding e.g. cp_00012 instead of cp_12
+                    print(f"Saving stage {k + 1} at {checkpoint_dir}/cp_{k + 1:05d}")
+                    check = os.path.abspath(f"{checkpoint_dir}/cp_{k + 1:05d}")
+                    algo.save(checkpoint_dir=check)
     finally:
         algo.stop()
         ray.shutdown()
@@ -218,7 +225,7 @@ def gridworld_test(checkpoint_path: str):
     )
 
     algo = config.build()
-    algo.restore(checkpoint_path)
+    restore_testing(algo, checkpoint_path)
 
     results = algo.evaluate()
     eval_data = build_eval_data(results)
