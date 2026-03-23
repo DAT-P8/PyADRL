@@ -80,7 +80,7 @@ def restore_testing(algo, checkpoint_path: str):
 def setup_checkpoint_dir(model_name: str | None = None) -> str:
     """Create dir for saving checkpoints. If a model name is not provided, find the highest model_XXX and creates model_XXX+1"""
     checkpoint_dir = os.path.abspath("./checkpoints")
-    if model_name: # model_name provided with --name flag
+    if model_name:  # model_name provided with --name flag
         # Check if model_name already exists in checkpoint_dir
         existing_models = [
             d for d in os.listdir(checkpoint_dir) if re.match(rf"{model_name}", d)
