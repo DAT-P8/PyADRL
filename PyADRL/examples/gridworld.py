@@ -25,7 +25,7 @@ P_OLD = 0.3
 
 # Number of alternating stages and PPO iterations per stage
 N_STAGES = 4
-ITERS_PER_STAGE = 20
+ITERS_PER_STAGE = 10
 
 
 def sample_opponent(pool: list[dict]) -> dict:
@@ -46,7 +46,7 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
     register_env(
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
-            GridWorldEnvironment(channel=grpc.insecure_channel("localhost:50051"),zero_sum=True)
+            GridWorldEnvironment(channel=grpc.insecure_channel("localhost:50051"),zero_sum=False)
         ),
     )
 

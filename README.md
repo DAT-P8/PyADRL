@@ -85,5 +85,5 @@ python3 main.py --train {name}
 
 Testing: 
 ```bash
-python3 main.py --test {name} --checkpoints ./checkpoints/iter_{num}
+python3 main.py --test {name} --checkpoints7 ./checkpoints7/iter_{num}
 ```

@@ -1,4 +1,5 @@
 import argparse
+
 import PyADRL.examples.gridworld
 
 GRIDWORLD = "gridworld"
@@ -29,7 +30,7 @@ def parse_args() -> argparse.Namespace:
         type=str,
         required=False,
         default=None,
-        help="Example: ./checkpoint/iter_100 or model_001 (if you have a folder in checkpoints with that name)."
+        help="Example: ./checkpoint/iter_100 or model_001 (if you have a folder in checkpoints7 with that name)."
         " If specified, the model will be restored from the checkpoint and training/testing will resume from there.",
     )
 
@@ -39,7 +40,7 @@ def parse_args() -> argparse.Namespace:
         type=str,
         required=False,
         default=None,
-        help="Name for folder that will contain checkpoints inside ./checkpoints. Example: model_001. "
+        help="Name for folder that will contain checkpoints7 inside ./checkpoints7. Example: model_001. "
         "Can be used in combination with --restore to train a new model from an old checkpoint",
     )
 

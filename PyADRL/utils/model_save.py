@@ -6,7 +6,7 @@ def checkpoint_exists(checkpoint_path: str) -> bool:
     if os.path.isdir(os.path.abspath(checkpoint_path)):
         return True
 
-    checkpoint_dir = os.path.abspath(f"./checkpoints/{checkpoint_path}")
+    checkpoint_dir = os.path.abspath(f"./checkpoints7/{checkpoint_path}")
     return os.path.isdir(checkpoint_dir) and any(
         re.match(r"cp_\d{5}", e.name) for e in os.scandir(checkpoint_dir)
     )
@@ -15,19 +15,19 @@ def checkpoint_exists(checkpoint_path: str) -> bool:
 def restore_checkpoint(algo, checkpoint_path: str, model_name: str | None = None):
     """ "Restore from checkpoint. If checkpoint_path is the model name e.g "model_001",
     it will restore newest CP from that model. If it's a path to a checkpoint folder,
-    e.g. "./checkpoints/model_001/cp_00010", it will restore from that exact checkpoint."""
+    e.g. "./checkpoints7/model_001/cp_00010", it will restore from that exact checkpoint."""
 
     if os.path.dirname(checkpoint_path):
         #  if checkpoint_path is a path to a specific checkpoint file, restore from that file
         print("Restoring checkpoint from file:", checkpoint_path)
         latest_checkpoint = os.path.abspath(checkpoint_path)
         algo.restore(latest_checkpoint)
-        # still set up a new checkpoint dir for saving future checkpoints
+        # still set up a new checkpoint dir for saving future checkpoints7
         checkpoint_dir = setup_checkpoint_dir(model_name=model_name)
         return checkpoint_dir, 0  # start from iteration 0
     else:
         #  if checkpoint_path is a model name e.g. "model_001", restore the latest checkpoint
-        checkpoint_dir = os.path.abspath(f"./checkpoints/{checkpoint_path}")
+        checkpoint_dir = os.path.abspath(f"./checkpoints7/{checkpoint_path}")
 
         # Ensure file is in format cp_XXXXX
         existing_checkpoints = [
@@ -35,7 +35,7 @@ def restore_checkpoint(algo, checkpoint_path: str, model_name: str | None = None
         ]
         if existing_checkpoints == []:
             raise ValueError(
-                f"No checkpoints found in {checkpoint_dir} matching pattern cp_XXXXX"
+                f"No checkpoints7 found in {checkpoint_dir} matching pattern cp_XXXXX"
             )
 
         latest = sorted(existing_checkpoints)[-1]
@@ -44,7 +44,7 @@ def restore_checkpoint(algo, checkpoint_path: str, model_name: str | None = None
         algo.restore(latest_checkpoint)
 
         if model_name:
-            # if model_name is provided, we save future checkpoints in that folder.
+            # if model_name is provided, we save future checkpoints7 in that folder.
             return setup_checkpoint_dir(model_name=model_name), 0
         else:
             # return the checkpoint dir and the iteration number to continue from
@@ -81,8 +81,8 @@ def restore_testing(algo, checkpoint_path: str):
 
 
 def setup_checkpoint_dir(model_name: str | None = None) -> str:
-    """Create dir for saving checkpoints. If a model name is not provided, find the highest model_XXX and creates model_XXX+1"""
-    checkpoint_dir = os.path.abspath("./checkpoints")
+    """Create dir for saving checkpoints7. If a model name is not provided, find the highest model_XXX and creates model_XXX+1"""
+    checkpoint_dir = os.path.abspath("./checkpoints7")
     if model_name:  # model_name provided with --name flag
         # Check if model_name already exists in checkpoint_dir
         existing_models = [
