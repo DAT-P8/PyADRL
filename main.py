@@ -1,7 +1,6 @@
 import argparse
 import PyADRL.examples.gridworld
 import os
-from os.path import exists
 
 GRIDWORLD = "gridworld"
 
@@ -49,7 +48,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main():
-    if not exists("checkpoints"):
+    if not os.path.exists("checkpoints"):
         os.makedirs("checkpoints")
 
     args = parse_args()
