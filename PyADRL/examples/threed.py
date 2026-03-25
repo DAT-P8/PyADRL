@@ -36,7 +36,7 @@ def sample_opponent(pool: list[dict]) -> dict:
 def threed_train(checkpoint_path: str | None = None):
     # If Ray is already initialized from a previous run, shut it down before starting a new one.
     ray.shutdown()
-    ray.init(log_to_driver=False)
+    ray.init(log_to_driver=True)
 
     register_env(
         "3d",

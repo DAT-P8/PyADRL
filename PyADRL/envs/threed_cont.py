@@ -261,7 +261,7 @@ class ThreeDEnvironment(ParallelEnv):
 
         response_result = self.client.DoStep(
             id=self.id,
-            actions=evader_actions + evader_actions
+            actions=pursuer_actions + evader_actions
         )
 
         if not response_result.is_ok():
@@ -305,7 +305,7 @@ class ThreeDEnvironment(ParallelEnv):
         pass
 
     def observation_space(self, agent):
-        n_drones = len(self.agents) + len(self.evaders)
+        n_drones = len(self.pursuers) + len(self.evaders)
 
         n_data_points = n_drones * 6  # x,y,z,xv,yv,zv for each drone
 
