@@ -1,10 +1,12 @@
 import argparse
 import os
 import PyADRL.examples.gridworld
+from PyADRL.examples.threed import (threed_train)
 
 GRIDWORLD = "gridworld"
+THREE_D = "3d"
 
-examples = [GRIDWORLD]
+examples = [GRIDWORLD, THREE_D]
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,7 +52,17 @@ def main():
         print("Verbose mode enabled")
 
     if args.train:
-        if args.train == GRIDWORLD:
+        if args.train == THREE_D:
+            checkpoint = args.checkpoint
+
+            print("Training 3d example:")
+            if checkpoint:
+                threed_train(
+                    checkpoint_path=os.path.abspath(checkpoint)
+                )
+            else:
+                threed_train()
+        elif args.train == GRIDWORLD:
             checkpoint = args.checkpoint
 
             print("Training gridworld example:")
