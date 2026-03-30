@@ -2,6 +2,9 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[dependency-groups]
+dev = ["ruff"]
+
 [project]
 name = "PyADRL"
 version = "0.0.1"
@@ -26,8 +29,6 @@ dependencies = [
   "lz4",
 ]
 
-[project.optional-dependencies]
-dev = ["ruff"]
 
 [tool.ruff]
 line-length = 88
