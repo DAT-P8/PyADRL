@@ -3,7 +3,8 @@ import grpc
 import ray
 import os
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
-from ..envs.gridworld_env import GridWorldEnvironment
+#from ..envs.gridworld_env import GridWorldEnvironment
+from ..envs.gridworld_env2 import GridWorldEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
 from ..logger.metricslogger import (
@@ -23,8 +24,8 @@ import matplotlib.pyplot as plt
 P_OLD = 0.3
 
 # Number of alternating stages and PPO iterations per stage
-N_STAGES = 4
-ITERS_PER_STAGE = 20
+N_STAGES = 2
+ITERS_PER_STAGE = 4
 
 
 def sample_opponent(pool: list[dict]) -> dict:
@@ -45,7 +46,11 @@ def gridworld_train(checkpoint_path: str | None = None):
     register_env(
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
-            GridWorldEnvironment(channel=grpc.insecure_channel("localhost:50051"))
+            GridWorldEnvironment(channel=grpc.insecure_channel("localhost:50051"), 
+                                 map_size=11, 
+                                 target_x=0, 
+                                 target_y=0, 
+                                 max_timestep=100)
         ),
     )
 

@@ -2,14 +2,21 @@
 
 from pettingzoo import ParallelEnv
 import grpc
-from .. import grid_world_pb2, SimStates
+from ..grid_world_pb2 import (
+    SimStates,
+    GWCloseRequest,
+    GWNewRequest,
+    GWResetRequest,
+    GWDroneAction,
+    GWActionRequest,
+)
 from ..utils.protobuf_utils import get_action
 from ..utils.gridworld_client import GridWorldClient
 from ..logger.metricslogger import EpisodeOutcome
 from gymnasium.spaces import Box, Discrete
 import numpy as np
 import time
-from reward_functions.rewards import GridWorldRewards
+from .reward_functions.grid_world_rewards import GridWorldRewards
 
 class Drone:
     def __init__(self, id: int, x: int, y: int, is_evader: bool):
@@ -23,7 +30,7 @@ class Drone:
 
 class GridWorldEnvironment(ParallelEnv):
     metadata = {
-        "name": "gridworld_environment_v1",
+        "name": "gridworld_environment_v0",
     }
 
     def __init__(self, channel: grpc.Channel, map_size: int, target_x: int, target_y : int, max_timestep: int, step_delay: float = 0.0):
@@ -65,7 +72,7 @@ class GridWorldEnvironment(ParallelEnv):
         return result
 
     def close(self):
-        self.client.Close(grid_world_pb2.GWCloseRequest(id=self.id))
+        self.client.Close(GWCloseRequest(id=self.id))
 
     def reset(self, seed=None, options=None):
         state = None
@@ -74,7 +81,7 @@ class GridWorldEnvironment(ParallelEnv):
         self.timestep = 0
 
         if self.id is None:
-            response = self.client.New(grid_world_pb2.GWNewRequest(
+            response = self.client.New(GWNewRequest(
                 map_size = self.map_size, 
                 target_x = self.target_x, 
                 target_y = self.target_y, 
@@ -83,7 +90,7 @@ class GridWorldEnvironment(ParallelEnv):
             self.id = response.id
             state = response.state
         else:
-            response = self.client.Reset(grid_world_pb2.GWResetRequest(id=self.id))
+            response = self.client.Reset(GWResetRequest(id=self.id))
             state = response.state
 
         for drone_state in state.drone_states:
@@ -113,7 +120,7 @@ class GridWorldEnvironment(ParallelEnv):
 
         # Create the list of actions to send to the godot server
         actions_send = [
-            grid_world_pb2.GWDroneAction(
+            GWDroneAction(
                 id=self.evader.id, action=get_action(actions["evader"])
             ),
         ]
@@ -122,13 +129,13 @@ class GridWorldEnvironment(ParallelEnv):
         ):  # add the pursuer actions if they are not destroyed
             if not pursuer.destroyed:
                 actions_send.append(
-                    grid_world_pb2.GWDroneAction(
+                    GWDroneAction(
                         id=pursuer.id, action=get_action(actions[f"pursuer_{i}"])
                     )
                 )
 
         response = self.client.DoStep(
-            grid_world_pb2.GWActionRequest(id=self.id, drone_actions=actions_send)
+            GWActionRequest(id=self.id, drone_actions=actions_send)
         )
 
         if response.WhichOneof("state_or_error") != "state":
