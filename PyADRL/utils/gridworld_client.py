@@ -1,26 +1,27 @@
 import grpc
-from .. import grid_world_pb2
-from .. import grid_world_pb2_grpc
+from ..ngw.v1 import ngw2d_pb2, ngw2d_pb2_grpc
+# from .. import grid_world_pb2
+# from .. import grid_world_pb2_grpc
 
 
 class GridWorldClient:
     def __init__(self, channel: grpc.Channel):
-        self.stub = grid_world_pb2_grpc.GWSimulationStub(channel)
+        self.stub = ngw2d_pb2_grpc.SimulationServiceStub(channel)
 
     def Reset(
-        self, request: grid_world_pb2.GWResetRequest
-    ) -> grid_world_pb2.GWResetResponse:
+        self, request: ngw2d_pb2.ResetRequest
+    ) -> ngw2d_pb2.ResetResponse:
         return self.stub.Reset(request)
 
     def DoStep(
-        self, request: grid_world_pb2.GWActionRequest
-    ) -> grid_world_pb2.GWActionResponse:
+        self, request: ngw2d_pb2.DroneAction
+    ) -> ngw2d_pb2.DroneAction:
         return self.stub.DoStep(request)
 
-    def New(self, request: grid_world_pb2.GWNewRequest) -> grid_world_pb2.GWNewResponse:
+    def New(self, request: ngw2d_pb2.NewRequest) -> ngw2d_pb2.NewResponse:
         return self.stub.New(request)
 
     def Close(
-        self, request: grid_world_pb2.GWCloseRequest
-    ) -> grid_world_pb2.GWCloseResponse:
+        self, request: ngw2d_pb2.CloseRequest
+    ) -> ngw2d_pb2.CloseResponse:
         return self.stub.Close(request)

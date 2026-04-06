@@ -1,4 +1,7 @@
 from .rewards import RewardFunction
+from ..ngw_drone import NGW_Drone
+from ..map_configs.map_config import MapConfig
+from ...ngw.v1.ngw2d_pb2 import State
 import numpy as np
 
 class GridWorldRewards(RewardFunction):
@@ -18,10 +21,14 @@ class GridWorldRewards(RewardFunction):
     REWARD_PURSUER_DESTROYED = -1000
     REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
 
-    # TODO: Fix arguements
-    def calculate_rewards(self, new_state, agents, max_time, pursuers, evaders, target_x, target_y):
-        rewards: dict[str, float] = {a: 0 for a in self.agents}
-        all_drones = {d.id: d for d in self.evaders + self.pursuers}
+    def calculate_rewards(self,
+                          new_state: State,
+                          agents: list[str],
+                          drones: dict[str, [NGW_Drone]],
+                          map_config: MapConfig,
+                          time_limit_reached: bool):
+        rewards: dict[str, float] = {a: 0 for a in agents}
+        all_drones = {d.id: d for d in drones['evaders'] + drones['pursuers']}
 
         # distribute rewards for events that occured
         for event in new_state.events:
@@ -53,32 +60,28 @@ class GridWorldRewards(RewardFunction):
                         else:
                             rewards[d.name] += self.REWARD_PURSUER_DESTROYED
 
-        # punish the pursuers for being far from the evader to encourage them to move towards the evaderforfor
-        for pursuer in pursuers:
-            distance_to_evader = min(np.sqrt(
-                (pursuer.x - evader.x) ** 2 + (pursuer.y - evader.y) ** 2)
-                for evader in evaders
+        # punish the pursuers for being far from the evader to encourage them to move towards the evader
+        for pursuer in drones['pursuers']:
+            distance_to_evader = min(    
+                np.linalg.norm((pursuer.x, pursuer.y) - (evader.x, evader.y))
+                for evader in drones['evaders']
             )
             rewards[pursuer.name] += distance_to_evader * self.REWARD_PURSUER_FAR_FROM_EVADER
     
-        # punish the evader for being far from the target to encourage it to move towards the target
-        for evader in evaders:
-            distance_to_target = np.sqrt(
-                (evader.x - target_x) ** 2 + (evader.y - target_y) ** 2
-            )
-            rewards[evader.name] += distance_to_target * self.REWARD_EVADER_FAR_FROM_TARGET
-    
         # reward the evader for being far from the pursuers to encourage it to move away from the pursuers
-        closest_pursuer_distance = min(
-            np.sqrt((pursuer.x - evader.x) ** 2 + (pursuer.y - evader.y) ** 2)
-            for pursuer in pursuer
-        )
+        for evader in drones['evaders']:
+            distance_to_pursuer = min(
+                np.linalg.norm((evader.x, evader.y) - (pursuer.x, pursuer.y))
+                for pursuer in drones['pursuers']
+            )
+            rewards[evader.name] += distance_to_pursuer * self.REWARD_EVADER_FAR_FROM_PUSUERS
+    
+        # punish evaders for being far from the target to encourage them to move towards it
+        for evader in drones['evaders']:
+            distance_to_target = map_config.distance_to_target(evader.x, evader.y)
+            rewards[evader.name] += distance_to_target * self.REWARD_EVADER_FAR_FROM_TARGET
 
-        rewards[evader.name] += (
-            closest_pursuer_distance * self.REWARD_EVADER_FAR_FROM_PUSUERS
-        )
-
-        if max_time:
+        if time_limit_reached:
             for e in self.evaders:
                 rewards[e.name] += self.REWARD_EVADER_MAX_TIMESTEPS
             for pursuer in self.pursuers:

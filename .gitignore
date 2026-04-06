@@ -224,3 +224,6 @@ results/
 .DS_Store
 # python version
 /.python-version
+
+# Protos generated files
+ngw/
