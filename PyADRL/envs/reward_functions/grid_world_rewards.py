@@ -13,6 +13,7 @@ class GridWorldRewards(RewardFunction):
     REWARD_EVADER_MAX_TIMESTEPS = 50
     REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
     REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
+    REWARD_EVADER_DESTROYED = -100
 
     # Rewards for pursuers
     REWARD_PURSUER_MAX_TIMESTEPS = (
@@ -25,15 +26,16 @@ class GridWorldRewards(RewardFunction):
     REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
     REWARD_PURSUER_DESTROYED = -1000
     REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
+    REWARD_PURSUER_OUT_OF_BOUNDS = -100
 
     def calculate_rewards(
         self,
         new_state: State,
         agents: list[str],
-        drones: dict[str, [NGW_Drone]],
+        drones: dict[str, list[NGW_Drone]],
         map_config: MapConfig,
         time_limit_reached: bool,
-    ):
+    ) -> dict[str, float]:
         rewards: dict[str, float] = {a: 0 for a in agents}
         all_drones = {d.id: d for d in drones["evaders"] + drones["pursuers"]}
 
@@ -42,22 +44,24 @@ class GridWorldRewards(RewardFunction):
             which_one = event.WhichOneof("event_case")
             match which_one:
                 case "target_reached":
-                    id = event.target_reached.drone_id
-                    d = all_drones[id]
-                    if d is None:
-                        raise Exception(f"Drone with id {id} not found")
-                    rewards[d.name] += self.REWARD_EVADER_TARGET_REACHED
+                    ids = [d for d in event.target_reached_event.drone_ids]
+                    for id in ids:
+                        d = all_drones[id]
+                        if d is None:
+                            raise Exception(f"Drone with id {id} not found")
+                        rewards[d.name] += self.REWARD_EVADER_TARGET_REACHED
                 case "drone_crashed":
-                    id = event.drone_out_of_bounds.drone_id
-                    d = all_drones[id]
-                    if d is None:
-                        raise Exception(f"Drone with id {id} not found")
-                    if d.is_evader:
-                        rewards[d.name] += self.REWARD_EVADER_OUT_OF_BOUNDS
-                    else:
-                        rewards[d.name] += self.REWARD_PURSUER_OUT_OF_BOUNDS
+                    ids = [d for d in event.out_of_bounds_event.drone_ids]
+                    for id in ids:
+                        d = all_drones[id]
+                        if d is None:
+                            raise Exception(f"Drone with id {id} not found")
+                        if d.is_evader:
+                            rewards[d.name] += self.REWARD_EVADER_OUT_OF_BOUNDS
+                        else:
+                            rewards[d.name] += self.REWARD_PURSUER_OUT_OF_BOUNDS
                 case "collision":
-                    ids = [d for d in event.collision.drone_ids]
+                    ids = [d for d in event.collision_event.drone_ids]
                     for id in ids:
                         d = all_drones[id]
                         if d is None:
@@ -70,7 +74,7 @@ class GridWorldRewards(RewardFunction):
         # punish the pursuers for being far from the evader to encourage them to move towards the evader
         for pursuer in drones["pursuers"]:
             distance_to_evader = min(
-                np.linalg.norm((pursuer.x, pursuer.y) - (evader.x, evader.y))
+                np.sqrt((pursuer.x - evader.x) ** 2 + (pursuer.y - evader.y) ** 2)
                 for evader in drones["evaders"]
             )
             rewards[pursuer.name] += (
@@ -80,7 +84,7 @@ class GridWorldRewards(RewardFunction):
         # reward the evader for being far from the pursuers to encourage it to move away from the pursuers
         for evader in drones["evaders"]:
             distance_to_pursuer = min(
-                np.linalg.norm((evader.x, evader.y) - (pursuer.x, pursuer.y))
+                np.sqrt((evader.x - pursuer.x) ** 2 + (evader.y - pursuer.y) ** 2)
                 for pursuer in drones["pursuers"]
             )
             rewards[evader.name] += (
@@ -95,9 +99,9 @@ class GridWorldRewards(RewardFunction):
             )
 
         if time_limit_reached:
-            for e in self.evaders:
+            for e in drones["evaders"]:
                 rewards[e.name] += self.REWARD_EVADER_MAX_TIMESTEPS
-            for pursuer in self.pursuers:
+            for pursuer in drones["pursuers"]:
                 rewards[pursuer.name] += self.REWARD_PURSUER_MAX_TIMESTEPS
 
         return rewards

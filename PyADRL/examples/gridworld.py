@@ -213,7 +213,11 @@ def gridworld_test(checkpoint_path: str):
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
             NGWEnvironment(
-                channel=grpc.insecure_channel("localhost:50051"), step_delay=0.2
+                channel=grpc.insecure_channel("localhost:50051"),
+                map_config=SquareMapConfig(11, 11, 6, 6),
+                reward_function=GridWorldRewards(),
+                n_pursuers=2,
+                n_evaders=1,
             )
         ),
     )

@@ -1,19 +1,20 @@
 from abc import ABC, abstractmethod
+from ...ngw.v1.ngw2d_pb2 import MapSpec
 
 
 class MapConfig(ABC):
     @abstractmethod
-    def get_target_position():
+    def get_target_position(self) -> tuple[int, int]:
         pass
 
     @abstractmethod
-    def normalise_position(x: int, y: int):
+    def normalise_position(self, x: int, y: int) -> tuple[float, float]:
         pass
 
     @abstractmethod
-    def distance_to_target(x: int, y: int):
+    def distance_to_target(self, x: int, y: int) -> float:
         pass
 
     @abstractmethod
-    def get_map_spec():
+    def get_map_spec(self) -> MapSpec:
         pass

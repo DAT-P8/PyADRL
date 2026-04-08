@@ -7,10 +7,11 @@ from ..map_configs.map_config import MapConfig
 class RewardFunction(ABC):
     @abstractmethod
     def calculate_rewards(
+        self,
         new_state: State,
         agents: list[str],
-        drones: dict[str, [NGW_Drone]],
+        drones: dict[str, list[NGW_Drone]],
         map_config: MapConfig,
         time_limit_reached: bool,
-    ):
+    ) -> dict[str, float]:
         pass

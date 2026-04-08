@@ -11,7 +11,7 @@ from ..ngw.v1.ngw2d_pb2 import (
     DoStepRequest,
 )
 from ..utils.ngw2d_actions import get_action
-from ..utils.gridworld_client import GridWorldClient
+from ..utils.ngw2d_client import NGWClient
 from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
 from ..logger.metricslogger import EpisodeOutcome
@@ -35,17 +35,17 @@ class NGWEnvironment(ParallelEnv):
         step_delay: float = 0.0,
     ):
         self.id: int | None = None
-        self.client = GridWorldClient(channel)
+        self.client = NGWClient(channel)
         self.step_delay = step_delay
 
         self.map_config = map_config
+        # Calculate normalised target position here to avoid doing it each _get_obs call
         (target_x, target_y) = map_config.get_target_position()
         self.norm_target_x, self.norm_target_y = map_config.normalise_position(
             target_x, target_y
         )
-        # self.map_spec = SquareMapHelper(11, 11, 6, 6)
 
-        self.drones: dict[str, NGW_Drone] = {"evaders": [], "pursuers": []}
+        self.drones: dict[str, list[NGW_Drone]] = {"evaders": [], "pursuers": []}
         self.n_pursuers = n_pursuers
         self.n_evaders = n_evaders
         self.drone_velocity = drone_velocity
@@ -80,7 +80,7 @@ class NGWEnvironment(ParallelEnv):
         return result
 
     def close(self):
-        self.client.Close(CloseRequest(id=self.id))
+        self.client.Close(CloseRequest(sim_id=self.id))
 
     def reset(self, seed=None, options=None):
         state = None
@@ -102,7 +102,7 @@ class NGWEnvironment(ParallelEnv):
             else:
                 raise ValueError("Error in new request")
         else:
-            response = self.client.Reset(ResetRequest(id=self.id))
+            response = self.client.Reset(ResetRequest(sim_id=self.id))
             if response.state_response.WhichOneof("state_or_error") == "state":
                 state = response.state_response.state
             else:
@@ -150,7 +150,7 @@ class NGWEnvironment(ParallelEnv):
                     )
 
         response = self.client.DoStep(
-            DoStepRequest(id=self.id, drone_actions=actions_send)
+            DoStepRequest(sim_id=self.id, drone_actions=actions_send)
         )
 
         if response.state_response.WhichOneof("state_or_error") == "state":
@@ -160,12 +160,12 @@ class NGWEnvironment(ParallelEnv):
                 # Mark destroyed drones as destroyed in python
                 if drone_state.destroyed:
                     for drone in self.drones[key]:
-                        if drone_state.id == d.id:
+                        if drone_state.id == drone.id:
                             drone.destroyed = True
                             break
                 else:  # Update positions
                     for drone in self.drones[key]:
-                        if drone_state.id == d.id:
+                        if drone_state.id == drone.id:
                             drone.x = drone_state.x
                             drone.y = drone_state.y
         else:
@@ -177,7 +177,7 @@ class NGWEnvironment(ParallelEnv):
         # TODO: Add parameters
         time_limit_reached = self.timestep >= self.time_limit
         rewards = self.reward_function.calculate_rewards(
-            new_state=response.state,
+            new_state=response.state_response.state,
             agents=self.agents,
             drones=self.drones,
             map_config=self.map_config,
@@ -225,4 +225,4 @@ class NGWEnvironment(ParallelEnv):
         return Box(low=0.0, high=1.0, shape=(n_positions + n_agents,), dtype=np.float32)
 
     def action_space(self, agent):
-        return Discrete(5)  # 5 possible actions: up, down, left, right, stay
+        return Discrete(9)  # 9 possible actions

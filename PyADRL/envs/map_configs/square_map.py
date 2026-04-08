@@ -15,15 +15,14 @@ class SquareMapConfig(MapConfig):
             )
         )
 
-    def get_target_position(self):
+    def get_target_position(self) -> tuple[int, int]:
         return (self.target_x, self.target_y)
 
-    def normalise_position(self, x: int, y: int):
+    def normalise_position(self, x: int, y: int) -> tuple[float, float]:
         return (x / self.width, y / self.height)
 
-    def distance_to_target(self, x: int, y: int):
-        return np.linalg.norm((x, y) - (self.target_x, self.target_y))
-        # return np.sqrt((x - self.target_x) ** 2 + (y - self.target_y) ** 2)
+    def distance_to_target(self, x: int, y: int) -> float:
+        return np.sqrt((x - self.target_x) ** 2 + (y - self.target_y) ** 2)
 
-    def get_map_spec(self):
+    def get_map_spec(self) -> MapSpec:
         return self.map_spec
