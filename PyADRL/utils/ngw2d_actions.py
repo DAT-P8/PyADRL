@@ -1,5 +1,6 @@
 from ..ngw.v1.ngw2d_pb2 import Action
 
+
 def get_action(action: float) -> Action:
     if action == 0:
         return Action.ACTION_NOTHING

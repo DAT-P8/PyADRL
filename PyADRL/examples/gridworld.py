@@ -45,21 +45,20 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
     ray.shutdown()
     ray.init(log_to_driver=False)
 
-    #map_config = SquareMapConfig(11, 11, 6, 6)
-    #reward_function = GridWorldRewards()
+    # map_config = SquareMapConfig(11, 11, 6, 6)
+    # reward_function = GridWorldRewards()
     register_env(
         "gridworld",
-         lambda cfg: ParallelPettingZooEnv(
-             NGWEnvironment(
+        lambda cfg: ParallelPettingZooEnv(
+            NGWEnvironment(
                 channel=grpc.insecure_channel("localhost:50051"),
-                map_config=SquareMapConfig(11,11,6,6),
+                map_config=SquareMapConfig(11, 11, 6, 6),
                 reward_function=GridWorldRewards(),
                 n_pursuers=2,
                 n_evaders=1,
             )
-         ),
+        ),
     )
-
 
     config: PPOConfig = (
         PPOConfig()

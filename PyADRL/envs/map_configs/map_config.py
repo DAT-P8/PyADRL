@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class MapConfig(ABC):
     @abstractmethod
     def get_target_position():
