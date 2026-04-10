@@ -41,16 +41,16 @@ class GridWorldRewards(RewardFunction):
 
         # distribute rewards for events that occured
         for event in new_state.events:
-            which_one = event.WhichOneof("event_case")
+            which_one = event.WhichOneof("event_oneof")
             match which_one:
-                case "target_reached":
+                case "target_reached_event ":
                     ids = [d for d in event.target_reached_event.drone_ids]
                     for id in ids:
                         d = all_drones[id]
                         if d is None:
                             raise Exception(f"Drone with id {id} not found")
                         rewards[d.name] += self.REWARD_EVADER_TARGET_REACHED
-                case "drone_crashed":
+                case "out_of_bounds_event ":
                     ids = [d for d in event.out_of_bounds_event.drone_ids]
                     for id in ids:
                         d = all_drones[id]
@@ -60,7 +60,7 @@ class GridWorldRewards(RewardFunction):
                             rewards[d.name] += self.REWARD_EVADER_OUT_OF_BOUNDS
                         else:
                             rewards[d.name] += self.REWARD_PURSUER_OUT_OF_BOUNDS
-                case "collision":
+                case "collision_event ":
                     ids = [d for d in event.collision_event.drone_ids]
                     for id in ids:
                         d = all_drones[id]

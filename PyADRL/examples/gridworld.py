@@ -3,9 +3,7 @@ import grpc
 import ray
 import os
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
-from ..envs.ngw_env import NGWEnvironment
-from ..envs.map_configs.square_map import SquareMapConfig
-from ..envs.reward_functions.grid_world_rewards import GridWorldRewards
+from ..envs.gridworld_env import GridWorldEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
 from ..logger.metricslogger import (
@@ -45,18 +43,10 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
     ray.shutdown()
     ray.init(log_to_driver=False)
 
-    # map_config = SquareMapConfig(11, 11, 6, 6)
-    # reward_function = GridWorldRewards()
     register_env(
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
-            NGWEnvironment(
-                channel=grpc.insecure_channel("localhost:50051"),
-                map_config=SquareMapConfig(11, 11, 6, 6),
-                reward_function=GridWorldRewards(),
-                n_pursuers=2,
-                n_evaders=1,
-            )
+            GridWorldEnvironment(channel=grpc.insecure_channel("localhost:50051"))
         ),
     )
 
@@ -212,12 +202,8 @@ def gridworld_test(checkpoint_path: str):
     register_env(
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
-            NGWEnvironment(
-                channel=grpc.insecure_channel("localhost:50051"),
-                map_config=SquareMapConfig(11, 11, 6, 6),
-                reward_function=GridWorldRewards(),
-                n_pursuers=2,
-                n_evaders=1,
+            GridWorldEnvironment(
+                channel=grpc.insecure_channel("localhost:50051"), step_delay=0.2
             )
         ),
     )

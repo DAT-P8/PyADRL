@@ -16,6 +16,7 @@ from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
 from ..logger.metricslogger import EpisodeOutcome
 from .ngw_drone import NGW_Drone
+import functools
 
 
 class NGWEnvironment(ParallelEnv):
@@ -55,10 +56,27 @@ class NGWEnvironment(ParallelEnv):
         self.time_limit = time_limit
         self.agents = []
 
-    def _get_obs(self):
-        # if len(self.drones['evaders']) == 0 or len(self.drones['pursuers']) == 0:
-        #    raise ValueError("Pursuer or evader not initialized")
+        # Pettingzoo wants all agents to have the same observation space, action space,
+        # and wants possible agents to be defined
+        self.possible_agents = [
+            f"{agent_type}_{i}"
+            for agent_type in ["evader", "pursuer"]
+            for i in range(n_pursuers + n_evaders)
+        ]
 
+        # one-hot agent ID, so drones can share a policy but still know who they are
+        n_agents = self.n_evaders + self.n_pursuers
+        # x,y pairs for each agent and the target tile
+        # TODO: un-hardcode the target when it is possible to make different target shapes
+        n_positions = (n_agents + 1) * 2
+        self.obs_space = Box(
+            low=0.0, high=1.0, shape=(n_positions + n_agents,), dtype=np.float32
+        )
+
+        # 9 possible actions
+        self.act_space = Discrete(9)
+
+    def _get_obs(self):
         obs = []
         for p in self.drones["pursuers"]:
             (norm_x, norm_y) = self.map_config.normalise_position(p.x, p.y)
@@ -66,9 +84,7 @@ class NGWEnvironment(ParallelEnv):
         for e in self.drones["evaders"]:
             (norm_x, norm_y) = self.map_config.normalise_position(e.x, e.y)
             obs += [norm_x, norm_y]
-            # obs += [e.x / self.map_size, e.y / self.map_size]
         obs += [self.norm_target_x, self.norm_target_y]
-        # obs += [self.target_x / self.map_size, self.target_y / self.map_size]
         obs_array = np.array(obs, dtype=np.float32)
 
         result = {}
@@ -85,6 +101,7 @@ class NGWEnvironment(ParallelEnv):
     def reset(self, seed=None, options=None):
         state = None
         self.drones = {"evaders": [], "pursuers": []}
+        self.agents = []
         self.timestep = 0
 
         if self.id is None:
@@ -126,7 +143,7 @@ class NGWEnvironment(ParallelEnv):
 
         infos = {a: {} for a in self.agents}
 
-        return observations, infos
+        return (observations, infos)
 
     def step(self, actions: dict[str, float]):
         if len(self.drones["evaders"]) == 0 or len(self.drones["pursuers"]) == 0:
@@ -195,7 +212,7 @@ class NGWEnvironment(ParallelEnv):
 
         infos = {a: {} for a in self.agents}
 
-        if state.terminated:
+        if response.state_response.state.terminated:
             episode_metrics = {
                 "captured": 1.0 if outcome.captured else 0.0,
                 "breached": 1.0 if outcome.breached else 0.0,
@@ -215,14 +232,8 @@ class NGWEnvironment(ParallelEnv):
         pass
 
     def observation_space(self, agent):
-        # one-hot agent ID, so drones can share a policy but still know who they are
-        n_agents = len(self.agents)
+        return self.obs_space
 
-        # x,y pairs for each agent and the target tile
-        # TODO: un-hardcode the target when it is possible to make different target shapes
-        n_positions = (n_agents + 1) * 2
-
-        return Box(low=0.0, high=1.0, shape=(n_positions + n_agents,), dtype=np.float32)
-
+    @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
-        return Discrete(9)  # 9 possible actions
+        return self.act_space
