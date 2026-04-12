@@ -16,7 +16,6 @@ from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
 from ..logger.metricslogger import EpisodeOutcome
 from .ngw_drone import NGW_Drone
-import functools
 
 
 class NGWEnvironment(ParallelEnv):
@@ -55,6 +54,7 @@ class NGWEnvironment(ParallelEnv):
         self.timestep = 0
         self.time_limit = time_limit
         self.agents = []
+        self.one_hot = {}
 
         # Pettingzoo wants all agents to have the same observation space, action space,
         # and wants possible agents to be defined
@@ -87,13 +87,11 @@ class NGWEnvironment(ParallelEnv):
         obs += [self.norm_target_x, self.norm_target_y]
         obs_array = np.array(obs, dtype=np.float32)
 
-        result = {}
-        for i, agent in enumerate(self.agents):
-            # Add one-hot agent ID so shared policy can distinguish roles
-            agent_id = np.zeros(len(self.agents), dtype=np.int32)
-            agent_id[i] = 1.0
-            result[agent] = np.concatenate([obs_array, agent_id])
-        return result
+        agent_observations = {}
+        for agent in self.agents:
+            one_hot_agent = self.one_hot[agent]
+            agent_observations[agent] = np.concatenate([obs_array, one_hot_agent])
+        return agent_observations
 
     def close(self):
         self.client.Close(CloseRequest(sim_id=self.id))
@@ -138,13 +136,17 @@ class NGWEnvironment(ParallelEnv):
             raise ValueError(
                 f"Pursuer or evader not initialized after reset\n{self.drones}"
             )
+        if len(self.agents) == 0:
+            raise ValueError("No agents initialised")
 
+        self.one_hot = self.encode_one_hot(self.agents)
         observations = self._get_obs()
 
         infos = {a: {} for a in self.agents}
 
         return (observations, infos)
 
+    # Only gets called once?
     def step(self, actions: dict[str, float]):
         if len(self.drones["evaders"]) == 0 or len(self.drones["pursuers"]) == 0:
             raise ValueError("Pursuer or evader not initialized")
@@ -170,6 +172,11 @@ class NGWEnvironment(ParallelEnv):
             DoStepRequest(sim_id=self.id, drone_actions=actions_send)
         )
 
+        terminations: dict[str, bool] = {a: False for a in self.agents}
+        truncations: dict[str, bool] = {a: False for a in self.agents}
+        terminations["__all__"] = False
+        truncations["__all__"] = False
+
         if response.state_response.WhichOneof("state_or_error") == "state":
             state = response.state_response.state
             for drone_state in state.drone_states:
@@ -179,6 +186,7 @@ class NGWEnvironment(ParallelEnv):
                     for drone in self.drones[key]:
                         if drone_state.id == drone.id:
                             drone.destroyed = True
+                            terminations[drone.name] = True
                             break
                 else:  # Update positions
                     for drone in self.drones[key]:
@@ -186,12 +194,11 @@ class NGWEnvironment(ParallelEnv):
                             drone.x = drone_state.x
                             drone.y = drone_state.y
         else:
-            raise ValueError("Error in step")
+            raise ValueError("Recieved error from DoStepRequest")
 
         # TODO: add capture rate to the outcome
         outcome = EpisodeOutcome(episode_length=self.timestep + 1)
 
-        # TODO: Add parameters
         time_limit_reached = self.timestep >= self.time_limit
         rewards = self.reward_function.calculate_rewards(
             new_state=response.state_response.state,
@@ -201,12 +208,20 @@ class NGWEnvironment(ParallelEnv):
             time_limit_reached=time_limit_reached,
         )
 
-        terminations: dict[str, bool] = {a: False for a in self.agents}
-        truncations: dict[str, bool] = {a: False for a in self.agents}
         if time_limit_reached:
             truncations = {a: True for a in self.agents}
-        if response.state_response.state.terminated:
+            truncations["__all__"] = True
+            self.agents = []
+        elif response.state_response.state.terminated:
             terminations = {a: True for a in self.agents}
+            terminations["__all__"] = True
+            self.agents = []
+        else:
+            self.agents = [
+                d.name
+                for d in (self.drones["evaders"] + self.drones["pursuers"])
+                if not d.destroyed
+            ]
 
         self.timestep += 1
 
@@ -234,6 +249,14 @@ class NGWEnvironment(ParallelEnv):
     def observation_space(self, agent):
         return self.obs_space
 
-    @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
         return self.act_space
+
+    def encode_one_hot(self, agents):
+        one_hot = {}
+        for i, agent in enumerate(agents):
+            # Add one-hot agent ID so shared policy can distinguish roles
+            agent_id = np.zeros(len(agents), dtype=np.int32)
+            agent_id[i] = 1.0
+            one_hot[agent] = agent_id
+        return one_hot
