@@ -17,6 +17,10 @@ from .map_configs.map_config import MapConfig
 from ..logger.metricslogger import EpisodeOutcome
 from .ngw_drone import NGW_Drone
 
+# Drone dictionary names
+EVADERS = "evaders"
+PURSUERS = "pursuers"
+
 
 class NGWEnvironment(ParallelEnv):
     metadata = {
@@ -45,7 +49,7 @@ class NGWEnvironment(ParallelEnv):
             target_x, target_y
         )
 
-        self.drones: dict[str, list[NGW_Drone]] = {"evaders": [], "pursuers": []}
+        self.drones: dict[str, list[NGW_Drone]] = {EVADERS: [], PURSUERS: []}
         self.n_pursuers = n_pursuers
         self.n_evaders = n_evaders
         self.drone_velocity = drone_velocity
@@ -78,10 +82,10 @@ class NGWEnvironment(ParallelEnv):
 
     def _get_obs(self):
         obs = []
-        for p in self.drones["pursuers"]:
+        for p in self.drones[PURSUERS]:
             (norm_x, norm_y) = self.map_config.normalise_position(p.x, p.y)
             obs += [norm_x, norm_y]
-        for e in self.drones["evaders"]:
+        for e in self.drones[EVADERS]:
             (norm_x, norm_y) = self.map_config.normalise_position(e.x, e.y)
             obs += [norm_x, norm_y]
         obs += [self.norm_target_x, self.norm_target_y]
@@ -91,6 +95,7 @@ class NGWEnvironment(ParallelEnv):
         for agent in self.agents:
             one_hot_agent = self.one_hot[agent]
             agent_observations[agent] = np.concatenate([obs_array, one_hot_agent])
+
         return agent_observations
 
     def close(self):
@@ -98,7 +103,7 @@ class NGWEnvironment(ParallelEnv):
 
     def reset(self, seed=None, options=None):
         state = None
-        self.drones = {"evaders": [], "pursuers": []}
+        self.drones = {EVADERS: [], PURSUERS: []}
         self.agents = []
         self.timestep = 0
 
@@ -128,11 +133,11 @@ class NGWEnvironment(ParallelEnv):
             drone = NGW_Drone(drone_state.id, drone_state.x, drone_state.y, is_evader)
             self.agents.append(drone.name)
             if is_evader:
-                self.drones["evaders"].append(drone)
+                self.drones[EVADERS].append(drone)
             else:
-                self.drones["pursuers"].append(drone)
+                self.drones[PURSUERS].append(drone)
 
-        if len(self.drones["evaders"]) == 0 or len(self.drones["pursuers"]) == 0:
+        if len(self.drones[EVADERS]) == 0 or len(self.drones[PURSUERS]) == 0:
             raise ValueError(
                 f"Pursuer or evader not initialized after reset\n{self.drones}"
             )
@@ -148,7 +153,7 @@ class NGWEnvironment(ParallelEnv):
 
     # Only gets called once?
     def step(self, actions: dict[str, float]):
-        if len(self.drones["evaders"]) == 0 or len(self.drones["pursuers"]) == 0:
+        if len(self.drones[EVADERS]) == 0 or len(self.drones[PURSUERS]) == 0:
             raise ValueError("Pursuer or evader not initialized")
 
         if self.step_delay > 0:
@@ -177,10 +182,11 @@ class NGWEnvironment(ParallelEnv):
         terminations["__all__"] = False
         truncations["__all__"] = False
 
+        state = None
         if response.state_response.WhichOneof("state_or_error") == "state":
             state = response.state_response.state
             for drone_state in state.drone_states:
-                key = "evaders" if drone_state.is_evader else "pursuers"
+                key = EVADERS if drone_state.is_evader else PURSUERS
                 # Mark destroyed drones as destroyed in python
                 if drone_state.destroyed:
                     for drone in self.drones[key]:
@@ -201,33 +207,25 @@ class NGWEnvironment(ParallelEnv):
 
         time_limit_reached = self.timestep >= self.time_limit
         rewards = self.reward_function.calculate_rewards(
-            new_state=response.state_response.state,
+            new_state=state,
             agents=self.agents,
             drones=self.drones,
             map_config=self.map_config,
             time_limit_reached=time_limit_reached,
         )
 
-        if time_limit_reached:
-            truncations = {a: True for a in self.agents}
-            truncations["__all__"] = True
-            self.agents = []
-        elif response.state_response.state.terminated:
+        if state.terminated:
             terminations = {a: True for a in self.agents}
             terminations["__all__"] = True
-            self.agents = []
-        else:
-            self.agents = [
-                d.name
-                for d in (self.drones["evaders"] + self.drones["pursuers"])
-                if not d.destroyed
-            ]
+        elif time_limit_reached:
+            truncations = {a: True for a in self.agents}
+            truncations["__all__"] = True
 
         self.timestep += 1
 
         infos = {a: {} for a in self.agents}
 
-        if response.state_response.state.terminated:
+        if state.terminated or time_limit_reached:
             episode_metrics = {
                 "captured": 1.0 if outcome.captured else 0.0,
                 "breached": 1.0 if outcome.breached else 0.0,
@@ -240,6 +238,16 @@ class NGWEnvironment(ParallelEnv):
                 infos[a]["episode_metrics"] = episode_metrics
 
         observations = self._get_obs()
+
+        # Remove terminated agents
+        if truncations["__all__"] or terminations["__all__"]:
+            self.agents = []
+        else:
+            self.agents = [
+                d.name
+                for d in (self.drones[EVADERS] + self.drones[PURSUERS])
+                if not d.destroyed
+            ]
 
         return observations, rewards, terminations, truncations, infos
 
