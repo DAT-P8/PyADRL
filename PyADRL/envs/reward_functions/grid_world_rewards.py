@@ -107,35 +107,3 @@ class GridWorldRewards(RewardFunction):
                     rewards[drone.name] += self.REWARD_PURSUER_MAX_TIMESTEPS
 
         return rewards
-
-        # punish the pursuers for being far from the evader to encourage them to move towards the evader
-        # for pursuer in drones["pursuers"]:
-        #     distance_to_evader = min(
-        #         np.sqrt((pursuer.x - evader.x) ** 2 + (pursuer.y - evader.y) ** 2)
-        #         for evader in drones["evaders"]
-        #     )
-        #     rewards[pursuer.name] += (
-        #         distance_to_evader * self.REWARD_PURSUER_FAR_FROM_EVADER
-        #     )
-
-        # reward the evader for being far from the pursuers to encourage it to move away from the pursuers
-        # for evader in drones["evaders"]:
-        #     distance_to_pursuer = min(
-        #         np.sqrt((evader.x - pursuer.x) ** 2 + (evader.y - pursuer.y) ** 2)
-        #         for pursuer in drones["pursuers"]
-        #     )
-        #     rewards[evader.name] += (
-        #         distance_to_pursuer * self.REWARD_EVADER_FAR_FROM_PUSUERS
-        #     )
-
-        # punish evaders for being far from the target to encourage them to move towards it
-        # for evader in drones["evaders"]:
-        #     distance_to_target = map_config.distance_to_target(evader.x, evader.y)
-        #     rewards[evader.name] += (
-        #         distance_to_target * self.REWARD_EVADER_FAR_FROM_TARGET
-        #     )
-
-        # for e in drones["evaders"]:
-        #    rewards[e.name] += self.REWARD_EVADER_MAX_TIMESTEPS
-        # for pursuer in drones["pursuers"]:
-        #    rewards[pursuer.name] += self.REWARD_PURSUER_MAX_TIMESTEPS

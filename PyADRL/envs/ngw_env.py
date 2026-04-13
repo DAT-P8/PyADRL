@@ -71,7 +71,6 @@ class NGWEnvironment(ParallelEnv):
         # one-hot agent ID, so drones can share a policy but still know who they are
         n_agents = self.n_evaders + self.n_pursuers
         # x,y pairs for each agent and the target tile
-        # TODO: un-hardcode the target when it is possible to make different target shapes
         n_positions = (n_agents + 1) * 2
         self.obs_space = Box(
             low=0.0, high=1.0, shape=(n_positions + n_agents,), dtype=np.float32
@@ -151,7 +150,6 @@ class NGWEnvironment(ParallelEnv):
 
         return (observations, infos)
 
-    # Only gets called once?
     def step(self, actions: dict[str, float]):
         if len(self.drones[EVADERS]) == 0 or len(self.drones[PURSUERS]) == 0:
             raise ValueError("Pursuer or evader not initialized")
@@ -202,7 +200,6 @@ class NGWEnvironment(ParallelEnv):
         else:
             raise ValueError("Recieved error from DoStepRequest")
 
-        # TODO: add capture rate to the outcome
         outcome = EpisodeOutcome(episode_length=self.timestep + 1)
 
         time_limit_reached = self.timestep >= self.time_limit
