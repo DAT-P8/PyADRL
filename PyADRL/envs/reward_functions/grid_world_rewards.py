@@ -2,7 +2,7 @@ from .rewards import RewardFunction
 from ..ngw_drone import NGW_Drone
 from ..map_configs.map_config import MapConfig
 from ...ngw.v1.ngw2d_pb2 import State
-import numpy as np
+from ...utils.chebeshyv import chebyshev_distance
 
 
 class GridWorldRewards(RewardFunction):
@@ -77,7 +77,7 @@ class GridWorldRewards(RewardFunction):
             if drone.is_evader:
                 # reward the evader for being far from the pursuers to encourage it to move away from the pursuers
                 distance_to_pursuer = min(
-                    np.sqrt((drone.x - pursuer.x) ** 2 + (drone.y - pursuer.y) ** 2)
+                    chebyshev_distance(drone.x, drone.y, pursuer.x, pursuer.y)
                     for pursuer in drones["pursuers"]
                 )
                 rewards[drone.name] += (
@@ -92,7 +92,7 @@ class GridWorldRewards(RewardFunction):
             else:
                 # punish the pursuers for being far from the evader to encourage them to move towards the evader
                 distance_to_evader = min(
-                    np.sqrt((drone.x - evader.x) ** 2 + (drone.y - evader.y) ** 2)
+                    chebyshev_distance(drone.x, drone.y, evader.x, evader.y)
                     for evader in drones["evaders"]
                 )
                 rewards[drone.name] += (

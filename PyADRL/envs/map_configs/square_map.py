@@ -1,6 +1,6 @@
 from .map_config import MapConfig
 from ...ngw.v1.ngw2d_pb2 import SquareMap, MapSpec
-import numpy as np
+from ...utils.chebeshyv import chebyshev_distance
 
 
 class SquareMapConfig(MapConfig):
@@ -22,7 +22,7 @@ class SquareMapConfig(MapConfig):
         return (x / self.width, y / self.height)
 
     def distance_to_target(self, x: int, y: int) -> float:
-        return np.sqrt((x - self.target_x) ** 2 + (y - self.target_y) ** 2)
+        return chebyshev_distance(x, y, self.target_x, self.target_y)
 
     def get_map_spec(self) -> MapSpec:
         return self.map_spec
