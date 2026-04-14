@@ -2,7 +2,6 @@ from .rewards import RewardFunction
 from ..ngw_drone import NGW_Drone
 from ..map_configs.map_config import MapConfig
 from ...ngw.v1.ngw2d_pb2 import State
-import numpy as np
 
 
 class GridWorldRewards(RewardFunction):
