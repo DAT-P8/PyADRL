@@ -24,7 +24,6 @@ class HeatmapCallback(RLlibCallback):
         files = glob.glob(os.path.join(_RESULTS_DIR, f"{EPISODE_FILE_PREFIX}*.json"))
         for path in files:
             os.remove(path)
-        print(f"[HeatmapCallback] Cleaned up {len(files)} old episode files.")
 
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
@@ -41,27 +40,20 @@ class HeatmapCallback(RLlibCallback):
         rl_module=None,
         **kwargs,
     ):
-        if env is None:
+        if not env or not env._infos:
             return
+        episode_info = env._infos[0]
 
-        infos = env._infos
-        if not infos:
-            return
-
-        info = infos[0]
-
-        for agent_id, agent_info in info.items():
+        for agent_id, agent_info in episode_info.items():
             drone = agent_info.get("drone_state", {})
             x, y = drone.get("x"), drone.get("y")
-            if x is None or y is None:
-                continue
 
             if agent_id.startswith("evader"):
                 states = episode.custom_data["evader_states"]
             elif agent_id.startswith("pursuer"):
                 states = episode.custom_data["pursuer_states"]
             else:
-                continue
+                raise ValueError(f"Unknown agent_id {agent_id} in HeatmapCallback")
 
             if agent_id not in states:
                 states[agent_id] = []
@@ -95,14 +87,15 @@ class HeatmapCallback(RLlibCallback):
         evaluation_metrics: dict,
         **kwargs,
     ) -> None:
-        time.sleep(
-            0.5
-        )  # Ensure all episode files have been written before we read them
+        # Sleep to ensure all episode files have been written before we read them
+        time.sleep(0.5)
+
         files = glob.glob(os.path.join(_RESULTS_DIR, f"{EPISODE_FILE_PREFIX}*.json"))
         if not files:
             print("[HeatmapCallback] No episode files found - nothing to plot.")
             return
 
+        # Concatenate all temporary episode files into one big file
         concatenated = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "evader_states": [],
@@ -120,6 +113,10 @@ class HeatmapCallback(RLlibCallback):
         with open(merged_path, "w") as f:
             json.dump(concatenated, f)
 
+        for path in files:  # clean up the temporary episode files after concatenation
+            os.remove(path)
+
+        # Plot the results
         self._plot_occupancy_heatmap(
             concatenated["evader_states"],
             title="Evader Position Heatmap",
@@ -132,9 +129,6 @@ class HeatmapCallback(RLlibCallback):
             filename=f"results/heatmap_pursuer_{date_str}.png",
             color="Blues",
         )
-
-        for path in files:  # clean up the temporary episode files after concatenation
-            os.remove(path)
 
     # PLOTTING METHODS
     def _plot_occupancy_heatmap(self, episode_states, *, title, filename, color):
