@@ -17,6 +17,7 @@ _RESULTS_DIR = os.path.normpath(
 
 EPISODE_FILE_PREFIX = "episode_states_tmp_"
 
+
 class HeatmapCallback(RLlibCallback):
     def on_evaluation_start(self, *, algorithm, **kwargs):
         # Clean up any old episode files from previous runs
@@ -132,7 +133,7 @@ class HeatmapCallback(RLlibCallback):
             color="Blues",
         )
 
-        for path in files: # clean up the temporary episode files after concatenation
+        for path in files:  # clean up the temporary episode files after concatenation
             os.remove(path)
 
     # PLOTTING METHODS
@@ -159,7 +160,7 @@ class HeatmapCallback(RLlibCallback):
             cmap=color,
             linewidths=0.3,
             linecolor="grey",
-            annot=(GRID_W <= 20 and GRID_H <= 20), # only show numbers if grid is small
+            annot=(GRID_W <= 20 and GRID_H <= 20),  # only show numbers if grid is small
             fmt="d",
             ax=ax,
             cbar_kws={"label": "Visit count"},
