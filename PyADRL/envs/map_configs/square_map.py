@@ -22,7 +22,7 @@ class SquareMapConfig(MapConfig):
         return (x / self.width, y / self.height)
 
     def distance_to_target(self, x: int, y: int) -> float:
-        return np.sqrt((x - self.target_x) ** 2 + (y - self.target_y) ** 2)
+        return max(abs(x - self.target_x), abs(y - self.target_y))
 
     def get_map_spec(self) -> MapSpec:
         return self.map_spec
