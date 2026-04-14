@@ -1,6 +1,5 @@
 from .map_config import MapConfig
 from ...ngw.v1.ngw2d_pb2 import SquareMap, MapSpec
-import numpy as np
 
 
 class SquareMapConfig(MapConfig):
