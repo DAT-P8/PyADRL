@@ -70,14 +70,14 @@ class HeatmapCallback(RLlibCallback):
         rl_module=None,
         **kwargs,
     ):
-        payload = {
+        drone_states = {
             "evader_states": episode.custom_data.get("evader_states", {}),
             "pursuer_states": episode.custom_data.get("pursuer_states", {}),
         }
         # Each worker writes its own file — episode_id keeps filenames unique
         path = os.path.join(_RESULTS_DIR, f"{EPISODE_FILE_PREFIX}{id(episode)}.json")
         with open(path, "w") as f:
-            json.dump(payload, f)
+            json.dump(drone_states, f)
 
     def on_evaluate_end(
         self,

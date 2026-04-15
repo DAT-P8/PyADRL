@@ -27,6 +27,7 @@ dependencies = [
   "scipy",
   "matplotlib",
   "lz4",
+  "seaborn",
 ]
 
 
