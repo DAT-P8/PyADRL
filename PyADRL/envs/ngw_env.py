@@ -11,7 +11,10 @@ from ..ngw.v1.ngw2d_pb2 import (
     DoStepRequest,
 )
 from ..utils.ngw2d_actions import get_action
-from ..utils.ngw2d_client import NGWClient
+from ..utils.ngw2d_client import (
+    NGWClient,
+    State,
+)
 from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
 from ..logger.metricslogger import EpisodeOutcome
@@ -107,7 +110,7 @@ class NGWEnvironment(ParallelEnv):
         self.timestep = 0
 
         if self.id is None:
-            response = self.client.New(
+            state = self.client.New(
                 NewRequest(
                     map=self.map_config.get_map_spec(),
                     evader_count=self.n_evaders,
@@ -115,17 +118,9 @@ class NGWEnvironment(ParallelEnv):
                     drone_velocity=self.drone_velocity,
                 )
             )
-            if response.state_response.WhichOneof("state_or_error") == "state":
-                state = response.state_response.state
-                self.id = state.sim_id
-            else:
-                raise ValueError("Error in new request")
+            self.id = state.sim_id
         else:
-            response = self.client.Reset(ResetRequest(sim_id=self.id))
-            if response.state_response.WhichOneof("state_or_error") == "state":
-                state = response.state_response.state
-            else:
-                raise ValueError("Error in reset request")
+            state = self.client.Reset(ResetRequest(sim_id=self.id))
 
         for drone_state in state.drone_states:
             is_evader = drone_state.is_evader
@@ -171,7 +166,7 @@ class NGWEnvironment(ParallelEnv):
                         )
                     )
 
-        response = self.client.DoStep(
+        state = self.client.DoStep(
             DoStepRequest(sim_id=self.id, drone_actions=actions_send)
         )
 
@@ -180,25 +175,20 @@ class NGWEnvironment(ParallelEnv):
         terminations["__all__"] = False
         truncations["__all__"] = False
 
-        state = None
-        if response.state_response.WhichOneof("state_or_error") == "state":
-            state = response.state_response.state
-            for drone_state in state.drone_states:
-                key = EVADERS if drone_state.is_evader else PURSUERS
-                # Mark destroyed drones as destroyed in python
-                if drone_state.destroyed:
-                    for drone in self.drones[key]:
-                        if drone_state.id == drone.id:
-                            drone.destroyed = True
-                            terminations[drone.name] = True
-                            break
-                else:  # Update positions
-                    for drone in self.drones[key]:
-                        if drone_state.id == drone.id:
-                            drone.x = drone_state.x
-                            drone.y = drone_state.y
-        else:
-            raise ValueError("Recieved error from DoStepRequest")
+        for drone_state in state.drone_states:
+            key = EVADERS if drone_state.is_evader else PURSUERS
+            # Mark destroyed drones as destroyed in python
+            if drone_state.destroyed:
+                for drone in self.drones[key]:
+                    if drone_state.id == drone.id:
+                        drone.destroyed = True
+                        terminations[drone.name] = True
+                        break
+            else:  # Update positions
+                for drone in self.drones[key]:
+                    if drone_state.id == drone.id:
+                        drone.x = drone_state.x
+                        drone.y = drone_state.y
 
         outcome = EpisodeOutcome(episode_length=self.timestep + 1)
 
@@ -228,7 +218,7 @@ class NGWEnvironment(ParallelEnv):
                 "breached": 1.0 if outcome.breached else 0.0,
                 "capture_step": float(outcome.capture_step)
                 if outcome.capture_step is not None
-                else 100.0,  # What is this?
+                else 100.0,
                 "episode_length": float(outcome.episode_length),
             }
             for a in self.agents:
