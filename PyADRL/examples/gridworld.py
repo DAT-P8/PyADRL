@@ -18,6 +18,7 @@ from ..logger.metricslogger import (
     print_eval_summary,
     write_metrics,
 )
+from ..logger.heatmaps import HeatmapCallback
 
 import matplotlib.pyplot as plt
 from ..utils.model_save import restore_testing, restore_training, setup_checkpoint_dir
@@ -177,31 +178,37 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
         algo.stop()
         ray.shutdown()
 
-    # Add final aggregate summary after all episodes are complete.
-    write_metrics(
-        train_metrics_path,
-        build_train(episodes_data, final_rewards=rewards[-1] if rewards else {}),
-    )
+        # Add final aggregate summary after all episodes are complete.
+        write_metrics(
+            train_metrics_path,
+            build_train(episodes_data, final_rewards=rewards[-1] if rewards else {}),
+        )
 
-    iterations = list(range(1, len(rewards) + 1))
-    evader_rewards = [r["evader_2"] for r in rewards]
-    pursuer_0_rewards = [r["pursuer_0"] for r in rewards]
+        iterations = list(range(1, len(rewards) + 1))
+        evader_rewards = [r["evader_2"] for r in rewards]
+        pursuer_0_rewards = [r["pursuer_0"] for r in rewards]
 
-    fig, ax = plt.subplots(figsize=(10, 5))
+        fig, ax = plt.subplots(figsize=(10, 5))
 
-    ax.plot(iterations, evader_rewards, label="Evader", color="royalblue", linewidth=2)
-    ax.plot(
-        iterations, pursuer_0_rewards, label="Pursuers", color="seagreen", linewidth=2
-    )
+        ax.plot(
+            iterations, evader_rewards, label="Evader", color="royalblue", linewidth=2
+        )
+        ax.plot(
+            iterations,
+            pursuer_0_rewards,
+            label="Pursuers",
+            color="seagreen",
+            linewidth=2,
+        )
 
-    ax.set_xlabel("Iteration")
-    ax.set_ylabel("Reward")
-    ax.set_title("Mean reward per Iteration")
-    ax.legend()
-    ax.grid(True, linestyle="--", alpha=0.5)
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel("Reward")
+        ax.set_title("Mean reward per Iteration")
+        ax.legend()
+        ax.grid(True, linestyle="--", alpha=0.5)
 
-    plt.tight_layout()
-    plt.show()
+        plt.tight_layout()
+        plt.show()
 
 
 def gridworld_test(checkpoint_path: str):
@@ -232,7 +239,7 @@ def gridworld_test(checkpoint_path: str):
         .env_runners(
             num_env_runners=1,
         )
-        .callbacks(MetricsCallback)
+        .callbacks(callbacks_class=[MetricsCallback, HeatmapCallback])
         .evaluation(evaluation_num_env_runners=1)
     )
 

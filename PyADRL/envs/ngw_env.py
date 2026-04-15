@@ -236,6 +236,14 @@ class NGWEnvironment(ParallelEnv):
 
         observations = self._get_obs()
 
+        for d in self.drones[EVADERS] + self.drones[PURSUERS]:
+            if d.name in infos:
+                infos[d.name]["drone_state"] = {
+                    "x": d.x,
+                    "y": d.y,
+                    "destroyed": d.destroyed,
+                }
+
         # Remove terminated agents
         if truncations["__all__"] or terminations["__all__"]:
             self.agents = []
