@@ -3,10 +3,10 @@ from ..ngw.v1 import ngw2d_pb2, ngw2d_pb2_grpc
 
 
 class EventTypes:
-    CollisionEvent = 1
-    TargetReachedEvent = 2
-    OutOfBoundsEvent = 3
-    CaptureEvent = 4
+    CollisionEvent = "collision"
+    TargetReachedEvent = "target"
+    OutOfBoundsEvent = "out-of-bounds"
+    CaptureEvent = "capture"
 
 
 class DroneState:
@@ -72,7 +72,7 @@ class NGWClient:
 
     def Close(self, request: ngw2d_pb2.CloseRequest) -> None:
         close_response = self.stub.Close(request)
-        if close_response.has_error_message():
+        if close_response.HasField("error_message"):
             raise ValueError(
                 f"Close request responded with an error: {close_response.error_message}"
             )
@@ -115,5 +115,4 @@ class NGWClient:
             if event_type not in events.keys():
                 events[event_type] = []
             events[event_type].append(drone_ids)
-
         return State(sim_id, terminated, drone_states, events)

@@ -11,10 +11,7 @@ from ..ngw.v1.ngw2d_pb2 import (
     DoStepRequest,
 )
 from ..utils.ngw2d_actions import get_action
-from ..utils.ngw2d_client import (
-    NGWClient,
-    State,
-)
+from ..utils.ngw2d_client import NGWClient
 from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
 from ..logger.metricslogger import EpisodeOutcome
