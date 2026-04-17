@@ -44,7 +44,7 @@ def sample_opponent(pool: list[dict]) -> dict:
 def gridworld_train(checkpoint: str | None = None, model_name: str | None = None):
     # If Ray is already initialized from a previous run, shut it down before starting a new one.
     ray.shutdown()
-    ray.init(log_to_driver=True)
+    ray.init(log_to_driver=False)
 
     register_env(
         "gridworld",
