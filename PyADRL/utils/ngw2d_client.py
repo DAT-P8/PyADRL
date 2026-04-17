@@ -3,10 +3,10 @@ from ..ngw.v1 import ngw2d_pb2, ngw2d_pb2_grpc
 
 
 class EventTypes:
-    CollisionEvent = "collision"
-    TargetReachedEvent = "target"
-    OutOfBoundsEvent = "out-of-bounds"
-    CaptureEvent = "capture"
+    CollisionEvent = "collision_event"
+    TargetReachedEvent = "target_reached_event"
+    OutOfBoundsEvent = "out_of_bounds_event"
+    CaptureEvent = "capture_event"
 
 
 class DroneState:
@@ -96,13 +96,13 @@ class NGWClient:
             drone_ids = []
             event_type = None
             match e.WhichOneof("event_oneof"):
-                case "target_reached_event":
+                case EventTypes.TargetReachedEvent as target_reached:
                     drone_ids = e.target_reached_event.drone_ids
-                    event_type = EventTypes.TargetReachedEvent
-                case "out_of_bounds_event":
+                    event_type = target_reached
+                case EventTypes.OutOfBoundsEvent as out_of_bounds:
                     drone_ids = e.out_of_bounds_event.drone_ids
-                    event_type = EventTypes.OutOfBoundsEvent
-                case "collision_event":
+                    event_type = out_of_bounds
+                case EventTypes.CollisionEvent:
                     drone_ids = e.collision_event.drone_ids
                     # Determine if it was a collision or a capture
                     has_evader = any(d in ids["evaders"] for d in drone_ids)
@@ -112,6 +112,8 @@ class NGWClient:
                         if has_evader and has_pursuer
                         else EventTypes.CollisionEvent
                     )
+                case _ as unkown_event:
+                    raise ValueError(f"Recieved unkown event type {unkown_event}")
             if event_type not in events.keys():
                 events[event_type] = []
             events[event_type].append(drone_ids)

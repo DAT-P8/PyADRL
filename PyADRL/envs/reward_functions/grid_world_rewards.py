@@ -47,8 +47,9 @@ class GridWorldRewards(RewardFunction):
             for drone_ids in event_occurances:
                 for id in drone_ids:
                     if id not in all_drones:
-                        continue  # TODO: remove this when events are fixed
-                        # raise ValueError(f"Terminated agent with id {id} recieved from {event_type} event")
+                        raise ValueError(
+                            f"Terminated agent with id {id} recieved from {event_type}"
+                        )
                     flat_drone_ids.append(id)
 
             match event_type:
