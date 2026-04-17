@@ -85,6 +85,8 @@ class GridWorldRewards(RewardFunction):
                     ]
                     for p in other_pursuers:
                         rewards[p.name] += self.REWARD_PURSUER_CAUGHT_EVADER_OTHERS
+                case EventTypes.PursuerEnteredTargetEvent:
+                    pass
 
         for drone in all_drones.values():
             if drone.is_evader:

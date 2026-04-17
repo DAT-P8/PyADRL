@@ -7,6 +7,7 @@ class EventTypes:
     TargetReachedEvent = "target_reached_event"
     OutOfBoundsEvent = "out_of_bounds_event"
     CaptureEvent = "capture_event"
+    PursuerEnteredTargetEvent = "pursuer_entered_target_event"
 
 
 class DroneState:
@@ -112,6 +113,9 @@ class NGWClient:
                         if has_evader and has_pursuer
                         else EventTypes.CollisionEvent
                     )
+                case EventTypes.PursuerEnteredTargetEvent as pusuer_in_target:
+                    drone_ids = e.pursuer_entered_target_event.drone_ids
+                    event_type = pusuer_in_target
                 case _ as unkown_event:
                     raise ValueError(f"Recieved unkown event type {unkown_event}")
             if event_type not in events.keys():
