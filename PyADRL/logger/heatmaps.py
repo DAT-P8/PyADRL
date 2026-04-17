@@ -18,10 +18,12 @@ EPISODE_FILE_PREFIX = "episode_states_tmp_"
 
 
 class HeatmapCallback(RLlibCallback):
-    grid_w = 0
-    grid_h = 0
-    target_x = 0
-    target_y = 0
+    def __init__(self):
+        super().__init__()
+        self.grid_w = 0
+        self.grid_h = 0
+        self.target_x = 0
+        self.target_y = 0
 
     def on_algorithm_init(
         self,
@@ -34,10 +36,11 @@ class HeatmapCallback(RLlibCallback):
         files = glob.glob(os.path.join(_RESULTS_DIR, f"{EPISODE_FILE_PREFIX}*.json"))
         for path in files:
             os.remove(path)
-        self.grid_w = algorithm.config.env_config.get("map_width")
-        self.grid_h = algorithm.config.env_config.get("map_height")
-        self.target_x = algorithm.config.env_config.get("target_x")
-        self.target_y = algorithm.config.env_config.get("target_y")
+        if algorithm and algorithm.config:
+            self.grid_w = algorithm.config.env_config.get("map_width", 0)
+            self.grid_h = algorithm.config.env_config.get("map_height", 0)
+            self.target_x = algorithm.config.env_config.get("target_x", 0)
+            self.target_y = algorithm.config.env_config.get("target_y", 0)
 
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
