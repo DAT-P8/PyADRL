@@ -29,7 +29,7 @@ class HeatmapCallback(RLlibCallback):
         self,
         *,
         algorithm,
-        metrics_logger,
+        metrics_logger=None,
         **kwargs,
     ) -> None:
         # Clean up any old episode files from previous runs
