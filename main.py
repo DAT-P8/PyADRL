@@ -6,7 +6,7 @@ GRIDWORLD = "gridworld"
 
 examples = [GRIDWORLD]
 
-
+log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Example CLI parser")
 
@@ -64,6 +64,13 @@ def parse_args() -> argparse.Namespace:
         help="X and Y coordinates of the target in the gridworld map (only for gridworld example)",
     )
 
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        required=False,
+        default="ERROR",
+        help=f"Log levels available: {', '.join(log_levels)}",
+    )
     return parser.parse_args()
 
 
@@ -72,6 +79,12 @@ def main():
         os.makedirs("checkpoints")
 
     args = parse_args()
+
+    if args.log_level:
+        if args.log_level.upper() in log_levels:
+            os.environ["RAY_LOGGER_LEVEL"] = args.log_level.upper()
+        else:
+            raise ValueError(f"Unknown log level: {args.log_level}. Available log levels: {', '.join(log_levels)}")
 
     if args.train:
         if args.train == GRIDWORLD:
