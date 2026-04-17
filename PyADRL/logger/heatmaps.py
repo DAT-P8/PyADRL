@@ -221,17 +221,7 @@ class HeatmapCallback(RLlibCallback):
         ax.invert_yaxis()
 
         # Draw the target square
-        rect = patches.Rectangle(
-            (self.target_x, self.target_y),
-            1,
-            1,
-            linewidth=2,
-            edgecolor="green",
-            facecolor="green",
-            alpha=0.3,
-            label="Target",
-        )
-        ax.add_patch(rect)
+        self._draw_target(ax)
 
         plt.tight_layout()
         plt.savefig(filename, dpi=150)
@@ -361,17 +351,7 @@ class HeatmapCallback(RLlibCallback):
         ax.grid(True, which="minor", linewidth=0.3, alpha=0.4)
 
         # Draw the target square
-        target_rect = patches.Rectangle(
-            (self.target_x, self.target_y),
-            1,
-            1,
-            linewidth=2,
-            edgecolor="green",
-            facecolor="green",
-            alpha=0.3,
-            label="Target",
-        )
-        ax.add_patch(target_rect)
+        self._draw_target(ax)
 
         ax.tick_params(axis="both", which="major", pad=8)
         ax.set_aspect("equal", adjustable="box")
@@ -381,3 +361,16 @@ class HeatmapCallback(RLlibCallback):
         plt.savefig(filename, dpi=150)
         plt.close(fig)
         print(f"Actor Traces Saved in {filename}")
+
+    def _draw_target(self, ax):
+        rect = patches.Rectangle(
+            (self.target_x, self.target_y),
+            1,
+            1,
+            linewidth=2,
+            edgecolor="green",
+            facecolor="green",
+            alpha=0.3,
+            label="Target",
+        )
+        ax.add_patch(rect)
