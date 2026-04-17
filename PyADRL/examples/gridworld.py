@@ -44,7 +44,7 @@ def sample_opponent(pool: list[dict]) -> dict:
 def gridworld_train(checkpoint: str | None = None, model_name: str | None = None):
     # If Ray is already initialized from a previous run, shut it down before starting a new one.
     ray.shutdown()
-    ray.init(log_to_driver=False)
+    ray.init(log_to_driver=True)
 
     register_env(
         "gridworld",
@@ -211,7 +211,9 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
         plt.show()
 
 
-def gridworld_test(checkpoint_path: str):
+def gridworld_test(
+    checkpoint_path: str, width: int, height: int, target_x: int, target_y: int
+):
     ray.init()
 
     register_env(
@@ -219,7 +221,7 @@ def gridworld_test(checkpoint_path: str):
         lambda cfg: ParallelPettingZooEnv(
             NGWEnvironment(
                 channel=grpc.insecure_channel("localhost:50051"),
-                map_config=SquareMapConfig(11, 11, 5, 5),
+                map_config=SquareMapConfig(width, height, target_x, target_y),
                 reward_function=GridWorldRewards(),
                 n_pursuers=2,
                 n_evaders=1,
@@ -229,7 +231,15 @@ def gridworld_test(checkpoint_path: str):
 
     config: PPOConfig = (
         PPOConfig()
-        .environment("gridworld")
+        .environment(
+            "gridworld",
+            env_config={
+                "map_width": width,
+                "map_height": height,
+                "target_x": target_x,
+                "target_y": target_y,
+            },
+        )
         .multi_agent(
             policies={"pursuer_policy", "evader_policy"},
             policy_mapping_fn=lambda agent_id, *args, **kwargs: (

@@ -44,6 +44,26 @@ def parse_args() -> argparse.Namespace:
         "Can be used in combination with --restore to train a new model from an old checkpoint",
     )
 
+    parser.add_argument(
+        "--grid",
+        "-g",
+        type=int,
+        nargs=2,
+        required=False,
+        default=[11, 11],
+        help="Width and height of the gridworld map (only for gridworld example)",
+    )
+
+    parser.add_argument(
+        "--target",
+        "-t",
+        type=int,
+        nargs=2,
+        required=False,
+        default=[5, 5],
+        help="X and Y coordinates of the target in the gridworld map (only for gridworld example)",
+    )
+
     return parser.parse_args()
 
 
@@ -75,7 +95,13 @@ def main():
                 print("You need to specify a checkpoint with --restore")
             else:
                 print("Testing gridworld example:")
-                PyADRL.examples.gridworld.gridworld_test(checkpoint_path=checkpoint)
+                PyADRL.examples.gridworld.gridworld_test(
+                    checkpoint_path=checkpoint,
+                    width=args.grid[0],
+                    height=args.grid[1],
+                    target_x=args.target[0],
+                    target_y=args.target[1],
+                )
         else:
             print(
                 f"Unknown test example: {args.test}. Available examples: {', '.join(examples)}"
