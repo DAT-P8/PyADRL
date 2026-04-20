@@ -22,7 +22,6 @@ from ..logger.heatmaps import HeatmapCallback
 
 import matplotlib.pyplot as plt
 from ..utils.model_save import restore_testing, restore_training, setup_checkpoint_dir
-from PyADRL.utils.logger import Logger
 
 # Probability of sampling an old opponent policy
 P_OLD = 0.3
