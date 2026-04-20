@@ -1,6 +1,6 @@
 from parser import parse_args, log_levels
 import os
-import PyADRL.examples.gridworld
+from PyADRL.examples.gridworld_train import gridworld_train
 from PyADRL.utils.logger import Logger
 
 
@@ -31,7 +31,7 @@ def main():
             f"Target coordinates {args.target} are out of bounds for grid size {args.grid}"
         )
 
-    PyADRL.examples.gridworld.gridworld_train(
+    gridworld_train(
         checkpoint=checkpoint,
         model_name=model_name,
         width=args.grid[0],

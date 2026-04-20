@@ -1,7 +1,7 @@
 from PyADRL.utils.logger import Logger
 from parser import parse_args, log_levels
 import os
-import PyADRL.examples.gridworld
+from PyADRL.examples.gridworld_eval import gridworld_eval
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
         print("You need to specify a checkpoint with --restore")
     else:
         print("Evaluating gridworld example:")
-        PyADRL.examples.gridworld.gridworld_test(
+        gridworld_eval(
             checkpoint_path=checkpoint,
             width=args.grid[0],
             height=args.grid[1],
