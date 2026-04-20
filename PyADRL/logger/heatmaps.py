@@ -27,17 +27,19 @@ class HeatmapCallback(RLlibCallback):
         self,
         *,
         algorithm,
-        metrics_logger = None,
+        metrics_logger=None,
         **kwargs,
     ) -> None:
         # Clean up any old episode files from previous runs
         files = glob.glob(os.path.join(_RESULTS_DIR, f"{EPISODE_FILE_PREFIX}*.json"))
         for path in files:
             os.remove(path)
-        
+
         if algorithm.config is None or algorithm.config.env_config is None:
-            raise ValueError("HeatmapCallback requires env_config to be set in the algorithm config")
-        
+            raise ValueError(
+                "HeatmapCallback requires env_config to be set in the algorithm config"
+            )
+
         self.grid_w = algorithm.config.env_config.get("map_width", 0)
         self.grid_h = algorithm.config.env_config.get("map_height", 0)
         self.target_x = algorithm.config.env_config.get("target_x", 0)
