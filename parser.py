@@ -2,6 +2,7 @@ import argparse
 
 log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Example CLI parser")
 

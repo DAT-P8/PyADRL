@@ -23,3 +23,7 @@ class Logger:
     @staticmethod
     def critical(msg: str):
         Logger.logger.critical("Critical: " + msg)
+
+    @staticmethod
+    def set_level(level: int):
+        Logger.logger.setLevel(level)

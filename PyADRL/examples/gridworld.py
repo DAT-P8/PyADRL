@@ -22,6 +22,7 @@ from ..logger.heatmaps import HeatmapCallback
 
 import matplotlib.pyplot as plt
 from ..utils.model_save import restore_testing, restore_training, setup_checkpoint_dir
+from PyADRL.utils.logger import Logger
 
 # Probability of sampling an old opponent policy
 P_OLD = 0.3
@@ -41,17 +42,24 @@ def sample_opponent(pool: list[dict]) -> dict:
         return pool[-1]
 
 
-def gridworld_train(checkpoint: str | None = None, model_name: str | None = None):
+def gridworld_train(
+    checkpoint: str | None = None,
+    model_name: str | None = None,
+    width: int = 11,
+    height: int = 11,
+    target_x: int = 5,
+    target_y: int = 5,
+):
     # If Ray is already initialized from a previous run, shut it down before starting a new one.
     ray.shutdown()
-    ray.init(log_to_driver=True)
+    ray.init()
 
     register_env(
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
             NGWEnvironment(
                 channel=grpc.insecure_channel("localhost:50051"),
-                map_config=SquareMapConfig(11, 11, 5, 5),
+                map_config=SquareMapConfig(width, height, target_x, target_y),
                 reward_function=GridWorldRewards(),
                 n_pursuers=2,
                 n_evaders=1,
@@ -61,7 +69,15 @@ def gridworld_train(checkpoint: str | None = None, model_name: str | None = None
 
     config: PPOConfig = (
         PPOConfig()
-        .environment("gridworld")
+        .environment(
+            "gridworld",
+            env_config={
+                "map_width": width,
+                "map_height": height,
+                "target_x": target_x,
+                "target_y": target_y,
+            },
+        )
         .multi_agent(
             policies={"pursuer_policy", "evader_policy"},
             policy_mapping_fn=lambda agent_id, *args, **kwargs: (
