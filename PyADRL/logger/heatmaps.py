@@ -3,14 +3,13 @@ import glob
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import seaborn as sns
 from datetime import datetime
 from ray.rllib.callbacks.callbacks import RLlibCallback
 import time
 
 # TODO: GRID SIZE SHOULD BE DYNAMIC BASED ON MAP CONFIG, NOT HARDCODED
-GRID_W, GRID_H = 11, 11
-
 _RESULTS_DIR = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "results")
 )
@@ -19,11 +18,29 @@ EPISODE_FILE_PREFIX = "episode_states_tmp_"
 
 
 class HeatmapCallback(RLlibCallback):
-    def on_evaluation_start(self, *, algorithm, **kwargs):
+    def __init__(self):
+        super().__init__()
+        self.grid_w = 0
+        self.grid_h = 0
+        self.target_x = 0
+        self.target_y = 0
+
+    def on_algorithm_init(
+        self,
+        *,
+        algorithm,
+        metrics_logger=None,
+        **kwargs,
+    ) -> None:
         # Clean up any old episode files from previous runs
         files = glob.glob(os.path.join(_RESULTS_DIR, f"{EPISODE_FILE_PREFIX}*.json"))
         for path in files:
             os.remove(path)
+        if algorithm and algorithm.config:
+            self.grid_w = algorithm.config.env_config.get("map_width", 0)
+            self.grid_h = algorithm.config.env_config.get("map_height", 0)
+            self.target_x = algorithm.config.env_config.get("target_x", 0)
+            self.target_y = algorithm.config.env_config.get("target_y", 0)
 
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
@@ -180,9 +197,9 @@ class HeatmapCallback(RLlibCallback):
             print(f"[HeatmapCallback] No positions collected for {title}, skipping.")
             return
 
-        grid = np.zeros((GRID_H, GRID_W), dtype=int)
+        grid = np.zeros((self.grid_h, self.grid_w), dtype=int)
         for x, y in all_positions:
-            if 0 <= x < GRID_W and 0 <= y < GRID_H:
+            if 0 <= x < self.grid_w and 0 <= y < self.grid_h:
                 grid[y, x] += 1
 
         fig, ax = plt.subplots(figsize=(8, 6))
@@ -191,7 +208,9 @@ class HeatmapCallback(RLlibCallback):
             cmap=color,
             linewidths=0.3,
             linecolor="grey",
-            annot=(GRID_W <= 20 and GRID_H <= 20),  # only show numbers if grid is small
+            annot=(
+                self.grid_w <= 20 and self.grid_h <= 20
+            ),  # only show numbers if grid is small
             fmt="d",
             ax=ax,
             cbar_kws={"label": "Visit count"},
@@ -200,6 +219,10 @@ class HeatmapCallback(RLlibCallback):
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.invert_yaxis()
+
+        # Draw the target square
+        self._draw_target(ax)
+
         plt.tight_layout()
         plt.savefig(filename, dpi=150)
         # plt.show()
@@ -237,8 +260,8 @@ class HeatmapCallback(RLlibCallback):
                     for x, y in positions
                     if isinstance(x, (int, float))
                     and isinstance(y, (int, float))
-                    and 0 <= x < GRID_W
-                    and 0 <= y < GRID_H
+                    and 0 <= x < self.grid_w
+                    and 0 <= y < self.grid_h
                 ]
                 if not cleaned:
                     continue
@@ -311,21 +334,25 @@ class HeatmapCallback(RLlibCallback):
         ax.set_title(title)
         ax.set_xlabel("x")
         ax.set_ylabel("y")
-        ax.set_xlim(0, GRID_W)
-        ax.set_ylim(0, GRID_H)
+        ax.set_xlim(0, self.grid_w)
+        ax.set_ylim(0, self.grid_h)
 
         # Label cell indices at centers (0.5, 1.5, ...) while keeping grid on boundaries.
-        x_center_ticks = np.arange(0.5, GRID_W, 1)
-        y_center_ticks = np.arange(0.5, GRID_H, 1)
+        x_center_ticks = np.arange(0.5, self.grid_w, 1)
+        y_center_ticks = np.arange(0.5, self.grid_h, 1)
         ax.set_xticks(x_center_ticks)
         ax.set_yticks(y_center_ticks)
-        ax.set_xticklabels(np.arange(0, GRID_W, 1))
-        ax.set_yticklabels(np.arange(0, GRID_H, 1))
+        ax.set_xticklabels(np.arange(0, self.grid_w, 1))
+        ax.set_yticklabels(np.arange(0, self.grid_h, 1))
 
         # Boundary grid lines at integer coordinates.
-        ax.set_xticks(np.arange(0, GRID_W + 1, 1), minor=True)
-        ax.set_yticks(np.arange(0, GRID_H + 1, 1), minor=True)
+        ax.set_xticks(np.arange(0, self.grid_w + 1, 1), minor=True)
+        ax.set_yticks(np.arange(0, self.grid_h + 1, 1), minor=True)
         ax.grid(True, which="minor", linewidth=0.3, alpha=0.4)
+
+        # Draw the target square
+        self._draw_target(ax)
+
         ax.tick_params(axis="both", which="major", pad=8)
         ax.set_aspect("equal", adjustable="box")
         ax.legend(loc="upper right")
@@ -334,3 +361,16 @@ class HeatmapCallback(RLlibCallback):
         plt.savefig(filename, dpi=150)
         plt.close(fig)
         print(f"Actor Traces Saved in {filename}")
+
+    def _draw_target(self, ax):
+        rect = patches.Rectangle(
+            (self.target_x, self.target_y),
+            1,
+            1,
+            linewidth=2,
+            edgecolor="green",
+            facecolor="green",
+            alpha=0.3,
+            label="Target",
+        )
+        ax.add_patch(rect)
