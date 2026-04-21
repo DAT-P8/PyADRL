@@ -77,7 +77,7 @@ class NGWEnvironment(ParallelEnv):
         )
 
         # 9 possible actions
-        self.act_space = Discrete(9)
+        self.act_space = Discrete(9 * drone_velocity)
 
     def _get_obs(self):
         obs = []
@@ -155,11 +155,13 @@ class NGWEnvironment(ParallelEnv):
         for drones in self.drones.values():
             for d in drones:
                 if not d.destroyed:
+                    steps = int(actions[d.name]) // 9 + 1
+                    direction = get_action(int(actions[d.name]) % 9)
                     actions_send.append(
                         DroneAction(
                             id=d.id,
-                            action=get_action(actions[d.name]),
-                            velocity=self.drone_velocity,
+                            action=direction,
+                            velocity=steps,
                         )
                     )
 
