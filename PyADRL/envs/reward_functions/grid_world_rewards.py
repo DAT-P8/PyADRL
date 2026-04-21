@@ -1,7 +1,7 @@
 from .rewards import RewardFunction
 from ..ngw_drone import NGW_Drone
 from ..map_configs.map_config import MapConfig
-from ...ngw.v1.ngw2d_pb2 import State
+from ...utils.ngw2d_client import State, EventTypes
 from ...utils.chebeshyv import chebyshev_distance
 
 
@@ -42,43 +42,62 @@ class GridWorldRewards(RewardFunction):
         }
 
         # distribute rewards for events that occured
-        for event in new_state.events:
-            which_one = event.WhichOneof("event_oneof")
-            match which_one:
-                case "target_reached_event ":
-                    ids = [d for d in event.target_reached_event.drone_ids]
-                    for id in ids:
+        for event_type, event_occurances in new_state.events.items():
+            flat_drone_ids = []
+            for drone_ids in event_occurances:
+                for id in drone_ids:
+                    if id not in all_drones:
+                        raise ValueError(
+                            f"Terminated agent with id {id} recieved from {event_type}"
+                        )
+                    flat_drone_ids.append(id)
+
+            match event_type:
+                case EventTypes.TargetReachedEvent:
+                    for id in flat_drone_ids:
                         d = all_drones[id]
-                        if d is None:
-                            raise Exception(f"Drone with id {id} not found")
                         rewards[d.name] += self.REWARD_EVADER_TARGET_REACHED
-                case "out_of_bounds_event ":
-                    ids = [d for d in event.out_of_bounds_event.drone_ids]
-                    for id in ids:
+                case EventTypes.OutOfBoundsEvent:
+                    for id in flat_drone_ids:
                         d = all_drones[id]
-                        if d is None:
-                            raise Exception(f"Drone with id {id} not found")
                         if d.is_evader:
                             rewards[d.name] += self.REWARD_EVADER_OUT_OF_BOUNDS
                         else:
                             rewards[d.name] += self.REWARD_PURSUER_OUT_OF_BOUNDS
-                case "collision_event ":
-                    ids = [d for d in event.collision_event.drone_ids]
-                    for id in ids:
+                case EventTypes.CollisionEvent:
+                    for id in flat_drone_ids:
                         d = all_drones[id]
-                        if d is None:
-                            raise Exception(f"Drone with id {id} not found")
                         if d.is_evader:
                             rewards[d.name] += self.REWARD_EVADER_DESTROYED
                         else:
                             rewards[d.name] += self.REWARD_PURSUER_DESTROYED
+                case EventTypes.CaptureEvent:
+                    for id in flat_drone_ids:
+                        d = all_drones[id]
+                        if d.is_evader:
+                            rewards[d.name] += self.REWARD_EVADER_CAUGHT
+                        else:
+                            rewards[d.name] += self.REWARD_PURSUER_CAUGHT_EVADER_SELF
+                    other_pursuers = [
+                        d
+                        for d in drones["pursuers"]
+                        if d.id not in flat_drone_ids and not d.destroyed
+                    ]
+                    for p in other_pursuers:
+                        rewards[p.name] += self.REWARD_PURSUER_CAUGHT_EVADER_OTHERS
+                case EventTypes.PursuerEnteredTargetEvent:
+                    pass
 
         for drone in all_drones.values():
             if drone.is_evader:
                 # reward the evader for being far from the pursuers to encourage it to move away from the pursuers
                 distance_to_pursuer = min(
-                    chebyshev_distance(drone.x, drone.y, pursuer.x, pursuer.y)
-                    for pursuer in drones["pursuers"]
+                    (
+                        chebyshev_distance(drone.x, drone.y, pursuer.x, pursuer.y)
+                        for pursuer in drones["pursuers"]
+                        if not pursuer.destroyed
+                    ),
+                    default=0,
                 )
                 rewards[drone.name] += (
                     distance_to_pursuer * self.REWARD_EVADER_FAR_FROM_PUSUERS
@@ -92,8 +111,12 @@ class GridWorldRewards(RewardFunction):
             else:
                 # punish the pursuers for being far from the evader to encourage them to move towards the evader
                 distance_to_evader = min(
-                    chebyshev_distance(drone.x, drone.y, evader.x, evader.y)
-                    for evader in drones["evaders"]
+                    (
+                        chebyshev_distance(drone.x, drone.y, evader.x, evader.y)
+                        for evader in drones["evaders"]
+                        if not evader.destroyed
+                    ),
+                    default=0,
                 )
                 rewards[drone.name] += (
                     distance_to_evader * self.REWARD_PURSUER_FAR_FROM_EVADER
@@ -105,5 +128,4 @@ class GridWorldRewards(RewardFunction):
                     rewards[drone.name] += self.REWARD_EVADER_MAX_TIMESTEPS
                 else:
                     rewards[drone.name] += self.REWARD_PURSUER_MAX_TIMESTEPS
-
         return rewards

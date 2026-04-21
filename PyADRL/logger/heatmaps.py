@@ -18,10 +18,12 @@ EPISODE_FILE_PREFIX = "episode_states_tmp_"
 
 
 class HeatmapCallback(RLlibCallback):
-    grid_w = 0
-    grid_h = 0
-    target_x = 0
-    target_y = 0
+    def __init__(self):
+        super().__init__()
+        self.grid_w = 0
+        self.grid_h = 0
+        self.target_x = 0
+        self.target_y = 0
 
     def on_algorithm_init(
         self,
@@ -34,6 +36,11 @@ class HeatmapCallback(RLlibCallback):
         files = glob.glob(os.path.join(_RESULTS_DIR, f"{EPISODE_FILE_PREFIX}*.json"))
         for path in files:
             os.remove(path)
+        if algorithm and algorithm.config:
+            self.grid_w = algorithm.config.env_config.get("map_width", 0)
+            self.grid_h = algorithm.config.env_config.get("map_height", 0)
+            self.target_x = algorithm.config.env_config.get("target_x", 0)
+            self.target_y = algorithm.config.env_config.get("target_y", 0)
 
         if algorithm.config is None or algorithm.config.env_config is None:
             raise ValueError(
@@ -224,17 +231,7 @@ class HeatmapCallback(RLlibCallback):
         ax.invert_yaxis()
 
         # Draw the target square
-        rect = patches.Rectangle(
-            (self.target_x, self.target_y),
-            1,
-            1,
-            linewidth=2,
-            edgecolor="green",
-            facecolor="green",
-            alpha=0.3,
-            label="Target",
-        )
-        ax.add_patch(rect)
+        self._draw_target(ax)
 
         plt.tight_layout()
         plt.savefig(filename, dpi=150)
@@ -364,17 +361,7 @@ class HeatmapCallback(RLlibCallback):
         ax.grid(True, which="minor", linewidth=0.3, alpha=0.4)
 
         # Draw the target square
-        target_rect = patches.Rectangle(
-            (self.target_x, self.target_y),
-            1,
-            1,
-            linewidth=2,
-            edgecolor="green",
-            facecolor="green",
-            alpha=0.3,
-            label="Target",
-        )
-        ax.add_patch(target_rect)
+        self._draw_target(ax)
 
         ax.tick_params(axis="both", which="major", pad=8)
         ax.set_aspect("equal", adjustable="box")
@@ -384,3 +371,16 @@ class HeatmapCallback(RLlibCallback):
         plt.savefig(filename, dpi=150)
         plt.close(fig)
         print(f"Actor Traces Saved in {filename}")
+
+    def _draw_target(self, ax):
+        rect = patches.Rectangle(
+            (self.target_x, self.target_y),
+            1,
+            1,
+            linewidth=2,
+            edgecolor="green",
+            facecolor="green",
+            alpha=0.3,
+            label="Target",
+        )
+        ax.add_patch(rect)
