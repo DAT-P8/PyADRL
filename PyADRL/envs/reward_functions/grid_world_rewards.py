@@ -8,6 +8,7 @@ from ...utils.chebeshyv import chebyshev_distance
 class GridWorldRewards(RewardFunction):
     # Rewards for evader
     REWARD_EVADER_TARGET_REACHED = 100
+    REWARD_EVADER_TARGET_REACHED_OTHER = 10
     REWARD_EVADER_CAUGHT = -100
     REWARD_EVADER_OUT_OF_BOUNDS = -1000
     REWARD_EVADER_MAX_TIMESTEPS = 50
@@ -27,6 +28,7 @@ class GridWorldRewards(RewardFunction):
     REWARD_PURSUER_DESTROYED = -1000
     REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
     REWARD_PURSUER_OUT_OF_BOUNDS = -100
+    REWARD_PURSUER_IN_TARGET = -100
 
     def calculate_rewards(
         self,
@@ -57,6 +59,13 @@ class GridWorldRewards(RewardFunction):
                     for id in flat_drone_ids:
                         d = all_drones[id]
                         rewards[d.name] += self.REWARD_EVADER_TARGET_REACHED
+                    other_evaders = [
+                        e 
+                        for e in drones["evaders"] 
+                        if e.id not in flat_drone_ids and not e.destroyed
+                    ]
+                    for e in other_evaders:
+                        rewards[e.name] += self.REWARD_EVADER_TARGET_REACHED_OTHER
                 case EventTypes.OutOfBoundsEvent:
                     for id in flat_drone_ids:
                         d = all_drones[id]
@@ -86,7 +95,9 @@ class GridWorldRewards(RewardFunction):
                     for p in other_pursuers:
                         rewards[p.name] += self.REWARD_PURSUER_CAUGHT_EVADER_OTHERS
                 case EventTypes.PursuerEnteredTargetEvent:
-                    pass
+                    for id in flat_drone_ids:
+                        d = all_drones[id]
+                        rewards[d.name] += self.REWARD_PURSUER_IN_TARGET
 
         for drone in all_drones.values():
             if drone.is_evader:
