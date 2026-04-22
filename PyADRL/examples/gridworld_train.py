@@ -227,7 +227,8 @@ def _run_alternating_loop(
             if checkpoint_dir and label == "pursuer":
                 print(f"Saving stage {k + 1} at {checkpoint_dir}/cp_{k + 1:05d}")
                 check = os.path.abspath(f"{checkpoint_dir}/cp_{k + 1:05d}")
-                algo.save(checkpoint_dir=check)
+                tune.report(checkpoint=check)
+                #algo.save(checkpoint_dir=check)
 
     return rewards, episodes_data
 
@@ -283,6 +284,7 @@ def gridworld_tune(
     height: int = 11,
     target_x: int = 5,
     target_y: int = 5,
+    checkpoint: str | None = None
 ) -> tune.ResultGrid:
     """Run a Ray Tune hyperparameter search over the alternating self-play loop.
 
@@ -338,6 +340,7 @@ def gridworld_tune(
         ),
         run_config=tune.RunConfig(
             name="gridworld_tune",
+            storage_path="./checkpoints",
             verbose=2,
         ),
     )
