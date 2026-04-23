@@ -111,7 +111,7 @@ class NGWEnvironment(ParallelEnv):
                 NewRequest(
                     map=self.map_config.get_map_spec(),
                     evader_count=self.n_evaders,
-                    pursuer_count=self.n_pursuers
+                    pursuer_count=self.n_pursuers,
                 )
             )
             self.id = state.sim_id
