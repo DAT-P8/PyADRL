@@ -22,7 +22,8 @@ from ..utils.map_load import load_map_config
 
 def gridworld_eval(
     map: str,
-    checkpoint_path: str
+    checkpoint_path: str,
+    delay: float,
 ):
     ray.init()
 
@@ -37,6 +38,7 @@ def gridworld_eval(
                 reward_function=GridWorldRewards(),
                 n_pursuers=2,
                 n_evaders=1,
+                step_delay=delay,
             )
         ),
     )

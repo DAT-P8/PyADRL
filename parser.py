@@ -42,4 +42,13 @@ def parse_args() -> argparse.Namespace:
         default="ERROR",
         help=f"Log levels available: {', '.join(log_levels)}",
     )
+
+    parser.add_argument(
+        "--delay",
+        "-d",
+        type=float,
+        required=False,
+        default=0.0,
+        help="Delay in seconds between each step."
+    )
     return parser.parse_args()

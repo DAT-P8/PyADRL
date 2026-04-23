@@ -27,6 +27,7 @@ def main():
         gridworld_eval(
             map=args.map,
             checkpoint_path=checkpoint,
+            delay=args.delay,
         )
 
 
