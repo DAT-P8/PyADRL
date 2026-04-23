@@ -112,7 +112,6 @@ class NGWEnvironment(ParallelEnv):
                     map=self.map_config.get_map_spec(),
                     evader_count=self.n_evaders,
                     pursuer_count=self.n_pursuers,
-                    drone_velocity=self.drone_velocity,
                 )
             )
             self.id = state.sim_id
