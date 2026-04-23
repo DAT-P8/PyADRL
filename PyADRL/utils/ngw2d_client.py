@@ -121,7 +121,7 @@ class NGWClient:
                     drone_ids = e.pursuer_entered_target_event.drone_ids
                     event_type = pusuer_in_target
                 case EventTypes.DroneObjectCollisionEvent as drone_object_collision:
-                    drone_ids = drone_object_collision.drone_ids
+                    drone_ids = e.drone_object_collision_event.drone_ids
                     event_type = drone_object_collision
                 case _ as unkown_event:
                     raise ValueError(f"Recieved unkown event type {unkown_event}")

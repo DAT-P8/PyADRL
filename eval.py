@@ -20,24 +20,13 @@ def main():
                 f"Unknown log level: {args.log_level}. Available log levels: {', '.join(log_levels)}"
             )
 
-    # check if target coordinates are within the grid
-    if not (0 <= args.target[0] < args.grid[0]) or not (
-        0 <= args.target[1] < args.grid[1]
-    ):
-        raise ValueError(
-            f"Target coordinates {args.target} are out of bounds for grid size {args.grid}"
-        )
-
     if checkpoint is None:
         print("You need to specify a checkpoint with --restore")
     else:
         print("Evaluating gridworld example:")
         gridworld_eval(
+            map=args.map,
             checkpoint_path=checkpoint,
-            width=args.grid[0],
-            height=args.grid[1],
-            target_x=args.target[0],
-            target_y=args.target[1],
         )
 
 

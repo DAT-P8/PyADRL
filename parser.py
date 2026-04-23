@@ -27,24 +27,13 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--grid",
-        "-g",
-        type=int,
-        nargs=2,
+        "--map",
+        type=str,
+        default="map_11_11",
         required=False,
-        default=[11, 11],
-        help="Width and height of the gridworld map (only for gridworld example)",
+        help="Map name, maps are found in PyADRL/examples/maps. Example: --map map_21_21",
     )
 
-    parser.add_argument(
-        "--target",
-        "-t",
-        type=int,
-        nargs=2,
-        required=False,
-        default=[5, 5],
-        help="X and Y coordinates of the target in the gridworld map (only for gridworld example)",
-    )
 
     parser.add_argument(
         "--log-level",

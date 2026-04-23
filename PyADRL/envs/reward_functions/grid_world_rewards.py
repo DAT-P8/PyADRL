@@ -14,6 +14,7 @@ class GridWorldRewards(RewardFunction):
     REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
     REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
     REWARD_EVADER_DESTROYED = -100
+    REWARD_EVADER_COLLISION_OBJECT = -100
 
     # Rewards for pursuers
     REWARD_PURSUER_MAX_TIMESTEPS = (
@@ -27,6 +28,7 @@ class GridWorldRewards(RewardFunction):
     REWARD_PURSUER_DESTROYED = -1000
     REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
     REWARD_PURSUER_OUT_OF_BOUNDS = -100
+    REWARD_PURSUER_COLLISION_OBJECT = -100
 
     def calculate_rewards(
         self,
@@ -86,14 +88,17 @@ class GridWorldRewards(RewardFunction):
                     for p in other_pursuers:
                         rewards[p.name] += self.REWARD_PURSUER_CAUGHT_EVADER_OTHERS
                 case EventTypes.PursuerEnteredTargetEvent:
-                    pass
+                    for id in flat_drone_ids:
+                        d = all_drones[id]
+                        rewards[d.name] += self.REWARD_PURSUER_TARGET_REACHED
                 case EventTypes.DroneObjectCollisionEvent:
+                    print(f"Collision event with drones")
                     for id in flat_drone_ids:
                         d = all_drones[id]
                         if d.is_evader:
-                            rewards[d.name] += self.REWARD_EVADER_DESTROYED
+                            rewards[d.name] += self.REWARD_EVADER_COLLISION_OBJECT
                         else:
-                            rewards[d.name] += self.REWARD_PURSUER_DESTROYED
+                            rewards[d.name] += self.REWARD_PURSUER_COLLISION_OBJECT
                 case _:
                     raise ValueError(f"Recieved unkown event type {event_type}")
 
@@ -137,4 +142,5 @@ class GridWorldRewards(RewardFunction):
                     rewards[drone.name] += self.REWARD_EVADER_MAX_TIMESTEPS
                 else:
                     rewards[drone.name] += self.REWARD_PURSUER_MAX_TIMESTEPS
+        print(f"Final rewards: {rewards}, events: {new_state.events}")
         return rewards
