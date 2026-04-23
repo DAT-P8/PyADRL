@@ -14,21 +14,21 @@ class GridWorldRewards(RewardFunction):
     REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
     REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
     REWARD_EVADER_DESTROYED = -100
-    REWARD_EVADER_COLLISION_OBJECT = -100
+    REWARD_EVADER_COLLISION_OBJECT = -200
 
     # Rewards for pursuers
     REWARD_PURSUER_MAX_TIMESTEPS = (
-        -100
+        -50
     )  # Punish pursuers for not catching evader in time
     REWARD_PURSUER_TARGET_REACHED = (
-        -100
+        -50
     )  # Punish pursuers for letting evader reach target
-    REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Reward for catching the evader yourself
-    REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
+    REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Rew ard for catching the evader yourself
+    REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 20  # Reward for helping catch the evader
     REWARD_PURSUER_DESTROYED = -1000
     REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
-    REWARD_PURSUER_OUT_OF_BOUNDS = -100
-    REWARD_PURSUER_COLLISION_OBJECT = -100
+    REWARD_PURSUER_OUT_OF_BOUNDS = -20
+    REWARD_PURSUER_COLLISION_OBJECT = -200
 
     def calculate_rewards(
         self,
@@ -142,5 +142,4 @@ class GridWorldRewards(RewardFunction):
                     rewards[drone.name] += self.REWARD_EVADER_MAX_TIMESTEPS
                 else:
                     rewards[drone.name] += self.REWARD_PURSUER_MAX_TIMESTEPS
-        print(f"Final rewards: {rewards}, events: {new_state.events}")
         return rewards
