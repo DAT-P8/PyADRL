@@ -70,8 +70,13 @@ class NGWEnvironment(ParallelEnv):
 
         # one-hot agent ID, so drones can share a policy but still know who they are
         n_agents = self.n_evaders + self.n_pursuers
-        # x,y pairs for each agent and the target tile
-        n_positions = (n_agents + 1) * 2
+        
+        map_spec = self.map_config.get_map_spec()
+        self.n_objects = len(map_spec.square_map.objects) if map_spec.HasField("square_map") else 0
+        self.objects_state = []
+
+        # x,y pairs for each agent, the target tile, and objects
+        n_positions = (n_agents + 1 + self.n_objects) * 2
         self.obs_space = Box(
             low=0.0, high=1.0, shape=(n_positions + n_agents,), dtype=np.float32
         )
@@ -88,6 +93,20 @@ class NGWEnvironment(ParallelEnv):
             (norm_x, norm_y) = self.map_config.normalise_position(e.x, e.y)
             obs += [norm_x, norm_y]
         obs += [self.norm_target_x, self.norm_target_y]
+        
+        for obj in self.objects_state:
+            if obj.HasField("square_object"):
+                (norm_x, norm_y) = self.map_config.normalise_position(obj.square_object.x, obj.square_object.y)
+                obs += [norm_x, norm_y]
+        
+        # pad with zeros if there are fewer objects than expected
+        expected_obj_features = self.n_objects * 2
+        actual_obj_features = len(obs) - (len(self.drones[PURSUERS]) * 2 + len(self.drones[EVADERS]) * 2 + 2)
+        if actual_obj_features < expected_obj_features:
+            obs += [0.0] * (expected_obj_features - actual_obj_features)
+        elif actual_obj_features > expected_obj_features:
+            obs = obs[:len(obs) - (actual_obj_features - expected_obj_features)]
+
         obs_array = np.array(obs, dtype=np.float32)
 
         agent_observations = {}
@@ -128,6 +147,8 @@ class NGWEnvironment(ParallelEnv):
             else:
                 self.drones[PURSUERS].append(drone)
 
+        self.objects_state = state.objects
+
         if len(self.drones[EVADERS]) == 0 or len(self.drones[PURSUERS]) == 0:
             raise ValueError(
                 f"Pursuer or evader not initialized after reset\n{self.drones}"
@@ -166,6 +187,7 @@ class NGWEnvironment(ParallelEnv):
         state = self.client.DoStep(
             DoStepRequest(sim_id=self.id, drone_actions=actions_send)
         )
+        self.objects_state = state.objects
 
         terminations: dict[str, bool] = {a: False for a in self.agents}
         truncations: dict[str, bool] = {a: False for a in self.agents}

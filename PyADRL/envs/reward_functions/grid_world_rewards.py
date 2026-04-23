@@ -87,6 +87,15 @@ class GridWorldRewards(RewardFunction):
                         rewards[p.name] += self.REWARD_PURSUER_CAUGHT_EVADER_OTHERS
                 case EventTypes.PursuerEnteredTargetEvent:
                     pass
+                case EventTypes.DroneObjectCollisionEvent:
+                    for id in flat_drone_ids:
+                        d = all_drones[id]
+                        if d.is_evader:
+                            rewards[d.name] += self.REWARD_EVADER_DESTROYED
+                        else:
+                            rewards[d.name] += self.REWARD_PURSUER_DESTROYED
+                case _:
+                    raise ValueError(f"Recieved unkown event type {event_type}")
 
         for drone in all_drones.values():
             if drone.is_evader:

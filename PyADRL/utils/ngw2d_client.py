@@ -8,6 +8,7 @@ class EventTypes:
     OutOfBoundsEvent = "out_of_bounds_event"
     CaptureEvent = "capture_event"
     PursuerEnteredTargetEvent = "pursuer_entered_target_event"
+    DroneObjectCollisionEvent = "drone_object_collision_event"
 
 
 class DroneState:
@@ -33,11 +34,13 @@ class State:
         terminated: bool = False,
         drone_states: list[DroneState] = [],
         events: dict[EventTypes, list[list[int]]] = {},
+        objects: list[ngw2d_pb2.ObjectSpec] = [],
     ):
         self.sim_id = sim_id
         self.terminated = terminated
         self.drone_states = drone_states
         self.events = events
+        self.objects = objects
 
 
 class NGWClient:
@@ -85,6 +88,7 @@ class NGWClient:
             DroneState(ds.id, ds.x, ds.y, ds.destroyed, ds.is_evader)
             for ds in state.drone_states
         ]
+        objects = list(state.objects)
 
         # Used to determine if a collision was a capture
         ids = {
@@ -116,9 +120,12 @@ class NGWClient:
                 case EventTypes.PursuerEnteredTargetEvent as pusuer_in_target:
                     drone_ids = e.pursuer_entered_target_event.drone_ids
                     event_type = pusuer_in_target
+                case EventTypes.DroneObjectCollisionEvent as drone_object_collision:
+                    drone_ids = drone_object_collision.drone_ids
+                    event_type = drone_object_collision
                 case _ as unkown_event:
                     raise ValueError(f"Recieved unkown event type {unkown_event}")
             if event_type not in events.keys():
                 events[event_type] = []
             events[event_type].append(drone_ids)
-        return State(sim_id, terminated, drone_states, events)
+        return State(sim_id, terminated, drone_states, events, objects)
