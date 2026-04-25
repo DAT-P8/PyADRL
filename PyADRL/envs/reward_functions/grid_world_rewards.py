@@ -108,6 +108,15 @@ class GridWorldRewards(RewardFunction):
                 else:
                     rewards[drone.name] += self.REWARD_PURSUER_DESTROYED
 
+        for id in all_drones:
+            drone = all_drones[id]
+
+            # TODO: this rewards the actual catcher twice, once for catching, once for shared reward
+            # It is intentional, but maybe we should talk about it
+            if not drone.is_evader:
+                rewards[drone.name] += len(evaders_caught) * self.REWARD_PURSUER_CAUGHT_EVADER_OTHERS
+
+
         for id in pursuer_entered_target_set:
             pass
 
