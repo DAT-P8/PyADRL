@@ -12,6 +12,7 @@ from ..ngw.v1.ngw2d_pb2 import (
     PursuerEnteredTargetEvent as GRPC_PursuerEnteredTargetEvent,
 )
 
+
 class Action:
     ACTION_UNKNOWN_UNSPECIFIED = 0
     ACTION_NOTHING = 1
@@ -93,18 +94,24 @@ class Action:
             case e:
                 raise ValueError(f"Did not recognize action: {e}")
 
+
 class DroneAction:
     def to_dto(self) -> GRPC_DroneAction:
-        return GRPC_DroneAction(id=self.id, action=self.action.to_dto(), velocity=self.velocity)
+        return GRPC_DroneAction(
+            id=self.id, action=self.action.to_dto(), velocity=self.velocity
+        )
 
     @classmethod
     def from_dto(cls, drone_action: GRPC_DroneAction) -> Self:
-        return cls(drone_action.id, drone_action.velocity, Action.from_dto(drone_action.action))
+        return cls(
+            drone_action.id, drone_action.velocity, Action.from_dto(drone_action.action)
+        )
 
     def __init__(self, id: int, velocity: int, action: Action) -> None:
         self.id = id
         self.velocity = velocity
         self.action = action
+
 
 class DroneState:
     def to_dto(self) -> GRPC_DroneState:
@@ -118,7 +125,13 @@ class DroneState:
 
     @classmethod
     def from_dto(cls, drone_state: GRPC_DroneState) -> Self:
-        return cls(drone_state.id, drone_state.x, drone_state.y, drone_state.destroyed, drone_state.is_evader)
+        return cls(
+            drone_state.id,
+            drone_state.x,
+            drone_state.y,
+            drone_state.destroyed,
+            drone_state.is_evader,
+        )
 
     def __init__(
         self,
@@ -134,6 +147,7 @@ class DroneState:
         self.destroyed = destroyed
         self.is_evader = is_evader
 
+
 class DroneObjectCollisionEvent:
     def to_dto(self) -> GRPC_DroneObjectCollisionEvent:
         return GRPC_DroneObjectCollisionEvent(drone_ids=self.drone_ids)
@@ -145,6 +159,7 @@ class DroneObjectCollisionEvent:
 
     def __init__(self, drone_ids: list[int]) -> None:
         self.drone_ids: list[int] = drone_ids
+
 
 class CollisionEvent:
     def to_dto(self) -> GRPC_CollisionEvent:
@@ -158,6 +173,7 @@ class CollisionEvent:
     def __init__(self, drone_ids: list[int]) -> None:
         self.drone_ids: list[int] = drone_ids
 
+
 class TargetReachedEvent:
     def to_dto(self) -> GRPC_TargetReachedEvent:
         return GRPC_TargetReachedEvent(drone_ids=self.drone_ids)
@@ -170,6 +186,7 @@ class TargetReachedEvent:
     def __init__(self, drone_ids: list[int]) -> None:
         self.drone_ids: list[int] = drone_ids
 
+
 class OutOfBoundsEvent:
     def to_dto(self) -> GRPC_OutOfBoundsEvent:
         return GRPC_OutOfBoundsEvent(drone_ids=self.drone_ids)
@@ -181,6 +198,7 @@ class OutOfBoundsEvent:
 
     def __init__(self, drone_ids: list[int]) -> None:
         self.drone_ids: list[int] = drone_ids
+
 
 class PursuerEnteredTargetEvent:
     def to_dto(self) -> GRPC_PursuerEnteredTargetEvent:
@@ -196,12 +214,12 @@ class PursuerEnteredTargetEvent:
 
 
 class Event:
-    CASE_NAME="event_oneof"
-    COLLISION_EVENT_CASE="collision_event"
-    TARGET_REACHED_EVENT_CASE="target_reached_event"
-    OUT_OF_BOUNDS_EVENT_CASE="out_of_bounds_event"
-    PURSUER_ENTERED_TARGET_EVENT_CASE="pursuer_entered_target_event"
-    DRONE_OBJECT_COLLISION_EVENT_CASE="drone_object_collision_event"
+    CASE_NAME = "event_oneof"
+    COLLISION_EVENT_CASE = "collision_event"
+    TARGET_REACHED_EVENT_CASE = "target_reached_event"
+    OUT_OF_BOUNDS_EVENT_CASE = "out_of_bounds_event"
+    PURSUER_ENTERED_TARGET_EVENT_CASE = "pursuer_entered_target_event"
+    DRONE_OBJECT_COLLISION_EVENT_CASE = "drone_object_collision_event"
 
     def to_dto(self) -> GRPC_Event:
         if self.collision_event is not None:
@@ -211,9 +229,13 @@ class Event:
         elif self.out_of_bounds_event is not None:
             return GRPC_Event(out_of_bounds_event=self.out_of_bounds_event.to_dto())
         elif self.pursuer_entered_target_event is not None:
-            return GRPC_Event(pursuer_entered_target_event=self.pursuer_entered_target_event.to_dto())
+            return GRPC_Event(
+                pursuer_entered_target_event=self.pursuer_entered_target_event.to_dto()
+            )
         elif self.drone_object_collision_event is not None:
-            return GRPC_Event(drone_object_collision_event=self.drone_object_collision_event.to_dto())
+            return GRPC_Event(
+                drone_object_collision_event=self.drone_object_collision_event.to_dto()
+            )
         else:
             raise ValueError("Did not find a not null event")
 
@@ -222,11 +244,15 @@ class Event:
         match event.WhichOneof(Event.CASE_NAME):
             case Event.TARGET_REACHED_EVENT_CASE:
                 return cls(
-                    target_reached_event=TargetReachedEvent.from_dto(event.target_reached_event)
+                    target_reached_event=TargetReachedEvent.from_dto(
+                        event.target_reached_event
+                    )
                 )
             case Event.PURSUER_ENTERED_TARGET_EVENT_CASE:
                 return cls(
-                    pursuer_entered_target_event=PursuerEnteredTargetEvent.from_dto(event.pursuer_entered_target_event)
+                    pursuer_entered_target_event=PursuerEnteredTargetEvent.from_dto(
+                        event.pursuer_entered_target_event
+                    )
                 )
             case Event.COLLISION_EVENT_CASE:
                 return cls(
@@ -234,11 +260,15 @@ class Event:
                 )
             case Event.OUT_OF_BOUNDS_EVENT_CASE:
                 return cls(
-                    out_of_bounds_event=OutOfBoundsEvent.from_dto(event.out_of_bounds_event)
+                    out_of_bounds_event=OutOfBoundsEvent.from_dto(
+                        event.out_of_bounds_event
+                    )
                 )
             case Event.DRONE_OBJECT_COLLISION_EVENT_CASE:
                 return cls(
-                    drone_object_collision_event=DroneObjectCollisionEvent.from_dto(event.drone_object_collision_event)
+                    drone_object_collision_event=DroneObjectCollisionEvent.from_dto(
+                        event.drone_object_collision_event
+                    )
                 )
             case e:
                 raise ValueError(f"Did not find a matching event type for {e}")
@@ -257,6 +287,7 @@ class Event:
         self.pursuer_entered_target_event = pursuer_entered_target_event
         self.drone_object_collision_event = drone_object_collision_event
 
+
 class State:
     def to_dto(self) -> GRPC_State:
         return GRPC_State(
@@ -272,7 +303,7 @@ class State:
             state.sim_id,
             state.terminated,
             [DroneState.from_dto(x) for x in state.drone_states],
-            [Event.from_dto(x) for x in state.events]
+            [Event.from_dto(x) for x in state.events],
         )
 
     def __init__(
@@ -286,4 +317,3 @@ class State:
         self.terminated = terminated
         self.drone_states = drone_states
         self.events = events
-

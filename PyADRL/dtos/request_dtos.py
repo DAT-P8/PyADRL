@@ -1,13 +1,12 @@
 from typing import Self
 from PyADRL.dtos.ngw_dtos import State
-from ..ngw.v1.ngw2d_pb2 import (
-    StateResponse as GRPC_StateResponse
-)
+from ..ngw.v1.ngw2d_pb2 import StateResponse as GRPC_StateResponse
+
 
 class StateResponse:
-    CASE_NAME="state_or_error"
-    STATE_CASE="state"
-    ERROR_CASE="error_message"
+    CASE_NAME = "state_or_error"
+    STATE_CASE = "state"
+    ERROR_CASE = "error_message"
 
     @classmethod
     def from_dto(cls, response: GRPC_StateResponse) -> Self:

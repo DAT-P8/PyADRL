@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from ...dtos.map_dtos import MapSpec
 
+
 class MapConfig(ABC):
     @abstractmethod
     def get_target_position(self) -> tuple[int, int]:

@@ -106,9 +106,7 @@ class NGWEnvironment(ParallelEnv):
 
         if self.id is None:
             state = self.client.New(
-                self.map_config.get_map_spec(),
-                self.n_evaders,
-                self.n_pursuers
+                self.map_config.get_map_spec(), self.n_evaders, self.n_pursuers
             )
             self.id = state.sim_id
         else:
@@ -138,7 +136,11 @@ class NGWEnvironment(ParallelEnv):
         return (observations, infos)
 
     def step(self, actions: dict[str, float]):
-        if len(self.drones[EVADERS]) == 0 or len(self.drones[PURSUERS]) == 0 or self.id is None:
+        if (
+            len(self.drones[EVADERS]) == 0
+            or len(self.drones[PURSUERS]) == 0
+            or self.id is None
+        ):
             raise ValueError("Pursuer or evader not initialized")
 
         if self.step_delay > 0:

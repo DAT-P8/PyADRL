@@ -6,6 +6,7 @@ from ..ngw.v1.ngw2d_pb2 import (
 )
 from typing import Self
 
+
 class SquareObject:
     def to_dto(self) -> GRPC_SquareObject:
         return GRPC_SquareObject(x=self.x, y=self.y)
@@ -22,9 +23,10 @@ class SquareObject:
         self.x = x
         self.y = y
 
+
 class ObjectSpec:
     CASE_NAME = "object_oneof"
-    SQUARE_OBJECT_CASE="square_object"
+    SQUARE_OBJECT_CASE = "square_object"
 
     def to_dto(self) -> GRPC_ObjectSpec:
         if self.square_object is not None:
@@ -36,15 +38,15 @@ class ObjectSpec:
     def from_dto(cls, object_spec: GRPC_ObjectSpec) -> Self:
         match object_spec.WhichOneof(ObjectSpec.CASE_NAME):
             case ObjectSpec.SQUARE_OBJECT_CASE:
-                return cls(square_object=SquareObject.from_dto(object_spec.square_object))
+                return cls(
+                    square_object=SquareObject.from_dto(object_spec.square_object)
+                )
             case e:
                 raise ValueError(f"Did not recognize WhichOneof case: {e}")
 
-    def __init__(
-        self,
-        square_object: SquareObject | None = None
-    ) -> None:
+    def __init__(self, square_object: SquareObject | None = None) -> None:
         self.square_object = square_object
+
 
 class SquareMap:
     def to_dto(self) -> GRPC_SquareMap:
@@ -53,7 +55,7 @@ class SquareMap:
             height=self.height,
             target_x=self.target_x,
             target_y=self.target_y,
-            objects=[x.to_dto() for x in self.objects]
+            objects=[x.to_dto() for x in self.objects],
         )
 
     @classmethod
@@ -80,9 +82,10 @@ class SquareMap:
         self.target_y = target_y
         self.objects = objects
 
+
 class MapSpec:
     CASE_NAME = "map_oneof"
-    SQUARE_MAP_CASE="square_map"
+    SQUARE_MAP_CASE = "square_map"
 
     def to_dto(self) -> GRPC_MapSpec:
         if self.square_map is not None:
@@ -98,8 +101,5 @@ class MapSpec:
             case e:
                 raise ValueError(f"Did not recognize map case: {e}")
 
-    def __init__(
-        self,
-        square_map: SquareMap | None = None
-    ) -> None:
+    def __init__(self, square_map: SquareMap | None = None) -> None:
         self.square_map = square_map

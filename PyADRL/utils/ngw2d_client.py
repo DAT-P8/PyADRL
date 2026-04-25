@@ -1,19 +1,20 @@
-from grpc import (
-    Channel
-)
+from grpc import Channel
 
-from PyADRL.dtos.map_dtos import (
-    MapSpec
-)
-from PyADRL.dtos.ngw_dtos import (
-    DroneAction,
-    State
-)
+from PyADRL.dtos.map_dtos import MapSpec
+from PyADRL.dtos.ngw_dtos import DroneAction, State
 from PyADRL.dtos.request_dtos import StateResponse
-from PyADRL.ngw.v1.ngw2d_pb2 import CloseRequest, CloseResponse, DoStepRequest, DoStepResponse, NewRequest, NewResponse, ResetRequest, ResetResponse
-from ..ngw.v1.ngw2d_pb2_grpc import (
-    SimulationServiceStub
+from PyADRL.ngw.v1.ngw2d_pb2 import (
+    CloseRequest,
+    CloseResponse,
+    DoStepRequest,
+    DoStepResponse,
+    NewRequest,
+    NewResponse,
+    ResetRequest,
+    ResetResponse,
 )
+from ..ngw.v1.ngw2d_pb2_grpc import SimulationServiceStub
+
 
 class NGWClient:
     def __init__(self, channel: Channel):
@@ -24,34 +25,42 @@ class NGWClient:
         response: DoStepResponse = self.stub.DoStep(req)
         parsed_response = StateResponse.from_dto(response.state_response)
         if parsed_response.error_message is not None:
-            raise ValueError(f"Error response from DoStep: {parsed_response.error_message}")
+            raise ValueError(
+                f"Error response from DoStep: {parsed_response.error_message}"
+            )
         if parsed_response.state is None:
             raise ValueError("Received a None state")
 
         return parsed_response.state
 
     def New(self, map: MapSpec, evader_count: int, pursuer_count: int) -> State:
-        req = NewRequest(map=map.to_dto(), evader_count=evader_count, pursuer_count=pursuer_count)
+        req = NewRequest(
+            map=map.to_dto(), evader_count=evader_count, pursuer_count=pursuer_count
+        )
         res: NewResponse = self.stub.New(req)
         parsed_response = StateResponse.from_dto(res.state_response)
         if parsed_response.error_message is not None:
-            raise ValueError(f"Error response from New: {parsed_response.error_message}")
+            raise ValueError(
+                f"Error response from New: {parsed_response.error_message}"
+            )
         if parsed_response.state is None:
             raise ValueError("Received a None state")
 
         return parsed_response.state
-    
+
     def Reset(self, id: int) -> State:
         req = ResetRequest(sim_id=id)
         res: ResetResponse = self.stub.Reset(req)
         parsed_response = StateResponse.from_dto(res.state_response)
         if parsed_response.error_message is not None:
-            raise ValueError(f"Error response from New: {parsed_response.error_message}")
+            raise ValueError(
+                f"Error response from New: {parsed_response.error_message}"
+            )
         if parsed_response.state is None:
             raise ValueError("Received a None state")
 
         return parsed_response.state
-    
+
     def Close(self, id: int) -> None:
         req = CloseRequest(sim_id=id)
         res: CloseResponse = self.stub.Reset(req)

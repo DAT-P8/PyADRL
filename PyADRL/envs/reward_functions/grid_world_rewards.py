@@ -1,6 +1,4 @@
-from ...dtos.ngw_dtos import (
-    State
-)
+from ...dtos.ngw_dtos import State
 from .rewards import RewardFunction
 from ..ngw_drone import NGW_Drone
 from ..map_configs.map_config import MapConfig
@@ -53,11 +51,15 @@ class GridWorldRewards(RewardFunction):
 
         for event in new_state.events:
             if event.drone_object_collision_event is not None:
-                drone_object_collision_set.update(event.drone_object_collision_event.drone_ids)
+                drone_object_collision_set.update(
+                    event.drone_object_collision_event.drone_ids
+                )
             elif event.out_of_bounds_event is not None:
                 out_of_bounds_set.update(event.out_of_bounds_event.drone_ids)
             elif event.pursuer_entered_target_event is not None:
-                pursuer_entered_target_set.update(event.pursuer_entered_target_event.drone_ids)
+                pursuer_entered_target_set.update(
+                    event.pursuer_entered_target_event.drone_ids
+                )
             elif event.target_reached_event is not None:
                 target_reached_set.update(event.target_reached_event.drone_ids)
             elif event.collision_event is not None:
@@ -84,7 +86,7 @@ class GridWorldRewards(RewardFunction):
 
         for id in collision_dict:
             collision_set = collision_dict[id]
-            
+
             drone = all_drones[id]
             evaders = [x for x in collision_set if all_drones[x].is_evader]
             pursuers = [x for x in collision_set if not all_drones[x].is_evader]
@@ -96,7 +98,9 @@ class GridWorldRewards(RewardFunction):
                 if drone.is_evader:
                     rewards[drone.name] += self.REWARD_EVADER_CAUGHT
                 else:
-                    rewards[drone.name] += len(evaders) * self.REWARD_PURSUER_CAUGHT_EVADER_SELF
+                    rewards[drone.name] += (
+                        len(evaders) * self.REWARD_PURSUER_CAUGHT_EVADER_SELF
+                    )
 
             else:
                 if drone.is_evader:

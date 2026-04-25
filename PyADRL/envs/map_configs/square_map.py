@@ -11,7 +11,11 @@ class SquareMapConfig(MapConfig):
         self.target_y = target_y
         self.map_spec = MapSpec(
             square_map=SquareMap(
-                width=width, height=height, target_x=target_x, target_y=target_y, objects=[]
+                width=width,
+                height=height,
+                target_x=target_x,
+                target_y=target_y,
+                objects=[],
             )
         )
 
