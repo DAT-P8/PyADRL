@@ -25,7 +25,7 @@ class StateResponse:
         elif self.state is not None:
             return GRPC_StateResponse(state=self.state.to_dto())
         else:
-            raise ValueError(f"Did not find any non-null members")
+            raise ValueError("Did not find any non-null members")
 
     def __init__(
         self,

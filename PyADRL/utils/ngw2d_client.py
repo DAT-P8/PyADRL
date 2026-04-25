@@ -26,7 +26,7 @@ class NGWClient:
         if parsed_response.error_message is not None:
             raise ValueError(f"Error response from DoStep: {parsed_response.error_message}")
         if parsed_response.state is None:
-            raise ValueError(f"Received a None state")
+            raise ValueError("Received a None state")
 
         return parsed_response.state
 
@@ -37,7 +37,7 @@ class NGWClient:
         if parsed_response.error_message is not None:
             raise ValueError(f"Error response from New: {parsed_response.error_message}")
         if parsed_response.state is None:
-            raise ValueError(f"Received a None state")
+            raise ValueError("Received a None state")
 
         return parsed_response.state
     
@@ -48,7 +48,7 @@ class NGWClient:
         if parsed_response.error_message is not None:
             raise ValueError(f"Error response from New: {parsed_response.error_message}")
         if parsed_response.state is None:
-            raise ValueError(f"Received a None state")
+            raise ValueError("Received a None state")
 
         return parsed_response.state
     

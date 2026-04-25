@@ -11,7 +11,6 @@ from ..logger.metricslogger import EpisodeOutcome
 from .ngw_drone import NGW_Drone
 from ..dtos.ngw_dtos import (
     DroneAction,
-    Action,
 )
 
 # Drone dictionary names
