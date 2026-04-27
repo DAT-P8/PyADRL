@@ -129,7 +129,12 @@ class GridWorldRewards(RewardFunction):
                 rewards[drone.name] += self.REWARD_PURSUER_TARGET_REACHED
 
         for id in drone_object_collision_set:
-            pass
+            drone = all_drones[id]
+            if drone.is_evader:
+                rewards[drone.name] += self.REWARD_EVADER_COLLISION_OBJECT
+            else:
+                rewards[drone.name] += self.REWARD_PURSUER_COLLISION_OBJECT
+            
 
         for drone in all_drones.values():
             if drone.is_evader:
