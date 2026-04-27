@@ -19,9 +19,7 @@ class GridWorldRewards(RewardFunction):
     REWARD_PURSUER_MAX_TIMESTEPS = (
         -100
     )  # Punish pursuers for not catching evader in time
-    REWARD_PURSUER_TARGET_REACHED = (
-        -100
-    )  # Punish pursuers for letting evader reach target
+    REWARD_PURSUER_TARGET_REACHED = -100  # Punish pursuers for entering target
     REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Reward for catching the evader yourself
     REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
     REWARD_PURSUER_DESTROYED = -1000
@@ -119,7 +117,9 @@ class GridWorldRewards(RewardFunction):
                 )
 
         for id in pursuer_entered_target_set:
-            pass
+            drone = all_drones[id]
+            if not drone.is_evader:
+                rewards[drone.name] += self.REWARD_PURSUER_TARGET_REACHED
 
         for id in drone_object_collision_set:
             pass
