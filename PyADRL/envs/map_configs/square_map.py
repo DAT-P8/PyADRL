@@ -1,5 +1,5 @@
 from .map_config import MapConfig
-from ...ngw.v1.ngw2d_pb2 import SquareMap, MapSpec
+from ...dtos.map_dtos import SquareMap, MapSpec
 from ...utils.chebeshyv import chebyshev_distance
 
 
@@ -11,7 +11,11 @@ class SquareMapConfig(MapConfig):
         self.target_y = target_y
         self.map_spec = MapSpec(
             square_map=SquareMap(
-                width=width, height=height, target_x=target_x, target_y=target_y
+                width=width,
+                height=height,
+                target_x=target_x,
+                target_y=target_y,
+                objects=[],
             )
         )
 
