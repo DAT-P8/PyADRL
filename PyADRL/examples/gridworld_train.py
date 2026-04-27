@@ -79,11 +79,11 @@ def gridworld_train(
             ),
         )
         .learners(
-            num_learners=1,  # Number of parallel learner processes for computing gradients
+            num_learners=2,  # Number of parallel learner processes for computing gradients
         )
         .env_runners(
-            num_env_runners=1,  # Number of processes/threads that run the environment in parallel
-            num_envs_per_env_runner=1,  # Number of environments per env_runner
+            num_env_runners=4,  # Number of processes/threads that run the environment in parallel
+            num_envs_per_env_runner=5,  # Number of environments per env_runner
         )
         .training(
             train_batch_size=10000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
