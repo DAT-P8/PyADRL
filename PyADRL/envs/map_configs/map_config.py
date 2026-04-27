@@ -1,10 +1,14 @@
 from abc import ABC, abstractmethod
-from ...ngw.v1.ngw2d_pb2 import MapSpec
+from ...dtos.map_dtos import MapSpec, ObjectSpec
 
 
 class MapConfig(ABC):
     @abstractmethod
     def get_target_position(self) -> tuple[int, int]:
+        pass
+
+    @abstractmethod
+    def get_objects(self) -> list[tuple[int, int]]:
         pass
 
     @abstractmethod

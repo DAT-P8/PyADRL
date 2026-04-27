@@ -3,19 +3,15 @@ from gymnasium.spaces import Box, Discrete
 import numpy as np
 import time
 import grpc
-from ..ngw.v1.ngw2d_pb2 import (
-    CloseRequest,
-    NewRequest,
-    ResetRequest,
-    DroneAction,
-    DoStepRequest,
-)
 from ..utils.ngw2d_actions import get_action
 from ..utils.ngw2d_client import NGWClient
 from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
 from ..logger.metricslogger import EpisodeOutcome
 from .ngw_drone import NGW_Drone
+from ..dtos.ngw_dtos import (
+    DroneAction,
+)
 
 # Drone dictionary names
 EVADERS = "evaders"
@@ -71,8 +67,7 @@ class NGWEnvironment(ParallelEnv):
         # one-hot agent ID, so drones can share a policy but still know who they are
         n_agents = self.n_evaders + self.n_pursuers
         
-        map_spec = self.map_config.get_map_spec()
-        self.n_objects = len(map_spec.square_map.objects) if map_spec.HasField("square_map") else 0
+        self.n_objects = len(map_config.get_objects())
         self.objects_state = []
 
         # x,y pairs for each agent, the target tile, and objects
@@ -95,9 +90,8 @@ class NGWEnvironment(ParallelEnv):
         obs += [self.norm_target_x, self.norm_target_y]
         
         for obj in self.objects_state:
-            if obj.HasField("square_object"):
-                (norm_x, norm_y) = self.map_config.normalise_position(obj.square_object.x, obj.square_object.y)
-                obs += [norm_x, norm_y]
+            (norm_x, norm_y) = self.map_config.normalise_position(obj[0], obj[1])
+            obs += [norm_x, norm_y]
         
         # pad with zeros if there are fewer objects than expected
         expected_obj_features = self.n_objects * 2
@@ -117,7 +111,9 @@ class NGWEnvironment(ParallelEnv):
         return agent_observations
 
     def close(self):
-        self.client.Close(CloseRequest(sim_id=self.id))
+        if self.id is None:
+            raise ValueError("Tried closing a null environment")
+        self.client.Close(self.id)
 
     def reset(self, seed=None, options=None):
         state = None
@@ -127,16 +123,11 @@ class NGWEnvironment(ParallelEnv):
 
         if self.id is None:
             state = self.client.New(
-                NewRequest(
-                    map=self.map_config.get_map_spec(),
-                    evader_count=self.n_evaders,
-                    pursuer_count=self.n_pursuers,
-                    drone_velocity=self.drone_velocity,
-                )
+                self.map_config.get_map_spec(), self.n_evaders, self.n_pursuers
             )
             self.id = state.sim_id
         else:
-            state = self.client.Reset(ResetRequest(sim_id=self.id))
+            state = self.client.Reset(self.id)
 
         for drone_state in state.drone_states:
             is_evader = drone_state.is_evader
@@ -164,7 +155,11 @@ class NGWEnvironment(ParallelEnv):
         return (observations, infos)
 
     def step(self, actions: dict[str, float]):
-        if len(self.drones[EVADERS]) == 0 or len(self.drones[PURSUERS]) == 0:
+        if (
+            len(self.drones[EVADERS]) == 0
+            or len(self.drones[PURSUERS]) == 0
+            or self.id is None
+        ):
             raise ValueError("Pursuer or evader not initialized")
         
 
@@ -179,16 +174,13 @@ class NGWEnvironment(ParallelEnv):
                 if not d.destroyed:
                     actions_send.append(
                         DroneAction(
-                            id=d.id,
-                            action=get_action(actions[d.name]),
-                            velocity=self.drone_velocity,
+                            d.id,
+                            self.drone_velocity,
+                            get_action(actions[d.name]),
                         )
                     )
 
-        state = self.client.DoStep(
-            DoStepRequest(sim_id=self.id, drone_actions=actions_send)
-        )
-        self.objects_state = state.objects
+        state = self.client.DoStep(self.id, actions_send)
 
         terminations: dict[str, bool] = {a: False for a in self.agents}
         truncations: dict[str, bool] = {a: False for a in self.agents}
