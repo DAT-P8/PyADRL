@@ -71,10 +71,10 @@ def gridworld_tune(
     tuner = tune.Tuner(
         tune.with_parameters(
             alternate_trainable,
-            checkpoint_dir = checkpoint,
-            n_stages = N_STAGES,
-            iters_per_stage = ITERS_PER_STAGE,
-            callbacks = callbacks,
+            checkpoint_dir=checkpoint,
+            n_stages=N_STAGES,
+            iters_per_stage=ITERS_PER_STAGE,
+            callbacks=callbacks,
         ),
         param_space=search_space,
         tune_config=tune.TuneConfig(
