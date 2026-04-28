@@ -29,9 +29,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--map",
         type=str,
-        default="map_11_11",
+        default="map",
         required=False,
-        help="Map name, maps are found in PyADRL/examples/maps. Example: --map map_21_21",
+        help="Map name, maps are found in PyADRL/examples/maps. Example: --map map",
     )
 
 
