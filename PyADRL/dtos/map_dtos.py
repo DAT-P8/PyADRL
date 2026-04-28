@@ -55,7 +55,7 @@ class SquareMap:
             height=self.height,
             target_x=self.target_x,
             target_y=self.target_y,
-            objects=[self.object_spec.to_dto() for self.object_spec in self.objects],
+            objects=[x.to_dto() for x in self.objects],
         )
 
     @classmethod
