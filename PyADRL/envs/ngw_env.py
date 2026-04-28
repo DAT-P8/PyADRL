@@ -67,13 +67,17 @@ class NGWEnvironment(ParallelEnv):
         # one-hot agent ID, so drones can share a policy but still know who they are
         n_agents = self.n_evaders + self.n_pursuers
         
-        self.n_objects = len(map_config.get_objects())
+        self.n_objects_positions = len(map_config.get_objects()) * 2 # x, y for each object
         self.objects_state = []
 
+        target_position = 2 # x and y position of the target
+
         # x,y pairs for each agent, the target tile, and objects
-        n_positions = (n_agents + 1 + self.n_objects) * 2
+        n_agent_positions = n_agents * 2
+        role_bits = n_agents # not actually sure if role_bits does anything
+        one_hot = n_agents # one hot encoding for agent ID, so shared policy can distinguish agents
         self.obs_space = Box(
-            low=0.0, high=1.0, shape=(n_positions + n_agents,), dtype=np.float32
+            low=0.0, high=1.0, shape=(n_agent_positions + one_hot + role_bits + target_position + self.n_objects_positions,), dtype=np.float32
         )
 
         # 9 possible actions
@@ -87,27 +91,23 @@ class NGWEnvironment(ParallelEnv):
         for e in self.drones[EVADERS]:
             (norm_x, norm_y) = self.map_config.normalise_position(e.x, e.y)
             obs += [norm_x, norm_y]
-        obs += [self.norm_target_x, self.norm_target_y]
-        
         for obj in self.objects_state:
             (norm_x, norm_y) = self.map_config.normalise_position(obj[0], obj[1])
             obs += [norm_x, norm_y]
-        
-        # pad with zeros if there are fewer objects than expected
-        expected_obj_features = self.n_objects * 2
-        actual_obj_features = len(obs) - (len(self.drones[PURSUERS]) * 2 + len(self.drones[EVADERS]) * 2 + 2)
-        if actual_obj_features < expected_obj_features:
-            obs += [0.0] * (expected_obj_features - actual_obj_features)
-        elif actual_obj_features > expected_obj_features:
-            obs = obs[:len(obs) - (actual_obj_features - expected_obj_features)]
+        obs += [self.norm_target_x, self.norm_target_y]
+
+        # Role bits, 1 for pursuer, 0 for evader
+        obs += [1.0 for _ in self.drones[PURSUERS]] + [0.0 for _ in self.drones[EVADERS]]
 
         obs_array = np.array(obs, dtype=np.float32)
 
         agent_observations = {}
         for agent in self.agents:
             one_hot_agent = self.one_hot[agent]
-            agent_observations[agent] = np.concatenate([obs_array, one_hot_agent])
-
+            agent_observations[agent] = np.concatenate(
+                [obs_array, one_hot_agent]
+            )
+        
         return agent_observations
 
     def close(self):
