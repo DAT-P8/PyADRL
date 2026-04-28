@@ -284,7 +284,7 @@ def gridworld_tune(
     height: int = 11,
     target_x: int = 5,
     target_y: int = 5,
-    checkpoint: str | None = None
+    checkpoint: str | None = None,
 ) -> tune.ResultGrid:
     """Run a Ray Tune hyperparameter search over the alternating self-play loop.
 
@@ -370,12 +370,12 @@ def gridworld_tune(
 
 
 def gridworld_train(
-        checkpoint: str | None = None,
-        model_name: str | None = None,
-        width: int = 11,
-        height: int = 11,
-        target_x: int = 5,
-        target_y: int = 5,
+    checkpoint: str | None = None,
+    model_name: str | None = None,
+    width: int = 11,
+    height: int = 11,
+    target_x: int = 5,
+    target_y: int = 5,
 ):
     # If Ray is already initialized from a previous run, shut it down before starting a new one.
     ray.shutdown()
