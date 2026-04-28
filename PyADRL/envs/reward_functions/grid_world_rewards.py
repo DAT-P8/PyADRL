@@ -10,7 +10,7 @@ class GridWorldRewards(RewardFunction):
     REWARD_EVADER_TARGET_REACHED_SELF = 100  # reward for reaching target yourself
     REWARD_EVADER_TARGET_REACHED_OTHERS = 10  # reward for helping reach target
     REWARD_EVADER_CAUGHT = -100
-    REWARD_EVADER_OUT_OF_BOUNDS = -1000
+    REWARD_EVADER_OUT_OF_BOUNDS = -200
     REWARD_EVADER_MAX_TIMESTEPS = 50
     REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
     REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
@@ -25,9 +25,9 @@ class GridWorldRewards(RewardFunction):
     REWARD_PURSUER_ENTERED_TARGET = -50 # Punish pursuers for entering target
     REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Reward for catching the evader yourself
     REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
-    REWARD_PURSUER_DESTROYED = -1000
+    REWARD_PURSUER_DESTROYED = -100
     REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
-    REWARD_PURSUER_OUT_OF_BOUNDS = -20
+    REWARD_PURSUER_OUT_OF_BOUNDS = -200
     REWARD_PURSUER_COLLISION_OBJECT = -200
 
     def calculate_rewards(
