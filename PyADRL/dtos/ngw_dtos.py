@@ -5,14 +5,13 @@ from ..ngw.v1.ngw2d_pb2 import (
     DroneState as GRPC_DroneState,
     State as GRPC_State,
     Event as GRPC_Event,
-    ObjectSpec as ObjectSpec,
-    SquareObject as SquareObject,
     DroneObjectCollisionEvent as GRPC_DroneObjectCollisionEvent,
     TargetReachedEvent as GRPC_TargetReachedEvent,
     CollisionEvent as GRPC_CollisionEvent,
     OutOfBoundsEvent as GRPC_OutOfBoundsEvent,
     PursuerEnteredTargetEvent as GRPC_PursuerEnteredTargetEvent,
 )
+from .map_dtos import ObjectSpec
 
 
 class Action:
@@ -297,7 +296,7 @@ class State:
             terminated=self.terminated,
             drone_states=[x.to_dto() for x in self.drone_states],
             events=[x.to_dto() for x in self.events],
-            objects=[ObjectSpec(square_object=SquareObject(x=x, y=y)) for x, y in self.objects],
+            objects=[obj.to_dto() for obj in self.objects],
         )
 
     @classmethod
@@ -307,7 +306,7 @@ class State:
             state.terminated,
             [DroneState.from_dto(x) for x in state.drone_states],
             [Event.from_dto(x) for x in state.events],
-            [(obj.square_object.x, obj.square_object.y) for obj in state.objects],
+            [ObjectSpec.from_dto(obj) for obj in state.objects],
         )
 
     def __init__(
@@ -316,7 +315,7 @@ class State:
         terminated: bool,
         drone_states: list[DroneState],
         events: list[Event],
-        objects: list[tuple[int, int]],
+        objects: list[ObjectSpec],
     ):
         self.sim_id = sim_id
         self.terminated = terminated

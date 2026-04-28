@@ -92,8 +92,9 @@ class NGWEnvironment(ParallelEnv):
             (norm_x, norm_y) = self.map_config.normalise_position(e.x, e.y)
             obs += [norm_x, norm_y]
         for obj in self.objects_state:
-            (norm_x, norm_y) = self.map_config.normalise_position(obj[0], obj[1])
-            obs += [norm_x, norm_y]
+            if obj.square_object is not None:
+                (norm_x, norm_y) = self.map_config.normalise_position(obj.square_object.x, obj.square_object.y)
+                obs += [norm_x, norm_y]
         obs += [self.norm_target_x, self.norm_target_y]
 
         # Role bits, 1 for pursuer, 0 for evader
