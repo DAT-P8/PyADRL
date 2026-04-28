@@ -4,7 +4,14 @@ from ...utils.chebeshyv import chebyshev_distance
 
 
 class SquareMapConfig(MapConfig):
-    def __init__(self, width: int, height: int, target_x: int, target_y: int, objects: list[tuple[int, int]]):
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        target_x: int,
+        target_y: int,
+        objects: list[tuple[int, int]],
+    ):
         self.width = width
         self.height = height
         self.target_x = target_x
@@ -16,13 +23,17 @@ class SquareMapConfig(MapConfig):
         ]
         self.map_spec = MapSpec(
             square_map=SquareMap(
-                width=width, height=height, target_x=target_x, target_y=target_y, objects=object_specs
+                width=width,
+                height=height,
+                target_x=target_x,
+                target_y=target_y,
+                objects=object_specs,
             )
         )
 
     def get_target_position(self) -> tuple[int, int]:
         return (self.target_x, self.target_y)
-    
+
     def get_objects(self) -> list[tuple[int, int]]:
         return self.objects
 

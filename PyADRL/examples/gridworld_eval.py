@@ -27,7 +27,7 @@ def gridworld_eval(
 ):
     ray.init()
 
-    width, height, target_x, target_y , objects= load_map_config(map)
+    width, height, target_x, target_y, objects = load_map_config(map)
 
     register_env(
         "gridworld",

@@ -34,7 +34,6 @@ def parse_args() -> argparse.Namespace:
         help="Map name, maps are found in PyADRL/examples/maps. Example: --map map",
     )
 
-
     parser.add_argument(
         "--log-level",
         type=str,
@@ -49,6 +48,6 @@ def parse_args() -> argparse.Namespace:
         type=float,
         required=False,
         default=0.0,
-        help="Delay in seconds between each step."
+        help="Delay in seconds between each step.",
     )
     return parser.parse_args()

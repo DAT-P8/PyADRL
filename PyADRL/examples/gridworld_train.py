@@ -37,6 +37,7 @@ def sample_opponent(pool: list[dict]) -> dict:
     else:
         return pool[-1]
 
+
 def gridworld_train(
     map: str,
     checkpoint: str | None = None,
@@ -46,7 +47,7 @@ def gridworld_train(
     ray.shutdown()
     ray.init()
 
-    width, height, target_x, target_y , objects= load_map_config(map)
+    width, height, target_x, target_y, objects = load_map_config(map)
 
     register_env(
         "gridworld",

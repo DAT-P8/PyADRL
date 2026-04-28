@@ -23,11 +23,7 @@ def main():
     checkpoint = args.restore
     model_name = args.name if args.name else None
 
-    gridworld_train(
-        args.map,
-        checkpoint=checkpoint,
-        model_name=model_name
-    )
+    gridworld_train(args.map, checkpoint=checkpoint, model_name=model_name)
 
 
 if __name__ == "__main__":

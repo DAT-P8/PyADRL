@@ -66,18 +66,29 @@ class NGWEnvironment(ParallelEnv):
 
         # one-hot agent ID, so drones can share a policy but still know who they are
         n_agents = self.n_evaders + self.n_pursuers
-        
-        self.n_objects_positions = len(map_config.get_objects()) * 2 # x, y for each object
+
+        self.n_objects_positions = (
+            len(map_config.get_objects()) * 2
+        )  # x, y for each object
         self.objects_state = []
 
-        target_position = 2 # x and y position of the target
+        target_position = 2  # x and y position of the target
 
         # x,y pairs for each agent, the target tile, and objects
         n_agent_positions = n_agents * 2
-        role_bits = n_agents # not actually sure if role_bits does anything
-        one_hot = n_agents # one hot encoding for agent ID, so shared policy can distinguish agents
+        role_bits = n_agents  # not actually sure if role_bits does anything
+        one_hot = n_agents  # one hot encoding for agent ID, so shared policy can distinguish agents
         self.obs_space = Box(
-            low=0.0, high=1.0, shape=(n_agent_positions + one_hot + role_bits + target_position + self.n_objects_positions,), dtype=np.float32
+            low=0.0,
+            high=1.0,
+            shape=(
+                n_agent_positions
+                + one_hot
+                + role_bits
+                + target_position
+                + self.n_objects_positions,
+            ),
+            dtype=np.float32,
         )
 
         # 9 possible actions
@@ -93,22 +104,24 @@ class NGWEnvironment(ParallelEnv):
             obs += [norm_x, norm_y]
         for obj in self.objects_state:
             if obj.square_object is not None:
-                (norm_x, norm_y) = self.map_config.normalise_position(obj.square_object.x, obj.square_object.y)
+                (norm_x, norm_y) = self.map_config.normalise_position(
+                    obj.square_object.x, obj.square_object.y
+                )
                 obs += [norm_x, norm_y]
         obs += [self.norm_target_x, self.norm_target_y]
 
         # Role bits, 1 for pursuer, 0 for evader
-        obs += [1.0 for _ in self.drones[PURSUERS]] + [0.0 for _ in self.drones[EVADERS]]
+        obs += [1.0 for _ in self.drones[PURSUERS]] + [
+            0.0 for _ in self.drones[EVADERS]
+        ]
 
         obs_array = np.array(obs, dtype=np.float32)
 
         agent_observations = {}
         for agent in self.agents:
             one_hot_agent = self.one_hot[agent]
-            agent_observations[agent] = np.concatenate(
-                [obs_array, one_hot_agent]
-            )
-        
+            agent_observations[agent] = np.concatenate([obs_array, one_hot_agent])
+
         return agent_observations
 
     def close(self):
@@ -162,7 +175,6 @@ class NGWEnvironment(ParallelEnv):
             or self.id is None
         ):
             raise ValueError("Pursuer or evader not initialized")
-        
 
         if self.step_delay > 0:
             time.sleep(self.step_delay)
