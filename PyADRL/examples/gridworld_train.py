@@ -18,6 +18,7 @@ from ..logger.metricslogger import (
 
 import matplotlib.pyplot as plt
 from ..utils.model_save import restore_training, setup_checkpoint_dir
+from ..utils.map_load import load_map_config
 
 # Probability of sampling an old opponent policy
 P_OLD = 0.3
@@ -38,23 +39,22 @@ def sample_opponent(pool: list[dict]) -> dict:
 
 
 def gridworld_train(
+    map: str,
     checkpoint: str | None = None,
     model_name: str | None = None,
-    width: int = 11,
-    height: int = 11,
-    target_x: int = 5,
-    target_y: int = 5,
 ):
     # If Ray is already initialized from a previous run, shut it down before starting a new one.
     ray.shutdown()
     ray.init()
+
+    width, height, target_x, target_y, objects = load_map_config(map)
 
     register_env(
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
             NGWEnvironment(
                 channel=grpc.insecure_channel("localhost:50051"),
-                map_config=SquareMapConfig(width, height, target_x, target_y),
+                map_config=SquareMapConfig(width, height, target_x, target_y, objects),
                 reward_function=GridWorldRewards(),
                 n_pursuers=2,
                 n_evaders=1,
@@ -173,6 +173,9 @@ def gridworld_train(
 
                     # Keep a live per-episode log while training is in progress.
                     write_metrics(train_metrics_path, {"episodes": episodes_data})
+
+                if len(opp_pool) != 0:
+                    algo.learner_group.set_weights({frozen_policy: opp_pool[-1]})
 
                 assert algo.learner_group is not None
                 # put the current training policy weights into the pool for future sampling

@@ -23,22 +23,7 @@ def main():
     checkpoint = args.restore
     model_name = args.name if args.name else None
 
-    # check if target coordinates are within the grid
-    if not (0 <= args.target[0] < args.grid[0]) or not (
-        0 <= args.target[1] < args.grid[1]
-    ):
-        raise ValueError(
-            f"Target coordinates {args.target} are out of bounds for grid size {args.grid}"
-        )
-
-    gridworld_train(
-        checkpoint=checkpoint,
-        model_name=model_name,
-        width=args.grid[0],
-        height=args.grid[1],
-        target_x=args.target[0],
-        target_y=args.target[1],
-    )
+    gridworld_train(args.map, checkpoint=checkpoint, model_name=model_name)
 
 
 if __name__ == "__main__":

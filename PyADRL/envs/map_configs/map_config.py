@@ -8,6 +8,10 @@ class MapConfig(ABC):
         pass
 
     @abstractmethod
+    def get_objects(self) -> list[tuple[int, int]]:
+        pass
+
+    @abstractmethod
     def normalise_position(self, x: int, y: int) -> tuple[float, float]:
         pass
 

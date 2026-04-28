@@ -11,6 +11,7 @@ from ..ngw.v1.ngw2d_pb2 import (
     OutOfBoundsEvent as GRPC_OutOfBoundsEvent,
     PursuerEnteredTargetEvent as GRPC_PursuerEnteredTargetEvent,
 )
+from .map_dtos import ObjectSpec
 
 
 class Action:
@@ -295,6 +296,7 @@ class State:
             terminated=self.terminated,
             drone_states=[x.to_dto() for x in self.drone_states],
             events=[x.to_dto() for x in self.events],
+            objects=[obj.to_dto() for obj in self.objects],
         )
 
     @classmethod
@@ -304,6 +306,7 @@ class State:
             state.terminated,
             [DroneState.from_dto(x) for x in state.drone_states],
             [Event.from_dto(x) for x in state.events],
+            [ObjectSpec.from_dto(obj) for obj in state.objects],
         )
 
     def __init__(
@@ -312,8 +315,10 @@ class State:
         terminated: bool,
         drone_states: list[DroneState],
         events: list[Event],
+        objects: list[ObjectSpec],
     ):
         self.sim_id = sim_id
         self.terminated = terminated
         self.drone_states = drone_states
         self.events = events
+        self.objects = objects
