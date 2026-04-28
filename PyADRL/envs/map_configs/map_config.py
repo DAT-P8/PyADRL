@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ...dtos.map_dtos import MapSpec, ObjectSpec
+from ...dtos.map_dtos import MapSpec
 
 
 class MapConfig(ABC):
