@@ -228,7 +228,7 @@ def _run_alternating_loop(
                 print(f"Saving stage {k + 1} at {checkpoint_dir}/cp_{k + 1:05d}")
                 check = os.path.abspath(f"{checkpoint_dir}/cp_{k + 1:05d}")
                 tune.report(checkpoint=check)
-                #algo.save(checkpoint_dir=check)
+                # algo.save(checkpoint_dir=check)
 
     return rewards, episodes_data
 
