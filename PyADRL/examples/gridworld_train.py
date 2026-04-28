@@ -174,6 +174,9 @@ def gridworld_train(
                     # Keep a live per-episode log while training is in progress.
                     write_metrics(train_metrics_path, {"episodes": episodes_data})
 
+                if len(opp_pool) != 0:
+                    algo.learner_group.set_weights({frozen_policy: opp_pool[-1]})
+
                 assert algo.learner_group is not None
                 # put the current training policy weights into the pool for future sampling
                 updated_weights = algo.learner_group.get_weights()[training_policy]
