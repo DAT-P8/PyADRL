@@ -42,6 +42,16 @@ class HeatmapCallback(RLlibCallback):
             self.target_x = algorithm.config.env_config.get("target_x", 0)
             self.target_y = algorithm.config.env_config.get("target_y", 0)
 
+        if algorithm.config is None or algorithm.config.env_config is None:
+            raise ValueError(
+                "HeatmapCallback requires env_config to be set in the algorithm config"
+            )
+
+        self.grid_w = algorithm.config.env_config.get("map_width", 0)
+        self.grid_h = algorithm.config.env_config.get("map_height", 0)
+        self.target_x = algorithm.config.env_config.get("target_x", 0)
+        self.target_y = algorithm.config.env_config.get("target_y", 0)
+
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
         episode.custom_data["pursuer_states"] = {}

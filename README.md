@@ -80,10 +80,10 @@ Launch the simulation environment by setting up and launching the project by fol
 
 Training:
 ```bash
-python3 main.py --train {name}
+python3 train.py
 ```
 
 Testing: 
 ```bash
-python3 main.py --test {name} --checkpoints ./checkpoints/iter_{num}
+python3 eval.py --restore {model_name}
 ```
