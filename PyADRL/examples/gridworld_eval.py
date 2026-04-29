@@ -27,14 +27,14 @@ def gridworld_eval(
 ):
     ray.init()
 
-    width, height, target_x, target_y, objects = load_map_config(map)
+    map_config = load_map_config(map)
 
     register_env(
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
             NGWEnvironment(
                 channel=grpc.insecure_channel("localhost:50051"),
-                map_config=SquareMapConfig(width, height, target_x, target_y, objects),
+                map_config=map_config,
                 reward_function=GridWorldRewards(),
                 n_pursuers=2,
                 n_evaders=1,
@@ -48,10 +48,10 @@ def gridworld_eval(
         .environment(
             "gridworld",
             env_config={
-                "map_width": width,
-                "map_height": height,
-                "target_x": target_x,
-                "target_y": target_y,
+                "map_width": map_config.width,
+                "map_height": map_config.height,
+                "target_x": map_config.target_x,
+                "target_y": map_config.target_y,
             },
         )
         .multi_agent(
