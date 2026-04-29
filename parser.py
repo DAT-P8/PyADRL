@@ -2,6 +2,15 @@ import argparse
 
 log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
+def get_maps() -> list[str]:
+    """Get list of maps from PyADRL/examples/maps. Maps are json files with name map_{map_name}.json"""
+    import os
+
+    maps = []
+    for file in os.listdir(os.path.join("PyADRL", "examples", "maps")):
+        if file.endswith(".json"):
+            maps.append(file[:-5])  # remove ".json" suffix
+    return maps
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Example CLI parser")
@@ -31,7 +40,7 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="map",
         required=False,
-        help="Map name, maps are found in PyADRL/examples/maps. Example: --map map",
+        help=f"Map name, maps are found in PyADRL/examples/maps. Maps: {get_maps()}",
     )
 
     parser.add_argument(
