@@ -28,7 +28,6 @@ dependencies = [
   "matplotlib",
   "lz4",
   "seaborn",
-  "unittest",
 ]
 
 
