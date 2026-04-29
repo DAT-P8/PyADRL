@@ -9,9 +9,6 @@ from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
 from ..logger.metricslogger import EpisodeOutcome
 from .ngw_drone import NGW_Drone
-from ..dtos.ngw_dtos import (
-    DroneAction,
-)
 
 # Drone dictionary names
 EVADERS = "evaders"
