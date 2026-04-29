@@ -85,8 +85,7 @@ class NGWEnvironment(ParallelEnv):
                 n_agent_positions
                 + one_hot
                 + role_bits
-                + target_position
-                + self.n_objects_positions,
+                + target_position,
             ),
             dtype=np.float32,
         )
@@ -102,13 +101,6 @@ class NGWEnvironment(ParallelEnv):
         for e in self.drones[EVADERS]:
             (norm_x, norm_y) = self.map_config.normalise_position(e.x, e.y)
             obs += [norm_x, norm_y]
-        for obj in self.objects_state:
-            if obj.square_object is not None:
-                (norm_x, norm_y) = self.map_config.normalise_position(
-                    obj.square_object.x, obj.square_object.y
-                )
-                obs += [norm_x, norm_y]
-        obs += [self.norm_target_x, self.norm_target_y]
 
         # Role bits, 1 for pursuer, 0 for evader
         obs += [1.0 for _ in self.drones[PURSUERS]] + [
