@@ -21,4 +21,4 @@ class MapConfig(metaclass=ABCMeta):
 
     @abstractmethod
     def get_map_spec(self) -> MapSpec:
-        raise NotImplementedError() 
+        raise NotImplementedError()

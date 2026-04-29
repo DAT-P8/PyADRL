@@ -3,7 +3,7 @@ import os
 
 from PyADRL.envs.map_configs.square_map import SquareMapConfig
 
-    
+
 def load_map_config(map_name: str) -> SquareMapConfig:
     """Load map config from file name. Expected format: map_{width}_{height}_{target_x}_{target_y} e.g. map_11_11_5_5"""
     try:

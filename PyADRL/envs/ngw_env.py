@@ -81,12 +81,7 @@ class NGWEnvironment(ParallelEnv):
         self.obs_space = Box(
             low=0.0,
             high=1.0,
-            shape=(
-                n_agent_positions
-                + one_hot
-                + role_bits
-                + target_position,
-            ),
+            shape=(n_agent_positions + one_hot + role_bits + target_position,),
             dtype=np.float32,
         )
 
