@@ -1,7 +1,11 @@
 from ..dtos.ngw_dtos import Action
+from ..dtos.ngw_dtos import (
+    DroneAction,
+)
+from ..envs.ngw_drone import NGW_Drone
 
 
-def get_action(action: float) -> Action:
+def get_direction(action: float) -> Action:
     match action:
         case 0:
             return Action(Action.ACTION_NOTHING)
@@ -23,3 +27,10 @@ def get_action(action: float) -> Action:
             return Action(Action.ACTION_LEFT_DOWN)
         case e:
             raise ValueError(f"Invalid action: {e}")
+
+def get_drone_action(actions: dict[str, float], drone: NGW_Drone) -> DroneAction:
+    return DroneAction(
+        id=drone.id,
+        action=get_direction(int(actions[drone.name]) % 9),
+        velocity=int(actions[drone.name]) // 9 + 1,
+    )

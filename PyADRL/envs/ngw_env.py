@@ -3,7 +3,7 @@ from gymnasium.spaces import Box, Discrete
 import numpy as np
 import time
 import grpc
-from ..utils.ngw2d_actions import get_action
+from ..utils.ngw2d_actions import get_drone_action
 from ..utils.ngw2d_client import NGWClient
 from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
@@ -152,15 +152,7 @@ class NGWEnvironment(ParallelEnv):
         for drones in self.drones.values():
             for d in drones:
                 if not d.destroyed:
-                    steps = int(actions[d.name]) // 9 + 1
-                    direction = get_action(int(actions[d.name]) % 9)
-                    actions_send.append(
-                        DroneAction(
-                            d.id,
-                            self.drone_velocity,
-                            get_action(actions[d.name]),
-                        )
-                    )
+                    actions_send.append(get_drone_action(actions, d))
 
         state = self.client.DoStep(self.id, actions_send)
 
