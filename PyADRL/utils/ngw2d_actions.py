@@ -28,6 +28,7 @@ def get_direction(action: float) -> Action:
         case e:
             raise ValueError(f"Invalid action: {e}")
 
+
 def get_drone_action(actions: dict[str, float], drone: NGW_Drone) -> DroneAction:
     return DroneAction(
         id=drone.id,
