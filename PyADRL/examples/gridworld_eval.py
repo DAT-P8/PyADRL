@@ -3,7 +3,6 @@ import ray
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
 from ..envs.ngw_env import NGWEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
-from ..envs.map_configs.square_map import SquareMapConfig
 from ..envs.reward_functions.grid_world_rewards import GridWorldRewards
 from ray.tune.registry import register_env
 from ..logger.metricslogger import (
