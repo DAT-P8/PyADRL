@@ -3,7 +3,6 @@ import ray
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
 from ..envs.ngw_env import NGWEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
-from ..envs.map_configs.square_map import SquareMapConfig
 from ..envs.reward_functions.grid_world_rewards import GridWorldRewards
 from ray.tune.registry import register_env
 from ..logger.metricslogger import (
@@ -17,22 +16,28 @@ from ..logger.metricslogger import (
 from ..logger.heatmaps import HeatmapCallback
 
 from ..utils.model_save import restore_testing
+from ..utils.map_load import load_map_config
 
 
 def gridworld_eval(
-    checkpoint_path: str, width: int, height: int, target_x: int, target_y: int
+    map: str,
+    checkpoint_path: str,
+    delay: float,
 ):
     ray.init()
+
+    map_config = load_map_config(map)
 
     register_env(
         "gridworld",
         lambda cfg: ParallelPettingZooEnv(
             NGWEnvironment(
                 channel=grpc.insecure_channel("localhost:50051"),
-                map_config=SquareMapConfig(width, height, target_x, target_y),
+                map_config=map_config,
                 reward_function=GridWorldRewards(),
                 n_pursuers=2,
                 n_evaders=1,
+                step_delay=delay,
             )
         ),
     )
@@ -42,10 +47,10 @@ def gridworld_eval(
         .environment(
             "gridworld",
             env_config={
-                "map_width": width,
-                "map_height": height,
-                "target_x": target_x,
-                "target_y": target_y,
+                "map_width": map_config.width,
+                "map_height": map_config.height,
+                "target_x": map_config.target_x,
+                "target_y": map_config.target_y,
             },
         )
         .multi_agent(

@@ -3,6 +3,17 @@ import argparse
 log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
+def get_maps() -> list[str]:
+    """Get list of maps from PyADRL/examples/maps. Maps are json files with name map_{map_name}.json"""
+    import os
+
+    maps = []
+    for file in os.listdir(os.path.join("PyADRL", "examples", "maps")):
+        if file.endswith(".json"):
+            maps.append(file[:-5])  # remove ".json" suffix
+    return maps
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Example CLI parser")
 
@@ -27,23 +38,11 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--grid",
-        "-g",
-        type=int,
-        nargs=2,
+        "--map",
+        type=str,
+        default="map",
         required=False,
-        default=[11, 11],
-        help="Width and height of the gridworld map (only for gridworld example)",
-    )
-
-    parser.add_argument(
-        "--target",
-        "-t",
-        type=int,
-        nargs=2,
-        required=False,
-        default=[5, 5],
-        help="X and Y coordinates of the target in the gridworld map (only for gridworld example)",
+        help=f"Map name, maps are found in PyADRL/examples/maps. Maps: {get_maps()}",
     )
 
     parser.add_argument(
@@ -52,5 +51,14 @@ def parse_args() -> argparse.Namespace:
         required=False,
         default="ERROR",
         help=f"Log levels available: {', '.join(log_levels)}",
+    )
+
+    parser.add_argument(
+        "--delay",
+        "-d",
+        type=float,
+        required=False,
+        default=0.0,
+        help="Delay in seconds between each step.",
     )
     return parser.parse_args()

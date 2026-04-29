@@ -10,22 +10,25 @@ class GridWorldRewards(RewardFunction):
     REWARD_EVADER_TARGET_REACHED_SELF = 100  # reward for reaching target yourself
     REWARD_EVADER_TARGET_REACHED_OTHERS = 10  # reward for helping reach target
     REWARD_EVADER_CAUGHT = -100
-    REWARD_EVADER_OUT_OF_BOUNDS = -1000
+    REWARD_EVADER_OUT_OF_BOUNDS = -200
     REWARD_EVADER_MAX_TIMESTEPS = 50
     REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
     REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
     REWARD_EVADER_DESTROYED = -100
+    REWARD_EVADER_COLLISION_OBJECT = -200
 
     # Rewards for pursuers
     REWARD_PURSUER_MAX_TIMESTEPS = (
-        -100
+        -50
     )  # Punish pursuers for not catching evader in time
     REWARD_PURSUER_TARGET_REACHED = -100  # Punish pursuers for entering target
+    REWARD_PURSUER_ENTERED_TARGET = -50  # Punish pursuers for entering target
     REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Reward for catching the evader yourself
     REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
-    REWARD_PURSUER_DESTROYED = -1000
+    REWARD_PURSUER_DESTROYED = -100
     REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
-    REWARD_PURSUER_OUT_OF_BOUNDS = -100
+    REWARD_PURSUER_OUT_OF_BOUNDS = -200
+    REWARD_PURSUER_COLLISION_OBJECT = -200
 
     def calculate_rewards(
         self,
@@ -73,6 +76,10 @@ class GridWorldRewards(RewardFunction):
             drone = all_drones[id]
             if drone.is_evader:
                 rewards[drone.name] += self.REWARD_EVADER_TARGET_REACHED_SELF
+            # Give all pursuer drones the reward
+            for pursuer_drone in all_drones.values():
+                if not pursuer_drone.is_evader:
+                    rewards[pursuer_drone.name] += self.REWARD_PURSUER_TARGET_REACHED
 
         for id in out_of_bounds_set:
             drone = all_drones[id]
@@ -124,10 +131,14 @@ class GridWorldRewards(RewardFunction):
         for id in pursuer_entered_target_set:
             drone = all_drones[id]
             if not drone.is_evader:
-                rewards[drone.name] += self.REWARD_PURSUER_TARGET_REACHED
+                rewards[drone.name] += self.REWARD_PURSUER_ENTERED_TARGET
 
         for id in drone_object_collision_set:
-            pass
+            drone = all_drones[id]
+            if drone.is_evader:
+                rewards[drone.name] += self.REWARD_EVADER_COLLISION_OBJECT
+            else:
+                rewards[drone.name] += self.REWARD_PURSUER_COLLISION_OBJECT
 
         for drone in all_drones.values():
             if drone.is_evader:

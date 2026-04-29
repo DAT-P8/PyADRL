@@ -1,20 +1,24 @@
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from ...dtos.map_dtos import MapSpec
 
 
-class MapConfig(ABC):
+class MapConfig(metaclass=ABCMeta):
     @abstractmethod
     def get_target_position(self) -> tuple[int, int]:
-        pass
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_objects(self) -> list[tuple[int, int]]:
+        raise NotImplementedError()
 
     @abstractmethod
     def normalise_position(self, x: int, y: int) -> tuple[float, float]:
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def distance_to_target(self, x: int, y: int) -> float:
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_map_spec(self) -> MapSpec:
-        pass
+        raise NotImplementedError()
