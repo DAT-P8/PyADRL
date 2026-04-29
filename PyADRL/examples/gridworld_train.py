@@ -18,7 +18,6 @@ from ..logger.metricslogger import (
 import matplotlib.pyplot as plt
 from ..utils.model_save import restore_training, setup_checkpoint_dir
 from ..utils.map_load import load_map_config
-from .trainables.alternate_training import _run_alternating_loop
 
 # Probability of sampling an old opponent policy
 P_OLD = 0.3
@@ -39,12 +38,9 @@ def sample_opponent(pool: list[dict]) -> dict:
 
 
 def gridworld_train(
+    map: str,
     checkpoint: str | None = None,
     model_name: str | None = None,
-    width: int = 11,
-    height: int = 11,
-    target_x: int = 5,
-    target_y: int = 5,
 ):
     # If Ray is already initialized from a previous run, shut it down before starting a new one.
     ray.shutdown()
@@ -191,16 +187,6 @@ def gridworld_train(
                     print(f"Saving stage {k + 1} at {checkpoint_dir}/cp_{k + 1:05d}")
                     check = os.path.abspath(f"{checkpoint_dir}/cp_{k + 1:05d}")
                     algo.save(checkpoint_dir=check)
-        rewards, episodes_data = _run_alternating_loop(
-            algo,
-            n_stages=N_STAGES,
-            iters_per_stage=ITERS_PER_STAGE,
-            pursuer_pool=pursuer_pool,
-            evader_pool=evader_pool,
-            report_to_tune=False,
-            checkpoint_dir=checkpoint_dir,
-            start_stage=start_iteration,
-        )
     finally:
         algo.stop()
         ray.shutdown()

@@ -1,7 +1,6 @@
 import ray
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
-from ..envs.map_configs.square_map import SquareMapConfig
 from ..envs.reward_functions.grid_world_rewards import GridWorldRewards
 from ..utils.register_env import _register_gridworld_env
 from .trainables.alternate_training import alternate_trainable
@@ -19,7 +18,10 @@ TOTAL_TUNE_ITERATIONS = N_STAGES * ITERS_PER_STAGE * 2
 
 
 def gridworld_tune(
-    num_samples: int = 8, max_concurrent_trials: int = 4, checkpoint: str | None = None
+    map: str,
+    num_samples: int = 8,
+    max_concurrent_trials: int = 4,
+    checkpoint: str | None = None,
 ) -> tune.ResultGrid:
     """Run a Ray Tune hyperparameter search over the alternating self-play loop.
 
@@ -35,7 +37,7 @@ def gridworld_tune(
     ray.init(log_to_driver=True)
 
     _register_gridworld_env(
-        map_config=SquareMapConfig(11, 11, 5, 5),
+        map=map,
         reward_function=GridWorldRewards(),
     )
 
