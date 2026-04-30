@@ -111,7 +111,7 @@ def alternate_trainable(
     checkpoint_dir: str | None = None,
     n_stages: int = 4,
     iters_per_stage: int = 20,
-    callbacks: list[RLlibCallback] = [],
+    callbacks: list[type[RLlibCallback]] | None = None,
 ) -> None:  # type: ignore[type-arg]
     """Trainable function for Ray Tune.
 

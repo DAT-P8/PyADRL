@@ -16,7 +16,7 @@ def _build_ppo_config(
     num_learners: int = 2,
     num_env_runners: int = 4,
     num_envs_per_env_runner: int = 5,
-    callbacks: list[RLlibCallback] = [],
+    callbacks: list[type[RLlibCallback]] | None = None,
 ) -> PPOConfig:
     """Build a PPOConfig with the given hyperparameters.
 
@@ -50,5 +50,5 @@ def _build_ppo_config(
             entropy_coeff=entropy_coeff,
         )
         .evaluation(evaluation_num_env_runners=0)
-        # .callbacks(callbacks_class = callbacks)
+        .callbacks(callbacks)
     )
