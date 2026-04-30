@@ -3,15 +3,12 @@ from gymnasium.spaces import Box, Discrete
 import numpy as np
 import time
 import grpc
-from ..utils.ngw2d_actions import get_action
+from ..utils.ngw2d_actions import get_drone_action
 from ..utils.ngw2d_client import NGWClient
 from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
 from ..logger.metricslogger import EpisodeOutcome
 from .ngw_drone import NGW_Drone
-from ..dtos.ngw_dtos import (
-    DroneAction,
-)
 
 # Drone dictionary names
 EVADERS = "evaders"
@@ -85,8 +82,8 @@ class NGWEnvironment(ParallelEnv):
             dtype=np.float32,
         )
 
-        # 9 possible actions
-        self.act_space = Discrete(9)
+        # 1 for nothing action, 8 * velocity for all actions with an actual direction
+        self.act_space = Discrete(1 + (8 * drone_velocity))
 
     def _get_obs(self):
         obs = []
@@ -172,13 +169,7 @@ class NGWEnvironment(ParallelEnv):
         for drones in self.drones.values():
             for d in drones:
                 if not d.destroyed:
-                    actions_send.append(
-                        DroneAction(
-                            d.id,
-                            self.drone_velocity,
-                            get_action(actions[d.name]),
-                        )
-                    )
+                    actions_send.append(get_drone_action(actions[d.name], d))
 
         state = self.client.DoStep(self.id, actions_send)
 
