@@ -7,7 +7,7 @@ def iterative_trainable(
     config: dict,
     checkpoint_dir: str | None = None,
     iterations: int = 25,
-    callbacks: list[RLlibCallback] = [],
+    callbacks: list[type[RLlibCallback]] | None = None,
 ) -> None:  # type: ignore[type-arg]
     ppo_config = _build_ppo_config(
         lr=config["lr"],

@@ -94,6 +94,9 @@ class NGWEnvironment(ParallelEnv):
             (norm_x, norm_y) = self.map_config.normalise_position(e.x, e.y)
             obs += [norm_x, norm_y]
 
+        # Include the fixed target position so the observation matches the declared space.
+        obs += [self.norm_target_x, self.norm_target_y]
+
         # Role bits, 1 for pursuer, 0 for evader
         obs += [1.0 for _ in self.drones[PURSUERS]] + [
             0.0 for _ in self.drones[EVADERS]
