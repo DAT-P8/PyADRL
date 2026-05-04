@@ -3,11 +3,12 @@ from gymnasium.spaces import Box, Discrete
 import numpy as np
 import time
 import grpc
+from dataclasses import asdict
 from ..utils.ngw2d_actions import get_drone_action
 from ..utils.ngw2d_client import NGWClient
 from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
-from ..logger.metricslogger import EpisodeOutcome
+from ..logger.metrics import compute_episode_metrics
 from .ngw_drone import NGW_Drone
 
 # Drone dictionary names
@@ -52,6 +53,8 @@ class NGWEnvironment(ParallelEnv):
         self.time_limit = time_limit
         self.agents = []
         self.one_hot = {}
+        self.capture_steps: list[int] = []  # Track steps at which evaders are captured
+        self.captured_evader_ids: set[int] = set()  # Track which evaders have been recorded as captured
 
         # Pettingzoo wants all agents to have the same observation space, action space,
         # and wants possible agents to be defined
@@ -121,6 +124,8 @@ class NGWEnvironment(ParallelEnv):
         self.drones = {EVADERS: [], PURSUERS: []}
         self.agents = []
         self.timestep = 0
+        self.capture_steps = []  # Reset capture tracking
+        self.captured_evader_ids = set()
 
         if self.id is None:
             state = self.client.New(
@@ -155,6 +160,8 @@ class NGWEnvironment(ParallelEnv):
 
         return (observations, infos)
 
+
+
     def step(self, actions: dict[str, float]):
         if (
             len(self.drones[EVADERS]) == 0
@@ -187,8 +194,9 @@ class NGWEnvironment(ParallelEnv):
             if drone_state.destroyed:
                 for drone in self.drones[key]:
                     if drone_state.id == drone.id:
-                        drone.destroyed = True
-                        terminations[drone.name] = True
+                        if not drone.destroyed:  # Only mark destroyed on first destruction
+                            drone.destroyed = True
+                            terminations[drone.name] = True
                         break
             else:  # Update positions
                 for drone in self.drones[key]:
@@ -196,7 +204,16 @@ class NGWEnvironment(ParallelEnv):
                         drone.x = drone_state.x
                         drone.y = drone_state.y
 
-        outcome = EpisodeOutcome(episode_length=self.timestep + 1)
+        # Compute episode metrics (will be used if episode ends)
+        outcome = compute_episode_metrics(
+            state=state,
+            drones=self.drones,
+            timestep=self.timestep,
+            n_evaders=self.n_evaders,
+            n_pursuers=self.n_pursuers,
+            capture_steps=self.capture_steps,
+            captured_evader_ids=self.captured_evader_ids,
+        )
 
         time_limit_reached = self.timestep >= self.time_limit
         rewards = self.reward_function.calculate_rewards(
@@ -219,14 +236,7 @@ class NGWEnvironment(ParallelEnv):
         infos = {a: {} for a in self.agents}
 
         if state.terminated or time_limit_reached:
-            episode_metrics = {
-                "captured": 1.0 if outcome.captured else 0.0,
-                "breached": 1.0 if outcome.breached else 0.0,
-                "capture_step": float(outcome.capture_step)
-                if outcome.capture_step is not None
-                else 100.0,
-                "episode_length": float(outcome.episode_length),
-            }
+            episode_metrics = asdict(outcome)
             for a in self.agents:
                 infos[a]["episode_metrics"] = episode_metrics
 
