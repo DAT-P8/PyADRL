@@ -99,6 +99,8 @@ class NGWEnvironment(ParallelEnv):
             0.0 for _ in self.drones[EVADERS]
         ]
 
+        obs += [self.norm_target_x, self.norm_target_y]
+
         obs_array = np.array(obs, dtype=np.float32)
 
         agent_observations = {}
