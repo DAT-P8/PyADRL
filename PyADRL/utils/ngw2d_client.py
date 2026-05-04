@@ -63,6 +63,6 @@ class NGWClient:
 
     def Close(self, id: int) -> None:
         req = CloseRequest(sim_id=id)
-        res: CloseResponse = self.stub.Reset(req)
-        if res.error_message and len(res.error_message) != 0:
-            raise ValueError(f"Error response from New: {res.error_message}")
+        res: CloseResponse = self.stub.Close(req)
+        if res.HasField("error_message"):
+            raise ValueError(f"Error response from Close: {res.error_message}")
