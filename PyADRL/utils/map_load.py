@@ -1,19 +1,19 @@
 import json
-import os
 
 from PyADRL.envs.map_configs.square_map import SquareMapConfig
+from PyADRL.utils.paths import get_env_map
 
 
 def load_map_config(map_name: str) -> SquareMapConfig:
     """Load map config from file name. Expected format: map_{width}_{height}_{target_x}_{target_y} e.g. map_11_11_5_5"""
+    map_path = get_env_map(map_name)
     try:
         # load json file from PyADRL/examples/maps with name map_name and parse width, height, target_x, target_y
         with open(
-            os.path.join("PyADRL", "examples", "maps", f"{map_name}.json"), "r"
+            map_path,
+            "r",
         ) as f:
-            print(
-                f"Loading map config from {os.path.join('PyADRL', 'examples', 'maps', f'{map_name}.json')}"
-            )
+            print(f"Loading map config from {map_path}.")
             map_config = json.load(f)
         return SquareMapConfig(
             map_config["width"],

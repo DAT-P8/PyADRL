@@ -215,7 +215,7 @@ __marimo__/
 *TDF_pb2_grpc.py
 
 # checkpoints folder
-checkpoints/
+experiments/
 
 #Results
 results/ 

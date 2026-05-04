@@ -1,5 +1,4 @@
 import random
-import os
 from ray import tune
 from ray.rllib.callbacks.callbacks import RLlibCallback
 from ...utils.config_builder import _build_ppo_config
@@ -93,8 +92,8 @@ def _run_alternating_loop(
 
         # Save a checkpoint after each full stage (evader+pursuer training)
         if checkpoint_dir and training == PURSUER:
-            print(f"Saving stage {k + 1} at {checkpoint_dir}/cp_{k + 1:05d}")
-            check = os.path.abspath(f"{checkpoint_dir}/cp_{k + 1:05d}")
+            print(f"Saving stage {k + 1} at {checkpoint_dir}/stage_{k + 1:05d}")
+            check = f"{checkpoint_dir}/stage_{k + 1:05d}"
             algo.save(checkpoint_dir=check)
 
         # Alternate what policy gets trained

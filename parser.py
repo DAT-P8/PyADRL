@@ -1,5 +1,7 @@
 import argparse
 
+from PyADRL.utils.paths import get_env_maps_dir
+
 log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
@@ -8,7 +10,7 @@ def get_maps() -> list[str]:
     import os
 
     maps = []
-    for file in os.listdir(os.path.join("PyADRL", "examples", "maps")):
+    for file in os.listdir(get_env_maps_dir()):
         if file.endswith(".json"):
             maps.append(file[:-5])  # remove ".json" suffix
     return maps

@@ -9,12 +9,14 @@ from datetime import datetime
 from ray.rllib.callbacks.callbacks import RLlibCallback
 import time
 
+from PyADRL.utils.paths import get_experiments_dir, get_model_maps_dir
+
 # TODO: GRID SIZE SHOULD BE DYNAMIC BASED ON MAP CONFIG, NOT HARDCODED
-_RESULTS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "results")
-)
+_RESULTS_DIR = get_experiments_dir()
 
 EPISODE_FILE_PREFIX = "episode_states_tmp_"
+
+# TODO: drone states goes into experiments/ should be in the model folder somewhere
 
 
 class HeatmapCallback(RLlibCallback):
@@ -24,6 +26,7 @@ class HeatmapCallback(RLlibCallback):
         self.grid_h = 0
         self.target_x = 0
         self.target_y = 0
+        self.model_name = ""
 
     def on_algorithm_init(
         self,
@@ -33,7 +36,7 @@ class HeatmapCallback(RLlibCallback):
         **kwargs,
     ) -> None:
         # Clean up any old episode files from previous runs
-        files = glob.glob(os.path.join(_RESULTS_DIR, f"{EPISODE_FILE_PREFIX}*.json"))
+        files = glob.glob(str(_RESULTS_DIR / f"{EPISODE_FILE_PREFIX}*.json"))
         for path in files:
             os.remove(path)
         if algorithm and algorithm.config:
@@ -41,6 +44,7 @@ class HeatmapCallback(RLlibCallback):
             self.grid_h = algorithm.config.env_config.get("map_height", 0)
             self.target_x = algorithm.config.env_config.get("target_x", 0)
             self.target_y = algorithm.config.env_config.get("target_y", 0)
+            self.model_name = algorithm.config.env_config.get("model_name", "")
 
         if algorithm.config is None or algorithm.config.env_config is None:
             raise ValueError(
@@ -51,6 +55,7 @@ class HeatmapCallback(RLlibCallback):
         self.grid_h = algorithm.config.env_config.get("map_height", 0)
         self.target_x = algorithm.config.env_config.get("target_x", 0)
         self.target_y = algorithm.config.env_config.get("target_y", 0)
+        self.model_name = algorithm.config.env_config.get("model_name", "")
 
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
@@ -102,7 +107,7 @@ class HeatmapCallback(RLlibCallback):
             "pursuer_states": episode.custom_data.get("pursuer_states", {}),
         }
         # Each worker writes its own file — episode_id keeps filenames unique
-        path = os.path.join(_RESULTS_DIR, f"{EPISODE_FILE_PREFIX}{id(episode)}.json")
+        path = _RESULTS_DIR / f"{EPISODE_FILE_PREFIX}{id(episode)}.json"
         with open(path, "w") as f:
             json.dump(drone_states, f)
 
@@ -117,7 +122,7 @@ class HeatmapCallback(RLlibCallback):
         # Sleep to ensure all episode files have been written before we read them
         time.sleep(0.5)
 
-        files = glob.glob(os.path.join(_RESULTS_DIR, f"{EPISODE_FILE_PREFIX}*.json"))
+        files = glob.glob(str(_RESULTS_DIR / f"{EPISODE_FILE_PREFIX}*.json"))
         if not files:
             print("[HeatmapCallback] No episode files found - nothing to plot.")
             return
@@ -135,8 +140,8 @@ class HeatmapCallback(RLlibCallback):
             concatenated["evader_states"].append(data.get("evader_states", {}))
             concatenated["pursuer_states"].append(data.get("pursuer_states", {}))
 
-        date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        merged_path = os.path.join(_RESULTS_DIR, f"drone_states_{date_str}.json")
+        date_str = datetime.now().strftime("%y%m%d_%H%M")
+        merged_path = _RESULTS_DIR / f"drone_states_{date_str}.json"
         with open(merged_path, "w") as f:
             json.dump(concatenated, f)
 
@@ -147,13 +152,15 @@ class HeatmapCallback(RLlibCallback):
         self._plot_occupancy_heatmap(
             concatenated["evader_states"],
             title="Evader Position Heatmap",
-            filename=f"results/heatmap_evader_{date_str}.png",
+            filename=get_model_maps_dir(self.model_name)
+            / f"heatmap_evader_{date_str}.png",
             color="YlOrRd",
         )
         self._plot_occupancy_heatmap(
             concatenated["pursuer_states"],
             title="Pursuer Position Heatmap",
-            filename=f"results/heatmap_pursuer_{date_str}.png",
+            filename=get_model_maps_dir(self.model_name)
+            / f"heatmap_pursuer_{date_str}.png",
             color="Blues",
         )
 
@@ -166,7 +173,7 @@ class HeatmapCallback(RLlibCallback):
             evader_episode,
             pursuer_episode,
             title="Agent Trace Map (Single Example Episode)",
-            filename=f"results/trace_map_{date_str}.png",
+            filename=get_model_maps_dir(self.model_name) / f"trace_map_{date_str}.png",
         )
 
     def _select_representative_episode(self, evader_episodes, pursuer_episodes):

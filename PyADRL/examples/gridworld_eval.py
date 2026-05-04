@@ -51,6 +51,7 @@ def gridworld_eval(
                 "map_height": map_config.height,
                 "target_x": map_config.target_x,
                 "target_y": map_config.target_y,
+                "model_name": checkpoint_path,
             },
         )
         .multi_agent(
