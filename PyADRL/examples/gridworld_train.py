@@ -1,7 +1,6 @@
 import random
 import grpc
 import ray
-import os
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
 from ..envs.ngw_env import NGWEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
@@ -16,7 +15,7 @@ from ..logger.metricslogger import (
 )
 
 import matplotlib.pyplot as plt
-from ..utils.model_save import restore_training, setup_checkpoint_dir
+from ..utils.model_save import restore_training, setup_checkpoints_dir
 from ..utils.map_load import load_map_config
 
 # Probability of sampling an old opponent policy
@@ -109,13 +108,14 @@ def gridworld_train(
     start_iteration = 0
     checkpoint_dir = ""
 
+    # TODO: Check this, restore_training only takes a model name now (e.g. checkpoint is just a model_name)
     train_metrics_path = metrics_path("train")
     if checkpoint is not None:
         checkpoint_dir, start_iteration = restore_training(
-            algo, checkpoint, pursuer_pool, evader_pool, model_name=model_name
+            algo, checkpoint, pursuer_pool, evader_pool
         )
     else:
-        checkpoint_dir = setup_checkpoint_dir(model_name=model_name)
+        checkpoint_dir = setup_checkpoints_dir(model_name=model_name)
         print(f"No checkpoint specified. Starting new training run at {checkpoint_dir}")
 
     rewards = []
@@ -183,9 +183,9 @@ def gridworld_train(
 
                 # Save a checkpoint after each full stage (evader+pursuer training)
                 if label == "pursuer":
-                    # {k + 1:05d} for zero padding e.g. cp_00012 instead of cp_12
-                    print(f"Saving stage {k + 1} at {checkpoint_dir}/cp_{k + 1:05d}")
-                    check = os.path.abspath(f"{checkpoint_dir}/cp_{k + 1:05d}")
+                    # {k + 1:05d} for zero padding e.g. stage_00012 instead of stage_12
+                    print(f"Saving stage {k + 1} at {checkpoint_dir}/stage_{k + 1:05d}")
+                    check = f"{checkpoint_dir}/stage_{k + 1:05d}"
                     algo.save(checkpoint_dir=check)
     finally:
         algo.stop()

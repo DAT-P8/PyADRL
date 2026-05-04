@@ -5,8 +5,6 @@ from PyADRL.examples.gridworld_eval import gridworld_eval
 
 
 def main():
-    if not os.path.exists("checkpoints"):
-        os.makedirs("checkpoints")
     args = parse_args()
     checkpoint = args.restore
 
