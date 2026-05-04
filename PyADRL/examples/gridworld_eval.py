@@ -37,7 +37,7 @@ def gridworld_eval(
                 reward_function=GridWorldRewards(),
                 n_pursuers=2,
                 n_evaders=1,
-                step_delay=delay,
+                step_delay=0.2,
             )
         ),
     )

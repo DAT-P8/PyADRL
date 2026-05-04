@@ -23,7 +23,7 @@ from ..utils.map_load import load_map_config
 P_OLD = 0.3
 
 # Number of alternating stages and PPO iterations per stage
-N_STAGES = 4
+N_STAGES = 6
 ITERS_PER_STAGE = 20
 
 
@@ -82,8 +82,8 @@ def gridworld_train(
             num_learners=2,  # Number of parallel learner processes for computing gradients
         )
         .env_runners(
-            num_env_runners=4,  # Number of processes/threads that run the environment in parallel
-            num_envs_per_env_runner=5,  # Number of environments per env_runner
+            num_env_runners=2,  # Keep runner count low to avoid overloading the simulator gRPC service
+            num_envs_per_env_runner=3,  # Run one environment per runner for stability
         )
         .training(
             train_batch_size=10000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients

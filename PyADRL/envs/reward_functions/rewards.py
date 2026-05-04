@@ -13,5 +13,6 @@ class RewardFunction(ABC):
         drones: dict[str, list[NGW_Drone]],
         map_config: MapConfig,
         time_limit_reached: bool,
+        previous_positions: dict[int, tuple[int, int]] | None = None,
     ) -> dict[str, float]:
         pass
