@@ -24,7 +24,6 @@ def gridworld_eval(
     checkpoint_path: str,
     delay: float,
 ):
-    ray.shutdown()
     ray.init()
 
     map_config = load_map_config(map)
@@ -38,7 +37,7 @@ def gridworld_eval(
                 reward_function=GridWorldRewards(),
                 n_pursuers=2,
                 n_evaders=1,
-                step_delay=delay,
+                step_delay=0.2,
             )
         ),
     )
@@ -55,7 +54,7 @@ def gridworld_eval(
                 "model_name": checkpoint_path,
             },
         )
-        .training(lr=0.0)
+        .training(lr=0.0, train_batch_size=150, minibatch_size=10, num_epochs=1)
         .multi_agent(
             policies={"pursuer_policy", "evader_policy"},
             policy_mapping_fn=lambda agent_id, *args, **kwargs: (
@@ -66,21 +65,23 @@ def gridworld_eval(
         .env_runners(
             num_env_runners=1,
         )
-        # .callbacks(callbacks_class=[MetricsCallback, HeatmapCallback])
+        .callbacks(callbacks_class=[HeatmapCallback])
         .evaluation(evaluation_num_env_runners=0)
     )
 
     algo = config.build()
-    restore_testing(algo, checkpoint_path)
 
-    result = algo.train()
-    eval_data = build_eval_data(result)
-    eval_episodes = eval_data.get("episodes", [])
-    eval_metrics_path = metrics_path("eval")
-    write_metrics(
-        eval_metrics_path,
-        build_eval(eval_episodes, fallback_summary=eval_data.get("summary", {})),
-    )
-    print_eval_summary(eval_data, eval_metrics_path)
-
-    algo.stop()
+    try:
+        restore_testing(algo, checkpoint_path)
+        result = algo.train()
+        eval_data = build_eval_data(result)
+        eval_episodes = eval_data.get("episodes", [])
+        eval_metrics_path = metrics_path("eval")
+        write_metrics(
+            eval_metrics_path,
+            build_eval(eval_episodes, fallback_summary=eval_data.get("summary", {})),
+        )
+        print_eval_summary(eval_data, eval_metrics_path)
+    finally:
+        algo.stop()
+        ray.shutdown()
