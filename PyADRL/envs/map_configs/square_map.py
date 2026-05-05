@@ -43,7 +43,7 @@ class SquareMapConfig(MapConfig):
     def distance_to_target(self, x: int, y: int) -> int:
         return chebyshev_distance(x, y, self.target_x, self.target_y)
 
-    # TODO: we should probably normalise the distance based on the map type is it rectangular or quadratic
+    # TODO: we should probably normalise the distance based on the map type is it rectangular or square
     # For now maximum distance, as it is simples and also does not change that much for rewards
     def normalise_map_distance(self, distance: int) -> float:
         return distance / max(self.width - 1, self.height - 1)
