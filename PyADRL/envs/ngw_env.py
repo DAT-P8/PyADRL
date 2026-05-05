@@ -170,10 +170,6 @@ class NGWEnvironment(ParallelEnv):
         if self.step_delay > 0:
             time.sleep(self.step_delay)
 
-        previous_positions = {
-            d.id: (d.x, d.y) for drones in self.drones.values() for d in drones
-        }
-
         # Create the list of actions to send to the godot server
         actions_send = []
         # Add drone action if it is not destroyed
@@ -213,7 +209,6 @@ class NGWEnvironment(ParallelEnv):
             drones=self.drones,
             map_config=self.map_config,
             time_limit_reached=time_limit_reached,
-            previous_positions=previous_positions,
         )
 
         if state.terminated:

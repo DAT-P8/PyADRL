@@ -23,8 +23,8 @@ from ..utils.map_load import load_map_config
 P_OLD = 0.3
 
 # Number of alternating stages and PPO iterations per stage
-N_STAGES = 6
-ITERS_PER_STAGE = 20
+N_STAGES = 3
+ITERS_PER_STAGE = 10
 
 
 def sample_opponent(pool: list[dict]) -> dict:
@@ -86,9 +86,9 @@ def gridworld_train(
             num_envs_per_env_runner=3,  # Run one environment per runner for stability
         )
         .training(
-            train_batch_size=10000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
-            minibatch_size=512,  # Size of each mini batch for each SGD update
-            num_epochs=10,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
+            train_batch_size=1000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
+            minibatch_size=256,  # Size of each mini batch for each SGD update
+            num_epochs=5,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
             lr=3e-4,  # Learning rate for optimization
             gamma=0.99,  # Discount factor: future rewards are multiplied by gamma
             lambda_=0.95,  # Balances short-term, low-variance estimates against long-term, high-variance returns in GAE (General Advantage Estimation)
@@ -96,7 +96,7 @@ def gridworld_train(
             vf_loss_coeff=0.5,  # Weight of the value function loss in the total loss
             entropy_coeff=0.01,  # Encourage exploration
         )
-        .callbacks(MetricsCallback)
+        #.callbacks(MetricsCallback)
         .evaluation(
             evaluation_num_env_runners=0
         )  # No separate evaluation environments. >0 = parallel evaluation of policy while training
