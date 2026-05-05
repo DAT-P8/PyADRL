@@ -7,26 +7,25 @@ from ...utils.chebeshyv import chebyshev_distance
 
 class GridWorldRewards(RewardFunction):
     # Rewards for evader
-    REWARD_EVADER_TARGET_REACHED_SELF = 100  # reward for reaching target yourself
-    REWARD_EVADER_TARGET_REACHED_OTHERS = 10  # reward for helping reach target
-    REWARD_EVADER_CAUGHT = -100
-    REWARD_EVADER_OUT_OF_BOUNDS = -200
     REWARD_EVADER_MAX_TIMESTEPS = 50
-    REWARD_EVADER_FAR_FROM_TARGET = -1  # Muiltiplier for distance to target
-    REWARD_EVADER_FAR_FROM_PUSUERS = 1  # Multiplier for distance to closest pursuer
+    REWARD_EVADER_TARGET_REACHED_SELF = 200  # reward for reaching target yourself
+    REWARD_EVADER_TARGET_REACHED_OTHERS = 20  # reward for helping reach target
+    REWARD_EVADER_CAUGHT = -100
+    REWARD_EVADER_FAR_FROM_TARGET = -10  # Muiltiplier for distance to target
     REWARD_EVADER_DESTROYED = -100
+    REWARD_EVADER_OUT_OF_BOUNDS = -200
     REWARD_EVADER_COLLISION_OBJECT = -200
 
     # Rewards for pursuers
     REWARD_PURSUER_MAX_TIMESTEPS = (
         -50
     )  # Punish pursuers for not catching evader in time
-    REWARD_PURSUER_TARGET_REACHED = -100  # Punish pursuers for entering target
+    REWARD_PURSUER_CAUGHT_EVADER_SELF = 200  # Reward for catching the evader yourself
+    REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 20  # Reward for helping catch the evader
+    REWARD_PURSUER_TARGET_REACHED = -100  # Punish pursuers for evader in target
     REWARD_PURSUER_ENTERED_TARGET = -50  # Punish pursuers for entering target
-    REWARD_PURSUER_CAUGHT_EVADER_SELF = 100  # Reward for catching the evader yourself
-    REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 10  # Reward for helping catch the evader
-    REWARD_PURSUER_DESTROYED = -100
-    REWARD_PURSUER_FAR_FROM_EVADER = -1  # Multiplier for distance to evader
+    REWARD_PURSUER_FAR_FROM_EVADER = -10  # Multiplier for distance to evader
+    REWARD_PURSUER_DESTROYED = -10
     REWARD_PURSUER_OUT_OF_BOUNDS = -200
     REWARD_PURSUER_COLLISION_OBJECT = -200
 
@@ -143,22 +142,12 @@ class GridWorldRewards(RewardFunction):
         for drone in all_drones.values():
             if drone.is_evader:
                 # reward the evader for being far from the pursuers to encourage it to move away from the pursuers
-                distance_to_pursuer = min(
-                    (
-                        chebyshev_distance(drone.x, drone.y, pursuer.x, pursuer.y)
-                        for pursuer in drones["pursuers"]
-                        if not pursuer.destroyed
-                    ),
-                    default=0,
-                )
-                rewards[drone.name] += (
-                    distance_to_pursuer * self.REWARD_EVADER_FAR_FROM_PUSUERS
-                )
 
                 # punish evaders for being far from the target to encourage them to move towards it
                 distance_to_target = map_config.distance_to_target(drone.x, drone.y)
                 rewards[drone.name] += (
-                    distance_to_target * self.REWARD_EVADER_FAR_FROM_TARGET
+                    map_config.normalise_map_distance(distance_to_target)
+                    * self.REWARD_EVADER_FAR_FROM_TARGET
                 )
             else:
                 # punish the pursuers for being far from the evader to encourage them to move towards the evader
@@ -171,7 +160,8 @@ class GridWorldRewards(RewardFunction):
                     default=0,
                 )
                 rewards[drone.name] += (
-                    distance_to_evader * self.REWARD_PURSUER_FAR_FROM_EVADER
+                    map_config.normalise_map_distance(distance_to_evader)
+                    * self.REWARD_PURSUER_FAR_FROM_EVADER
                 )
 
         if time_limit_reached:
