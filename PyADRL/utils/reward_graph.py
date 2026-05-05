@@ -1,14 +1,24 @@
 import matplotlib.pyplot as plt
+from pathlib import Path
 from numpy import mean
 
 
-def plot_rewards(rewards, plot_best: bool = True):
+def create_reward_graph(
+    rewards,
+    plot_best: bool = False,
+    figure_path: Path | None = None,
+):
     """Plots agent rewards.
     Args:
         rewards: The dictionary mapping agents to a list of rewards.
         plot_best: If set to true only the pursuer and evader with the highest mean reward will be plottet.
+        figure_path: If set the plot will be saved to the destination instead of being plottet
     """
-    iterations = list(range(1, len(rewards) + 1))
+    # Todo: fix iterations and agent rewards
+    reward_len = 0
+    for v in rewards.values():
+        reward_len = len(v)
+    iterations = list(range(1, reward_len + 1))
 
     _fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -28,7 +38,10 @@ def plot_rewards(rewards, plot_best: bool = True):
     ax.grid(True, linestyle="--", alpha=0.5)
 
     plt.tight_layout()
-    plt.show()
+    if figure_path is not None:
+        plt.savefig(f"{figure_path}/reward_graph.svg")
+    else:
+        plt.show()
 
 
 def find_best(policy: str, rewards: dict) -> str:

@@ -3,14 +3,18 @@ from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
 from ..envs.reward_functions.rewards import RewardFunction
 from ..envs.ngw_env import NGWEnvironment
-from .map_load import load_map_config
+from .map_load import dict_to_map_config
 
 
 def _register_gridworld_env(
-    map: str, reward_function: RewardFunction, n_pursuers=2, n_evaders=1
+    map_dict: dict,
+    reward_function: RewardFunction,
+    n_pursuers=2,
+    n_evaders=1,
+    shielding=False,
 ) -> None:
     """Register the gridworld environment with Ray. Safe to call multiple times."""
-    map_config = load_map_config(map)
+    map_config = dict_to_map_config(map_dict)
     register_env(
         "gridworld",
         lambda _cfg: ParallelPettingZooEnv(
@@ -20,6 +24,7 @@ def _register_gridworld_env(
                 reward_function=reward_function,
                 n_pursuers=n_pursuers,
                 n_evaders=n_evaders,
+                shielded=shielding,
             )
         ),
     )

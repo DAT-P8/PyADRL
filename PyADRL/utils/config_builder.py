@@ -1,30 +1,32 @@
 from ray.rllib.callbacks.callbacks import RLlibCallback
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
 from ray.rllib.policy.policy import PolicySpec
+from pathlib import Path
 
 
 def _build_ppo_config(
-    lr: float = 3e-4,
-    gamma: float = 0.99,
-    lambda_: float = 0.95,
-    clip_param: float = 0.2,
-    vf_loss_coeff: float = 0.5,
-    entropy_coeff: float = 0.01,
-    train_batch_size: int = 10000,
-    minibatch_size: int = 512,
-    num_epochs: int = 10,
-    num_learners: int = 2,
-    num_env_runners: int = 4,
-    num_envs_per_env_runner: int = 5,
+    config: dict,
     callbacks: list[type[RLlibCallback]] | None = None,
+    env_config: dict = {},
+    n_pursuers: int = 2,
+    n_evaders: int = 1,
+    figure_path: Path | None = None,
+    metrics_path: Path | None = None,
 ) -> PPOConfig:
-    """Build a PPOConfig with the given hyperparameters.
+    """Build a PPOConfig with the given hyperparameters."""
+    if figure_path:
+        env_config["figure_path"] = figure_path
+    if metrics_path:
+        env_config["metrics_path"] = metrics_path
+    env_config["n_pursuers"] = n_pursuers
+    env_config["n_evaders"] = n_evaders
 
-    Shared between gridworld_train and gridworld_tune to keep config in sync.
-    """
     return (
         PPOConfig()
-        .environment("gridworld")
+        .environment(
+            "gridworld",
+            env_config=env_config,
+        )
         .multi_agent(
             policies={"pursuer_policy": PolicySpec(), "evader_policy": PolicySpec()},
             policy_mapping_fn=lambda agent_id, *_args, **_kwargs: (
@@ -32,23 +34,28 @@ def _build_ppo_config(
             ),
         )
         .learners(
-            num_learners=num_learners,
+            num_learners=config.get("num_learners", 2),
         )
         .env_runners(
-            num_env_runners=num_env_runners,
-            num_envs_per_env_runner=num_envs_per_env_runner,
+            num_env_runners=config.get("num_env_runners", 4),
+            num_envs_per_env_runner=config.get("num_envs_per_env_runner", 5),
         )
         .training(
-            train_batch_size=train_batch_size,
-            minibatch_size=minibatch_size,
-            num_epochs=num_epochs,
-            lr=lr,
-            gamma=gamma,
-            lambda_=lambda_,
-            clip_param=clip_param,
-            vf_loss_coeff=vf_loss_coeff,
-            entropy_coeff=entropy_coeff,
+            train_batch_size=config.get("train_batch_size", 10000),
+            minibatch_size=config.get("minibatch_size", 512),
+            num_epochs=config.get("num_epochs", 10),
+            lr=config.get("lr", 3e-4),
+            gamma=config.get("gamma", 0.99),
+            lambda_=config.get("lambda_", 0.95),
+            clip_param=config.get("clip_param", 0.2),
+            vf_loss_coeff=config.get("vf_loss_coeff", 0.5),
+            entropy_coeff=config.get("entropy_coeff", 0.01),
         )
         .evaluation(evaluation_num_env_runners=0)
         .callbacks(callbacks)
+        .evaluation(
+            evaluation_interval=None,
+            evaluation_num_env_runners=config.get("evaluation_num_env_runners", 0),
+            evaluation_duration=config.get("evaluation_duration", 200),
+        )
     )
