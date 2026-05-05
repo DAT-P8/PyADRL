@@ -65,7 +65,7 @@ def gridworld_eval(
         .env_runners(
             num_env_runners=1,
         )
-        .callbacks(callbacks_class=[HeatmapCallback])
+        .callbacks(callbacks_class=[MetricsCallback, HeatmapCallback])
         .evaluation(evaluation_num_env_runners=0)
     )
 
