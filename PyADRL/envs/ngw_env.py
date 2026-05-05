@@ -29,7 +29,7 @@ class NGWEnvironment(ParallelEnv):
         n_evaders: int,
         drone_velocity: int = 1,
         time_limit: int = 100,
-        step_delay: float = 0.2,
+        step_delay: float = 0.0,
     ):
         self.id: int | None = None
         self.client = NGWClient(channel)
