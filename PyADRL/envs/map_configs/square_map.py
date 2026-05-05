@@ -2,6 +2,7 @@ from .map_config import MapConfig
 from ...dtos.map_dtos import SquareMap, MapSpec, ObjectSpec, SquareObject
 from ...utils.chebeshyv import chebyshev_distance
 
+
 class SquareMapConfig(MapConfig):
     def __init__(
         self,
@@ -42,8 +43,10 @@ class SquareMapConfig(MapConfig):
     def distance_to_target(self, x: int, y: int) -> int:
         return chebyshev_distance(x, y, self.target_x, self.target_y)
 
+    # TODO: we should probably normalise the distance based on the map type is it rectangular or quadratic
+    # For now maximum distance, as it is simples and also does not change that much for rewards
     def normalise_map_distance(self, distance: int) -> float:
-        return distance / max(self.width-1, self.height-1)
+        return distance / max(self.width - 1, self.height - 1)
 
     def get_map_spec(self) -> MapSpec:
         return self.map_spec
