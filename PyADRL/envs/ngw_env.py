@@ -113,12 +113,8 @@ class NGWEnvironment(ParallelEnv):
 
     def close(self):
         if self.id is None:
-            return
-
-        try:
-            self.client.Close(self.id)
-        finally:
-            self.id = None
+            raise ValueError("Tried closing a null environment")
+        self.client.Close(self.id)
 
     def reset(self, seed=None, options=None):
         state = None
