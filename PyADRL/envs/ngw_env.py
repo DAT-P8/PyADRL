@@ -53,8 +53,12 @@ class NGWEnvironment(ParallelEnv):
         self.time_limit = time_limit
         self.agents = []
         self.one_hot = {}
+
+        # Metrics tracking
         self.capture_steps: list[int] = []  # Track steps at which evaders are captured
-        self.captured_evader_ids: set[int] = set()  # Track which evaders have been recorded as captured
+        self.captured_evader_ids: set[int] = (
+            set()
+        )  # Track which evaders have been recorded as captured
         self.target_reached_ids: set[int] = set()
         self.drone_object_collision_ids: set[int] = set()
         self.collision_ids: set[int] = set()
@@ -127,7 +131,9 @@ class NGWEnvironment(ParallelEnv):
         self.drones = {EVADERS: [], PURSUERS: []}
         self.agents = []
         self.timestep = 0
-        self.capture_steps = []  # Reset capture tracking
+
+        # Reset metrics tracking
+        self.capture_steps = []
         self.captured_evader_ids = set()
         self.target_reached_ids = set()
         self.drone_object_collision_ids = set()
@@ -166,8 +172,6 @@ class NGWEnvironment(ParallelEnv):
 
         return (observations, infos)
 
-
-
     def step(self, actions: dict[str, float]):
         if (
             len(self.drones[EVADERS]) == 0
@@ -200,7 +204,9 @@ class NGWEnvironment(ParallelEnv):
             if drone_state.destroyed:
                 for drone in self.drones[key]:
                     if drone_state.id == drone.id:
-                        if not drone.destroyed:  # Only mark destroyed on first destruction
+                        if (
+                            not drone.destroyed
+                        ):  # Only mark destroyed on first destruction
                             drone.destroyed = True
                             terminations[drone.name] = True
                         break
