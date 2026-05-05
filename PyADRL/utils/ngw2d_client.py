@@ -17,12 +17,19 @@ from ..ngw.v1.ngw2d_pb2_grpc import SimulationServiceStub
 
 
 class NGWClient:
-    def __init__(self, channel: Channel):
+    def __init__(self, channel: Channel, rpc_timeout: float | None = 5.0):
+        """RPC client for NGW simulation. rpc_timeout is seconds passed to each RPC; None means no timeout."""
         self.stub = SimulationServiceStub(channel)
+        self.rpc_timeout = rpc_timeout
 
     def DoStep(self, id: int, actions: list[DroneAction]) -> State:
         req = DoStepRequest(sim_id=id, drone_actions=[a.to_dto() for a in actions])
-        response: DoStepResponse = self.stub.DoStep(req)
+        # Pass rpc timeout so a hung server doesn't block training forever
+        response: DoStepResponse = (
+            self.stub.DoStep(req, timeout=self.rpc_timeout)
+            if self.rpc_timeout is not None
+            else self.stub.DoStep(req)
+        )
         parsed_response = StateResponse.from_dto(response.state_response)
         if parsed_response.error_message is not None:
             raise ValueError(
@@ -37,7 +44,11 @@ class NGWClient:
         req = NewRequest(
             map=map.to_dto(), evader_count=evader_count, pursuer_count=pursuer_count
         )
-        res: NewResponse = self.stub.New(req)
+        res: NewResponse = (
+            self.stub.New(req, timeout=self.rpc_timeout)
+            if self.rpc_timeout is not None
+            else self.stub.New(req)
+        )
         parsed_response = StateResponse.from_dto(res.state_response)
         if parsed_response.error_message is not None:
             raise ValueError(
@@ -50,7 +61,11 @@ class NGWClient:
 
     def Reset(self, id: int) -> State:
         req = ResetRequest(sim_id=id)
-        res: ResetResponse = self.stub.Reset(req)
+        res: ResetResponse = (
+            self.stub.Reset(req, timeout=self.rpc_timeout)
+            if self.rpc_timeout is not None
+            else self.stub.Reset(req)
+        )
         parsed_response = StateResponse.from_dto(res.state_response)
         if parsed_response.error_message is not None:
             raise ValueError(
@@ -63,6 +78,9 @@ class NGWClient:
 
     def Close(self, id: int) -> None:
         req = CloseRequest(sim_id=id)
-        res: CloseResponse = self.stub.Close(req)
-        if res.HasField("error_message"):
-            raise ValueError(f"Error response from Close: {res.error_message}")
+        if self.rpc_timeout is not None:
+            _res: CloseResponse = self.stub.Close(req, timeout=self.rpc_timeout)
+        else:
+            _res: CloseResponse = self.stub.Close(req)
+        if _res.HasField("error_message"):
+            raise ValueError(f"Error response from Close: {_res.error_message}")

@@ -23,8 +23,8 @@ from ..utils.map_load import load_map_config
 P_OLD = 0.3
 
 # Number of alternating stages and PPO iterations per stage
-N_STAGES = 3
-ITERS_PER_STAGE = 10
+N_STAGES = 6
+ITERS_PER_STAGE = 15
 
 
 def sample_opponent(pool: list[dict]) -> dict:
@@ -88,7 +88,7 @@ def gridworld_train(
         .training(
             train_batch_size=1000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
             minibatch_size=256,  # Size of each mini batch for each SGD update
-            num_epochs=5,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
+            num_epochs=7,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
             lr=3e-4,  # Learning rate for optimization
             gamma=0.99,  # Discount factor: future rewards are multiplied by gamma
             lambda_=0.95,  # Balances short-term, low-variance estimates against long-term, high-variance returns in GAE (General Advantage Estimation)
@@ -150,6 +150,7 @@ def gridworld_train(
                 # Once the algorithm is built using build_algo(), RLlib locks the config as direct mutation is not intended.
                 # Only solution (i found) is to unfreeze it, change the multi-agent config, then refreeze it
                 algo.config._is_frozen = False
+                algo.config.multi_agent(policies_to_train=[training_policy])
                 # Update the learn_group config
                 algo.learner_group.foreach_learner(
                     lambda learner, *args: learner.config.multi_agent(
@@ -162,9 +163,52 @@ def gridworld_train(
                 if opp_pool:
                     opp_weights = sample_opponent(opp_pool)
                     algo.learner_group.set_weights({frozen_policy: opp_weights})
+                    if algo.env_runner_group is not None and (algo.config.num_env_runners or 0) > 0:
+                        algo.env_runner_group.sync_weights(
+                            from_worker_or_learner_group=algo.learner_group,
+                            policies=[frozen_policy],
+                        )
 
                 for i in range(ITERS_PER_STAGE):
-                    result = algo.train()
+                    try:
+                        result = algo.train()
+                    except Exception:
+                        import traceback
+
+                        print("Error during algo.train() at stage", k + 1, "iteration", i + 1)
+                        traceback.print_exc()
+                        # Dump a short diagnostic to disk for post-mortem
+                        try:
+                            import json, time
+
+                            diag = {
+                                "stage": k + 1,
+                                "iteration": i + 1,
+                                "time": time.time(),
+                            }
+                            with open(os.path.join(checkpoint_dir, "train_diag_exception.json"), "w") as f:
+                                json.dump(diag, f)
+                        except Exception:
+                            pass
+                        raise
+
+                    # Defensive checks for RLlib result structure
+                    if result is None:
+                        raise RuntimeError(f"algo.train() returned None at stage {k+1} iter {i+1}")
+
+                    if "env_runners" not in result or "agent_episode_returns_mean" not in result.get("env_runners", {}):
+                        # Unexpected result: write full result to disk and raise for visibility
+                        try:
+                            import json, time
+
+                            fname = os.path.join(checkpoint_dir, f"train_diag_bad_result_stage{str(k+1)}_iter{str(i+1)}.json")
+                            with open(fname, "w") as f:
+                                json.dump(result, f, default=str)
+                            print("Wrote diagnostic result to", fname)
+                        except Exception:
+                            print("Failed to write diagnostic result file")
+                        raise RuntimeError(f"Unexpected training result structure at stage {k+1} iter {i+1}: keys missing")
+
                     mean = result["env_runners"]["agent_episode_returns_mean"]
                     rewards.append(mean)
                     iteration_data = build_train_iteration_data(result, i + 1)
@@ -172,9 +216,21 @@ def gridworld_train(
 
                     # Keep a live per-episode log while training is in progress.
                     write_metrics(train_metrics_path, {"episodes": episodes_data})
+                    # Also flush stdout so logs appear even if buffered
+                    try:
+                        import sys
+
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
 
                 if len(opp_pool) != 0:
                     algo.learner_group.set_weights({frozen_policy: opp_pool[-1]})
+                    if algo.env_runner_group is not None and (algo.config.num_env_runners or 0) > 0:
+                        algo.env_runner_group.sync_weights(
+                            from_worker_or_learner_group=algo.learner_group,
+                            policies=[frozen_policy],
+                        )
 
                 assert algo.learner_group is not None
                 # put the current training policy weights into the pool for future sampling

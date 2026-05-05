@@ -16,7 +16,11 @@ class MapConfig(metaclass=ABCMeta):
         raise NotImplementedError()
 
     @abstractmethod
-    def distance_to_target(self, x: int, y: int) -> float:
+    def distance_to_target(self, x: int, y: int) -> int:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def normalise_map_distance(self, distance: int) -> float:
         raise NotImplementedError()
 
     @abstractmethod
