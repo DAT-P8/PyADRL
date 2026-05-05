@@ -32,10 +32,18 @@ def compute_episode_metrics(
     n_pursuers: int,
     capture_steps: list[int],
     captured_evader_ids: set[int],
+    target_reached_ids: set[int] | None = None,
+    drone_object_collision_ids: set[int] | None = None,
+    cumulative_collision_ids: set[int] | None = None,
 ) -> EpisodeOutcome:
-    target_reached_set: set[int] = set()
-    drone_object_collision_set: set[int] = set()
-    collision_dict: dict[int, set[int]] = {}
+    target_reached_set: set[int] = target_reached_ids if target_reached_ids is not None else set()
+    drone_object_collision_set: set[int] = (
+        drone_object_collision_ids if drone_object_collision_ids is not None else set()
+    )
+    collision_id_set: set[int] = (
+        cumulative_collision_ids if cumulative_collision_ids is not None else set()
+    )
+    collision_events: list[set[int]] = []
 
     for event in state.events:
         if event.drone_object_collision_event is not None:
@@ -43,17 +51,13 @@ def compute_episode_metrics(
         elif event.target_reached_event is not None:
             target_reached_set.update(event.target_reached_event.drone_ids)
         elif event.collision_event is not None:
-            for id_key in event.collision_event.drone_ids:
-                if id_key in collision_dict:
-                    collision_dict[id_key].update(event.collision_event.drone_ids)
-                else:
-                    collision_dict[id_key] = set(event.collision_event.drone_ids)
+            collision_events.append(set(event.collision_event.drone_ids))
 
     evader_ids = {d.id for d in drones[EVADERS]}
     pursuer_ids = {d.id for d in drones[PURSUERS]}
 
     evaders_caught: set[int] = set()
-    for _, coll_set in collision_dict.items():
+    for coll_set in collision_events:
         evaders_in_coll = [x for x in coll_set if x in evader_ids]
         pursuers_in_coll = [x for x in coll_set if x in pursuer_ids]
         if evaders_in_coll and pursuers_in_coll:
@@ -64,13 +68,20 @@ def compute_episode_metrics(
             capture_steps.append(timestep)
             captured_evader_ids.add(evader_id)
 
-    collision_ids: set[int] = set()
-    for key, collision_set in collision_dict.items():
-        collision_ids.add(key)
-        collision_ids.update(collision_set)
+    for coll_set in collision_events:
+        evaders_in_coll = [x for x in coll_set if x in evader_ids]
+        pursuers_in_coll = [x for x in coll_set if x in pursuer_ids]
 
-    evader_collided = len([i for i in collision_ids if i in evader_ids])
-    pursuer_collided = len([i for i in collision_ids if i in pursuer_ids])
+        # Count collisions only for events with one team.
+        # Mixed-team events are capture events and are excluded from collision_ids.
+        if evaders_in_coll and not pursuers_in_coll:
+            collision_id_set.update(evaders_in_coll)
+        elif pursuers_in_coll and not evaders_in_coll:
+            collision_id_set.update(pursuers_in_coll)
+            
+
+    evader_collided = len([i for i in collision_id_set if i in evader_ids])
+    pursuer_collided = len([i for i in collision_id_set if i in pursuer_ids])
 
     evader_obj_collided = len([i for i in drone_object_collision_set if i in evader_ids])
     pursuer_obj_collided = len([i for i in drone_object_collision_set if i in pursuer_ids])
@@ -200,7 +211,7 @@ class MetricsCallback(RLlibCallback):
         mean_summary = {
             "mean_capture_rate": float(means[0]),
             "mean_capture_steps": mean_steps,
-            "mean_breached": float(means[1]),
+            "mean_breach_rate": float(means[1]),
             "mean_episode_length": float(means[2]),
             "mean_evader_drone_collision_rate": float(means[3]),
             "mean_pursuer_drone_collision_rate": float(means[4]),

@@ -55,6 +55,9 @@ class NGWEnvironment(ParallelEnv):
         self.one_hot = {}
         self.capture_steps: list[int] = []  # Track steps at which evaders are captured
         self.captured_evader_ids: set[int] = set()  # Track which evaders have been recorded as captured
+        self.target_reached_ids: set[int] = set()
+        self.drone_object_collision_ids: set[int] = set()
+        self.collision_ids: set[int] = set()
 
         # Pettingzoo wants all agents to have the same observation space, action space,
         # and wants possible agents to be defined
@@ -126,6 +129,9 @@ class NGWEnvironment(ParallelEnv):
         self.timestep = 0
         self.capture_steps = []  # Reset capture tracking
         self.captured_evader_ids = set()
+        self.target_reached_ids = set()
+        self.drone_object_collision_ids = set()
+        self.collision_ids = set()
 
         if self.id is None:
             state = self.client.New(
@@ -204,7 +210,6 @@ class NGWEnvironment(ParallelEnv):
                         drone.x = drone_state.x
                         drone.y = drone_state.y
 
-        # Compute episode metrics (will be used if episode ends)
         outcome = compute_episode_metrics(
             state=state,
             drones=self.drones,
@@ -213,6 +218,9 @@ class NGWEnvironment(ParallelEnv):
             n_pursuers=self.n_pursuers,
             capture_steps=self.capture_steps,
             captured_evader_ids=self.captured_evader_ids,
+            target_reached_ids=self.target_reached_ids,
+            drone_object_collision_ids=self.drone_object_collision_ids,
+            cumulative_collision_ids=self.collision_ids,
         )
 
         time_limit_reached = self.timestep >= self.time_limit
@@ -235,10 +243,9 @@ class NGWEnvironment(ParallelEnv):
 
         infos = {a: {} for a in self.agents}
 
-        if state.terminated or time_limit_reached:
-            episode_metrics = asdict(outcome)
-            for a in self.agents:
-                infos[a]["episode_metrics"] = episode_metrics
+        episode_metrics = asdict(outcome)
+        for a in self.agents:
+            infos[a]["episode_metrics"] = episode_metrics
 
         observations = self._get_obs()
 
