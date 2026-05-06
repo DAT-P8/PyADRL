@@ -24,7 +24,7 @@ P_OLD = 0.3
 
 # Number of alternating stages and PPO iterations per stage
 N_STAGES = 4
-ITERS_PER_STAGE = 20
+ITERS_PER_STAGE = 15
 
 
 def sample_opponent(pool: list[dict]) -> dict:
@@ -86,9 +86,9 @@ def gridworld_train(
             num_envs_per_env_runner=5,  # Number of environments per env_runner
         )
         .training(
-            train_batch_size=10000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
-            minibatch_size=512,  # Size of each mini batch for each SGD update
-            num_epochs=10,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
+            train_batch_size=1000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
+            minibatch_size=256,  # Size of each mini batch for each SGD update
+            num_epochs=5,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
             lr=3e-4,  # Learning rate for optimization
             gamma=0.99,  # Discount factor: future rewards are multiplied by gamma
             lambda_=0.95,  # Balances short-term, low-variance estimates against long-term, high-variance returns in GAE (General Advantage Estimation)

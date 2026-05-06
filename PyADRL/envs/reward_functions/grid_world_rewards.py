@@ -1,4 +1,7 @@
+from time import sleep, time
 from ...dtos.ngw_dtos import State
+import sys
+import logging
 from .rewards import RewardFunction
 from ..ngw_drone import NGW_Drone
 from ..map_configs.map_config import MapConfig
@@ -37,6 +40,7 @@ class GridWorldRewards(RewardFunction):
         map_config: MapConfig,
         time_limit_reached: bool,
     ) -> dict[str, float]:
+        logging.info("FUCKME FUCKME FUCKME")
         rewards: dict[str, float] = {a: 0 for a in agents}
         all_drones = {
             d.id: d for d in drones["evaders"] + drones["pursuers"] if d.name in agents
@@ -170,4 +174,29 @@ class GridWorldRewards(RewardFunction):
                     rewards[drone.name] += self.REWARD_EVADER_MAX_TIMESTEPS
                 else:
                     rewards[drone.name] += self.REWARD_PURSUER_MAX_TIMESTEPS
+
+        for a in agents:
+            if a not in rewards:
+                rewards[a] = 0
+                print(f"GREP MIG a {a}")
+                logging.info(f"GREP MIG a {a}")
+                with open("/home/madsbyriel/fuckmigtesta.txt", "rw") as f:
+                    f.write(f"GREP MIG a {a}")
+
+                sleep(.1)
+                sys.exit(42069)
+
+
+        # some drone outta nowhere injected itself?
+        for d in rewards:
+            if d not in agents:
+                rewards.pop(d)
+                print(f"GREP MIG {d}")
+                logging.info(f"GREP MIG {d}")
+                with open("/home/madsbyriel/fuckmigtest.txt", "rw") as f:
+                    f.write(f"GREP MIG {d}")
+
+                sleep(.1)
+                sys.exit(42069)
+
         return rewards
