@@ -175,28 +175,4 @@ class GridWorldRewards(RewardFunction):
                 else:
                     rewards[drone.name] += self.REWARD_PURSUER_MAX_TIMESTEPS
 
-        for a in agents:
-            if a not in rewards:
-                rewards[a] = 0
-                print(f"GREP MIG a {a}")
-                logging.info(f"GREP MIG a {a}")
-                with open("/home/madsbyriel/fuckmigtesta.txt", "rw") as f:
-                    f.write(f"GREP MIG a {a}")
-
-                sleep(.1)
-                sys.exit(42069)
-
-
-        # some drone outta nowhere injected itself?
-        for d in rewards:
-            if d not in agents:
-                rewards.pop(d)
-                print(f"GREP MIG {d}")
-                logging.info(f"GREP MIG {d}")
-                with open("/home/madsbyriel/fuckmigtest.txt", "rw") as f:
-                    f.write(f"GREP MIG {d}")
-
-                sleep(.1)
-                sys.exit(42069)
-
         return rewards
