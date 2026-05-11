@@ -54,7 +54,7 @@ def gridworld_eval(
                 "model_name": checkpoint_path,
             },
         )
-        .training(lr=0.0, train_batch_size=150, minibatch_size=10, num_epochs=1)
+        .training(lr=0.0, train_batch_size=1024, minibatch_size=102, num_epochs=10)
         .multi_agent(
             policies={"pursuer_policy", "evader_policy"},
             policy_mapping_fn=lambda agent_id, *args, **kwargs: (
