@@ -20,6 +20,7 @@ class EpisodeOutcome:
     pursuer_drone_collision_rate: float = 0.0
     evader_obstacle_collision_rate: float = 0.0
     pursuer_obstacle_collision_rate: float = 0.0
+    pursuer_entered_target_count: int = 0
     n_evaders: int = 0
     n_pursuers: int = 0
     evader_ids: list[int] = field(default_factory=list)
@@ -37,6 +38,7 @@ def compute_episode_metrics(
     capture_steps: list[int],
     captured_evader_ids: set[int],
     target_reached_ids: set[int] | None = None,
+    pursuer_entered_target_count: int = 0,
     drone_object_collision_ids: set[int] | None = None,
     cumulative_collision_ids: set[int] | None = None,
 ) -> EpisodeOutcome:
@@ -55,6 +57,10 @@ def compute_episode_metrics(
         if event.drone_object_collision_event is not None:
             drone_object_collision_set.update(
                 event.drone_object_collision_event.drone_ids
+            )
+        elif event.pursuer_entered_target_event is not None:
+            pursuer_entered_target_count += len(
+                event.pursuer_entered_target_event.drone_ids
             )
         elif event.target_reached_event is not None:
             target_reached_set.update(event.target_reached_event.drone_ids)
@@ -94,6 +100,7 @@ def compute_episode_metrics(
         capture_steps=list(capture_steps),
         breached=len(target_reached_set) > 0,
         episode_length=int(timestep),
+        pursuer_entered_target_count=int(pursuer_entered_target_count),
         n_evaders=int(n_evaders),
         n_pursuers=int(n_pursuers),
         evader_ids=sorted(evader_ids),
@@ -264,6 +271,14 @@ class MetricsCallback(RLlibCallback):
         mean_summary = {
             "mean_capture_rate": float(means[0]),
             "mean_capture_steps": mean_steps,
+            "mean_pursuer_entered_target_count": float(
+                np.mean(
+                    [
+                        outcome.get("pursuer_entered_target_count", 0)
+                        for outcome in episode_outcomes
+                    ]
+                )
+            ),
             "breach_rate": float(means[1]),
             "mean_episode_length": float(means[2]),
             "mean_evader_drone_collision_rate": float(means[3]),

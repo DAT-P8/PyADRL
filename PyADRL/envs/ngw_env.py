@@ -60,6 +60,7 @@ class NGWEnvironment(ParallelEnv):
             set()
         )  # Track which evaders have been recorded as captured
         self.target_reached_ids: set[int] = set()
+        self.pursuer_entered_target_count: int = 0
         self.drone_object_collision_ids: set[int] = set()
         self.collision_ids: set[int] = set()
 
@@ -136,6 +137,7 @@ class NGWEnvironment(ParallelEnv):
         self.capture_steps = []
         self.captured_evader_ids = set()
         self.target_reached_ids = set()
+        self.pursuer_entered_target_count = 0
         self.drone_object_collision_ids = set()
         self.collision_ids = set()
 
@@ -225,9 +227,11 @@ class NGWEnvironment(ParallelEnv):
             capture_steps=self.capture_steps,
             captured_evader_ids=self.captured_evader_ids,
             target_reached_ids=self.target_reached_ids,
+            pursuer_entered_target_count=self.pursuer_entered_target_count,
             drone_object_collision_ids=self.drone_object_collision_ids,
             cumulative_collision_ids=self.collision_ids,
         )
+        self.pursuer_entered_target_count = outcome.pursuer_entered_target_count
 
         time_limit_reached = self.timestep >= self.time_limit
         rewards = self.reward_function.calculate_rewards(
