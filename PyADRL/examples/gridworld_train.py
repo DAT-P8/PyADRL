@@ -15,7 +15,7 @@ from ..logger.metricslogger import (
 )
 
 import matplotlib.pyplot as plt
-from ..utils.model_save import restore_training, setup_checkpoints_dir
+from ..utils.model_save import restore_training, save_model_info, setup_checkpoints_dir
 from ..utils.map_load import load_map_config
 
 # Probability of sampling an old opponent policy
@@ -40,6 +40,9 @@ def gridworld_train(
     map: str,
     checkpoint: str | None = None,
     model_name: str | None = None,
+    n_pursuers: int = 2,
+    n_evaders: int = 1,
+    training_strategy: str = "alternating",  # "alternating" or "simultaneous"
 ):
     # If Ray is already initialized from a previous run, shut it down before starting a new one.
     ray.shutdown()
@@ -54,8 +57,8 @@ def gridworld_train(
                 channel=grpc.insecure_channel("localhost:50051"),
                 map_config=map_config,
                 reward_function=GridWorldRewards(),
-                n_pursuers=2,
-                n_evaders=1,
+                n_pursuers=n_pursuers,
+                n_evaders=n_evaders,
             )
         ),
     )
@@ -78,7 +81,7 @@ def gridworld_train(
             ),
         )
         .learners(
-            num_learners=2,  # Number of parallel learner processes for computing gradients
+            num_learners=1,  # Number of parallel learner processes for computing gradients
         )
         .env_runners(
             num_env_runners=4,  # Number of processes/threads that run the environment in parallel
@@ -117,6 +120,44 @@ def gridworld_train(
     else:
         checkpoint_dir = setup_checkpoints_dir(model_name=model_name)
         print(f"No checkpoint specified. Starting new training run at {checkpoint_dir}")
+
+        # This is not needed if model_name is provided
+        extracted_model_name = checkpoint_dir.parent.name
+
+        # Build training config based on strategy
+        training_config = {}
+        if training_strategy == "alternating":
+            training_config = {
+                "n_stages": N_STAGES,
+                "iters_per_stage": ITERS_PER_STAGE,
+            }
+        elif training_strategy == "simultaneous":
+            training_config = {
+                "n_iterations": ITERS_PER_STAGE,  # Total iterations
+            }
+
+        initial_info = {
+            "map": map,
+            "n_pursuers": n_pursuers,
+            "n_evaders": n_evaders,
+            "training_strategy": training_strategy,
+            "training_config": training_config,
+            "hyperparameters": {
+                "num_learners": config.num_learners,
+                "num_env_runners": config.num_env_runners,
+                "num_envs_per_env_runner": config.num_envs_per_env_runner,
+                "train_batch_size": config.train_batch_size,
+                "minibatch_size": config.minibatch_size,
+                "num_epochs": config.num_epochs,
+                "lr": config.lr,
+                "gamma": config.gamma,
+                "lambda_": config.lambda_,
+                "clip_param": config.clip_param,
+                "vf_loss_coeff": config.vf_loss_coeff,
+                "entropy_coeff": config.entropy_coeff,
+            },
+        }
+        save_model_info(extracted_model_name, initial_info)
 
     rewards = []
     episodes_data = []
