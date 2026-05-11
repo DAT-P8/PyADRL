@@ -1,5 +1,6 @@
 import os
 import re
+import json
 from datetime import datetime
 from pathlib import Path
 from .paths import get_checkpoints_dir, get_experiments_dir
@@ -80,3 +81,13 @@ def setup_checkpoints_dir(model_name: str | None = None) -> Path:
 def get_current_time_as_str() -> str:
     current_date_time = datetime.now().strftime("%y%m%d_%H%M")
     return current_date_time
+
+
+def save_model_info(model_name: str, info: dict):
+    """Saves model info as a json file in the model directory."""
+    model_dir = get_experiments_dir() / model_name
+    model_dir.mkdir(exist_ok=True)
+
+    info_file = model_dir / "model-info.json"
+    with open(info_file, "w") as f:
+        json.dump(info, f, indent=2)
