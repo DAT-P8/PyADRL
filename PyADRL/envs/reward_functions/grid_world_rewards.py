@@ -7,7 +7,7 @@ from ...utils.chebeshyv import chebyshev_distance
 
 class GridWorldRewards(RewardFunction):
     # Rewards for evader
-    REWARD_EVADER_MAX_TIMESTEPS = 50
+    REWARD_EVADER_MAX_TIMESTEPS = -50
     REWARD_EVADER_TARGET_REACHED_SELF = 200  # reward for reaching target yourself
     REWARD_EVADER_TARGET_REACHED_OTHERS = 20  # reward for helping reach target
     REWARD_EVADER_CAUGHT = -100
@@ -22,7 +22,7 @@ class GridWorldRewards(RewardFunction):
     )  # Punish pursuers for not catching evader in time
     REWARD_PURSUER_CAUGHT_EVADER_SELF = 200  # Reward for catching the evader yourself
     REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 20  # Reward for helping catch the evader
-    REWARD_PURSUER_TARGET_REACHED = -100  # Punish pursuers for evader in target
+    REWARD_PURSUER_TARGET_REACHED = -50  # Punish pursuers for evader in target
     REWARD_PURSUER_ENTERED_TARGET = -50  # Punish pursuers for entering target
     REWARD_PURSUER_FAR_FROM_EVADER = -10  # Multiplier for distance to evader
     REWARD_PURSUER_DESTROYED = -10
