@@ -5,9 +5,6 @@ from PyADRL.utils.logger import Logger
 
 
 def main():
-    if not os.path.exists("checkpoints"):
-        os.makedirs("checkpoints")
-
     args = parse_args()
 
     if args.log_level:

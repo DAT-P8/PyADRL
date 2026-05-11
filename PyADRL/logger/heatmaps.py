@@ -5,10 +5,10 @@ import matplotlib.patches as patches
 import seaborn as sns
 from ray.rllib.callbacks.callbacks import RLlibCallback
 
+from PyADRL.utils.paths import get_experiments_dir, get_model_maps_dir
+
 # TODO: GRID SIZE SHOULD BE DYNAMIC BASED ON MAP CONFIG, NOT HARDCODED
-_RESULTS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "results")
-)
+_RESULTS_DIR = get_experiments_dir()
 
 
 class HeatmapCallback(RLlibCallback):
@@ -18,6 +18,7 @@ class HeatmapCallback(RLlibCallback):
         self.grid_h = 0
         self.target_x = 0
         self.target_y = 0
+        self.model_name = ""
 
     def on_algorithm_init(
         self,
@@ -31,6 +32,7 @@ class HeatmapCallback(RLlibCallback):
             self.grid_h = algorithm.config.env_config.get("map_height", 0)
             self.target_x = algorithm.config.env_config.get("target_x", 0)
             self.target_y = algorithm.config.env_config.get("target_y", 0)
+            self.model_name = algorithm.config.env_config.get("model_name", "")
 
         if algorithm.config is None or algorithm.config.env_config is None:
             raise ValueError(
@@ -41,6 +43,7 @@ class HeatmapCallback(RLlibCallback):
         self.grid_h = algorithm.config.env_config.get("map_height", 0)
         self.target_x = algorithm.config.env_config.get("target_x", 0)
         self.target_y = algorithm.config.env_config.get("target_y", 0)
+        self.model_name = algorithm.config.env_config.get("model_name", "")
 
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
@@ -127,13 +130,15 @@ class HeatmapCallback(RLlibCallback):
         self._plot_occupancy_heatmap(
             [episode.get("evader_states", {}) for episode in drone_states],
             title="Evader Position Heatmap",
-            filename=f"results/heatmap_evader_{date_str}.png",
+            filename=get_model_maps_dir(self.model_name)
+            / f"heatmap_evader_{date_str}.png",
             color="YlOrRd",
         )
         self._plot_occupancy_heatmap(
             [episode.get("pursuer_states", {}) for episode in drone_states],
             title="Pursuer Position Heatmap",
-            filename=f"results/heatmap_pursuer_{date_str}.png",
+            filename=get_model_maps_dir(self.model_name)
+            / f"heatmap_pursuer_{date_str}.png",
             color="Blues",
         )
 
@@ -146,7 +151,7 @@ class HeatmapCallback(RLlibCallback):
             evader_episode,
             pursuer_episode,
             title="Agent Trace Map (Single Example Episode)",
-            filename=f"results/trace_map_{date_str}.png",
+            filename=get_model_maps_dir(self.model_name) / f"trace_map_{date_str}.png",
         )
 
     def _select_representative_episode(self, evader_episodes, pursuer_episodes):
