@@ -141,6 +141,24 @@ def mean_capture_steps(episode_outcomes: list[dict]) -> list[float]:
 
     return mean_steps
 
+def capture_rate_at_k(episode_outcomes: list[dict]) -> dict[int, float]:
+    capture_step_sequences = [
+        outcome.get("capture_steps", []) for outcome in episode_outcomes
+    ]
+
+    capture_rates = {}
+    for captures in capture_step_sequences:
+        capture_rates[len(captures)] = capture_rates.get(len(captures), 0) + 1
+
+    total_episodes = len(episode_outcomes)
+    print(f"Total episodes: {total_episodes} Capture rates: {capture_rates}")
+
+    # normalize to get capture rate at each k
+    for k in capture_rates:
+        capture_rates[k] /= total_episodes
+
+    return capture_rates
+
 
 class MetricsCallback(RLlibCallback):
     def __init__(self):
@@ -253,7 +271,6 @@ class MetricsCallback(RLlibCallback):
         outcomes_array = np.array(
             [
                 [
-                    outcome["capture_rate"],
                     float(outcome["breached"]),
                     outcome["episode_length"],
                     outcome["evader_drone_collision_rate"],
@@ -267,9 +284,10 @@ class MetricsCallback(RLlibCallback):
 
         means = np.mean(outcomes_array, axis=0)
         mean_steps = mean_capture_steps(episode_outcomes)
+        capture_rates = capture_rate_at_k(episode_outcomes)
 
         mean_summary = {
-            "mean_capture_rate": float(means[0]),
+            "capture_rate_at_k": capture_rates,
             "mean_capture_steps": mean_steps,
             "mean_pursuer_entered_target_count": float(
                 np.mean(
@@ -279,12 +297,12 @@ class MetricsCallback(RLlibCallback):
                     ]
                 )
             ),
-            "breach_rate": float(means[1]),
-            "mean_episode_length": float(means[2]),
-            "mean_evader_drone_collision_rate": float(means[3]),
-            "mean_pursuer_drone_collision_rate": float(means[4]),
-            "mean_evader_obstacle_collision_rate": float(means[5]),
-            "mean_pursuer_obstacle_collision_rate": float(means[6]),
+            "breach_rate": float(means[0]),
+            "mean_episode_length": float(means[1]),
+            "mean_evader_drone_collision_rate": float(means[2]),
+            "mean_pursuer_drone_collision_rate": float(means[3]),
+            "mean_evader_obstacle_collision_rate": float(means[4]),
+            "mean_pursuer_obstacle_collision_rate": float(means[5]),
             "mean_rewards": rewards_dict,
         }
 
