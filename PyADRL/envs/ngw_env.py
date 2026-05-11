@@ -3,13 +3,12 @@ from gymnasium.spaces import Box, Discrete
 import numpy as np
 import time
 import grpc
-from dataclasses import asdict
 from ..utils.ngw2d_actions import get_drone_action
 from ..utils.ngw2d_client import NGWClient
 from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
-from ..logger.metrics import compute_episode_metrics
 from .ngw_drone import NGW_Drone
+
 
 # Drone dictionary names
 EVADERS = "evaders"
@@ -171,6 +170,9 @@ class NGWEnvironment(ParallelEnv):
         observations = self._get_obs()
 
         infos = {a: {} for a in self.agents}
+        for d in self.drones[EVADERS] + self.drones[PURSUERS]:
+            if d.name in infos:
+                infos[d.name]["drone"] = d
 
         return (observations, infos)
 
@@ -218,21 +220,6 @@ class NGWEnvironment(ParallelEnv):
                         drone.x = drone_state.x
                         drone.y = drone_state.y
 
-        outcome = compute_episode_metrics(
-            state=state,
-            drones=self.drones,
-            timestep=self.timestep,
-            n_evaders=self.n_evaders,
-            n_pursuers=self.n_pursuers,
-            capture_steps=self.capture_steps,
-            captured_evader_ids=self.captured_evader_ids,
-            target_reached_ids=self.target_reached_ids,
-            pursuer_entered_target_count=self.pursuer_entered_target_count,
-            drone_object_collision_ids=self.drone_object_collision_ids,
-            cumulative_collision_ids=self.collision_ids,
-        )
-        self.pursuer_entered_target_count = outcome.pursuer_entered_target_count
-
         time_limit_reached = self.timestep >= self.time_limit
         rewards = self.reward_function.calculate_rewards(
             new_state=state,
@@ -253,10 +240,6 @@ class NGWEnvironment(ParallelEnv):
 
         infos = {a: {} for a in self.agents}
 
-        episode_metrics = asdict(outcome)
-        for a in self.agents:
-            infos[a]["episode_metrics"] = episode_metrics
-
         observations = self._get_obs()
 
         for d in self.drones[EVADERS] + self.drones[PURSUERS]:
@@ -266,6 +249,7 @@ class NGWEnvironment(ParallelEnv):
                     "y": d.y,
                     "destroyed": d.destroyed,
                 }
+                infos[d.name]["events"] = state.events
 
         # Remove terminated agents
         if truncations["__all__"] or terminations["__all__"]:
