@@ -6,13 +6,7 @@ from ..envs.ngw_env import NGWEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ..envs.reward_functions.grid_world_rewards import GridWorldRewards
 from ray.tune.registry import register_env
-from ..logger.metricslogger import (
-    MetricsCallback,
-    build_train_iteration_data,
-    build_train,
-    metrics_path,
-    write_metrics,
-)
+from ..logger.metrics import MetricsCallback
 
 import matplotlib.pyplot as plt
 from ..utils.model_save import restore_training, save_model_info, setup_checkpoints_dir
@@ -113,7 +107,6 @@ def gridworld_train(
     checkpoint_dir = ""
 
     # TODO: Check this, restore_training only takes a model name now (e.g. checkpoint is just a model_name)
-    train_metrics_path = metrics_path("train")
     if checkpoint is not None:
         checkpoint_dir, start_iteration = restore_training(
             algo, checkpoint, pursuer_pool, evader_pool
@@ -161,7 +154,6 @@ def gridworld_train(
         save_model_info(extracted_model_name, initial_info)
 
     rewards = []
-    episodes_data = []
 
     # try/finally ensures Ray always shuts down cleanly even if training crashes
     try:
@@ -209,20 +201,15 @@ def gridworld_train(
                     result = algo.train()
                     mean = result["env_runners"]["agent_episode_returns_mean"]
                     rewards.append(mean)
-                    iteration_data = build_train_iteration_data(result, i + 1)
-                    episodes_data.extend(iteration_data.get("episodes", []))
-
-                    # Keep a live per-episode log while training is in progress.
-                    write_metrics(train_metrics_path, {"episodes": episodes_data})
 
                 if len(opp_pool) != 0:
                     algo.learner_group.set_weights({frozen_policy: opp_pool[-1]})
-
+                
                 assert algo.learner_group is not None
                 # put the current training policy weights into the pool for future sampling
                 updated_weights = algo.learner_group.get_weights()[training_policy]
                 pool.append(updated_weights)
-
+                
                 # Save a checkpoint after each full stage (evader+pursuer training)
                 if label == "pursuer":
                     # {k + 1:05d} for zero padding e.g. stage_00012 instead of stage_12
@@ -232,12 +219,6 @@ def gridworld_train(
     finally:
         algo.stop()
         ray.shutdown()
-
-        # Add final aggregate summary after all episodes are complete.
-        write_metrics(
-            train_metrics_path,
-            build_train(episodes_data, final_rewards=rewards[-1] if rewards else {}),
-        )
 
         iterations = list(range(1, len(rewards) + 1))
         evader_rewards = [r["evader_2"] for r in rewards]
