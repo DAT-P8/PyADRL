@@ -1,22 +1,13 @@
-import json
-import glob
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import seaborn as sns
-from datetime import datetime
 from ray.rllib.callbacks.callbacks import RLlibCallback
-import time
 
 from PyADRL.utils.paths import get_experiments_dir, get_model_maps_dir
 
 # TODO: GRID SIZE SHOULD BE DYNAMIC BASED ON MAP CONFIG, NOT HARDCODED
 _RESULTS_DIR = get_experiments_dir()
-
-EPISODE_FILE_PREFIX = "episode_states_tmp_"
-
-# TODO: drone states goes into experiments/ should be in the model folder somewhere
 
 
 class HeatmapCallback(RLlibCallback):
@@ -35,10 +26,6 @@ class HeatmapCallback(RLlibCallback):
         metrics_logger=None,
         **kwargs,
     ) -> None:
-        # Clean up any old episode files from previous runs
-        files = glob.glob(str(_RESULTS_DIR / f"{EPISODE_FILE_PREFIX}*.json"))
-        for path in files:
-            os.remove(path)
         if algorithm and algorithm.config:
             self.grid_w = algorithm.config.env_config.get("map_width", 0)
             self.grid_h = algorithm.config.env_config.get("map_height", 0)
@@ -61,6 +48,17 @@ class HeatmapCallback(RLlibCallback):
         episode.custom_data["evader_states"] = {}
         episode.custom_data["pursuer_states"] = {}
 
+    def _get_episode_info(self, env, env_index: int):
+        if not env or not getattr(env, "_infos", None):
+            return None
+
+        if isinstance(env._infos, (list, tuple)):
+            if 0 <= env_index < len(env._infos):
+                return env._infos[env_index]
+            return env._infos[0] if env._infos else None
+
+        return env._infos
+
     def on_episode_step(
         self,
         *,
@@ -72,9 +70,9 @@ class HeatmapCallback(RLlibCallback):
         rl_module=None,
         **kwargs,
     ):
-        if not env or not env._infos:
+        episode_info = self._get_episode_info(env, env_index)
+        if not episode_info:
             return
-        episode_info = env._infos[0]
 
         for agent_id, agent_info in episode_info.items():
             drone = agent_info.get("drone_state", {})
@@ -89,7 +87,7 @@ class HeatmapCallback(RLlibCallback):
 
             if agent_id not in states:
                 states[agent_id] = []
-            states[agent_id].append((x, y))
+            states[agent_id].append([x, y])
 
     def on_episode_end(
         self,
@@ -102,14 +100,14 @@ class HeatmapCallback(RLlibCallback):
         rl_module=None,
         **kwargs,
     ):
+        if metrics_logger is None:
+            return
+
         drone_states = {
             "evader_states": episode.custom_data.get("evader_states", {}),
             "pursuer_states": episode.custom_data.get("pursuer_states", {}),
         }
-        # Each worker writes its own file — episode_id keeps filenames unique
-        path = _RESULTS_DIR / f"{EPISODE_FILE_PREFIX}{id(episode)}.json"
-        with open(path, "w") as f:
-            json.dump(drone_states, f)
+        metrics_logger.log_value("drone_states", drone_states, reduce="item_series")
 
     def on_evaluate_end(
         self,
@@ -119,45 +117,24 @@ class HeatmapCallback(RLlibCallback):
         evaluation_metrics: dict,
         **kwargs,
     ) -> None:
-        # Sleep to ensure all episode files have been written before we read them
-        time.sleep(0.5)
-
-        files = glob.glob(str(_RESULTS_DIR / f"{EPISODE_FILE_PREFIX}*.json"))
-        if not files:
-            print("[HeatmapCallback] No episode files found - nothing to plot.")
+        env_runners = evaluation_metrics.get("env_runners", {})
+        drone_states = env_runners.get("drone_states")
+        if not drone_states:
+            print("[HeatmapCallback] No episode states found - nothing to plot.")
             return
 
-        # Concatenate all temporary episode files into one big file
-        concatenated = {
-            "created_at": datetime.now().isoformat(timespec="seconds"),
-            "evader_states": [],
-            "pursuer_states": [],
-        }
-
-        for path in files:
-            with open(path) as f:
-                data = json.load(f)
-            concatenated["evader_states"].append(data.get("evader_states", {}))
-            concatenated["pursuer_states"].append(data.get("pursuer_states", {}))
-
-        date_str = datetime.now().strftime("%y%m%d_%H%M")
-        merged_path = _RESULTS_DIR / f"drone_states_{date_str}.json"
-        with open(merged_path, "w") as f:
-            json.dump(concatenated, f)
-
-        for path in files:  # clean up the temporary episode files after concatenation
-            os.remove(path)
+        date_str = f"eval_{len(drone_states)}"
 
         # Plot the results
         self._plot_occupancy_heatmap(
-            concatenated["evader_states"],
+            [episode.get("evader_states", {}) for episode in drone_states],
             title="Evader Position Heatmap",
             filename=get_model_maps_dir(self.model_name)
             / f"heatmap_evader_{date_str}.png",
             color="YlOrRd",
         )
         self._plot_occupancy_heatmap(
-            concatenated["pursuer_states"],
+            [episode.get("pursuer_states", {}) for episode in drone_states],
             title="Pursuer Position Heatmap",
             filename=get_model_maps_dir(self.model_name)
             / f"heatmap_pursuer_{date_str}.png",
@@ -166,8 +143,8 @@ class HeatmapCallback(RLlibCallback):
 
         # For trace maps, show one representative episode instead of concatenating paths.
         evader_episode, pursuer_episode = self._select_representative_episode(
-            concatenated["evader_states"],
-            concatenated["pursuer_states"],
+            [episode.get("evader_states", {}) for episode in drone_states],
+            [episode.get("pursuer_states", {}) for episode in drone_states],
         )
         self._plot_trace_map(
             evader_episode,
