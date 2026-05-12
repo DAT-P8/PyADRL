@@ -211,11 +211,8 @@ class NGWEnvironment(ParallelEnv):
             if drone_state.destroyed:
                 for drone in self.drones[key]:
                     if drone_state.id == drone.id:
-                        if (
-                            not drone.destroyed
-                        ):  # Only mark destroyed on first destruction
-                            drone.destroyed = True
-                            terminations[drone.name] = True
+                        drone.destroyed = True
+                        terminations[drone.name] = True
                         break
             else:  # Update positions
                 for drone in self.drones[key]:
