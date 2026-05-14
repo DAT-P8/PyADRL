@@ -13,4 +13,4 @@ class RewardFunction(ABC):
         map_config: MapConfig,
         time_limit_reached: bool,
     ) -> dict[int, float]:
-        raise NotImplemented("this method is abstract")
+        raise NotImplementedError("this method is abstract")

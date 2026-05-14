@@ -1,4 +1,3 @@
-from abc import ABCMeta, abstractmethod
 import random
 from typing import Any, override
 import numpy as np
@@ -68,12 +67,12 @@ class CentralizedShield(Shield):
         self, drones: dict[int, tuple[DroneState, DroneAction, NDArray[Any]]]
     ) -> set[int]:
         bounds: tuple[int, int] | None = None
-        if self.map.square_map != None:
+        if self.map.square_map is not None:
             y = self.map.square_map.height
             x = self.map.square_map.width
             bounds = (x, y)
 
-        if bounds == None:
+        if bounds is None:
             raise Exception("Could not find bounds")
 
         invalid_actions: set[int] = set()

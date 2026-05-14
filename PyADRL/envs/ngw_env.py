@@ -186,11 +186,12 @@ class NGWEnvironment(ParallelEnv):
                     actions_send.append(get_drone_action(actions[d.name], d))
 
         alt_state: State | None = None
-        if self.shield != None:
-            if self.newest_state == None:
+        if self.shield is not None:
+            if self.newest_state is not None:
+                new_acts, alt_state = self.shield.shield(actions_send, self.newest_state)
+                actions_send = new_acts
+            else:
                 raise Exception("Tried shielding on a stateless simulation?")
-            new_acts, alt_state = self.shield.shield(actions_send, self.newest_state)
-            actions_send = new_acts
 
         self.newest_state = self.client.DoStep(self.id, actions_send)
         name_to_drone = {k.name: k for drones in self.drones.values() for k in drones}
@@ -219,7 +220,7 @@ class NGWEnvironment(ParallelEnv):
 
         time_limit_reached = self.timestep >= self.time_limit
         rewards = self.reward_function.calculate_rewards(
-            events=alt_state.events if alt_state != None else self.newest_state.events,
+            events=alt_state.events if alt_state is not None else self.newest_state.events,
             drones=[drone for drone in self.newest_state.drone_states],
             map_config=self.map_config,
             time_limit_reached=time_limit_reached,

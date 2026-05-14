@@ -1,6 +1,5 @@
-from ...dtos.ngw_dtos import DroneState, Event, State
+from ...dtos.ngw_dtos import DroneState, Event
 from .rewards import RewardFunction
-from ..ngw_drone import NGW_Drone
 from ..map_configs.map_config import MapConfig
 from ...utils.chebeshyv import chebyshev_distance
 
