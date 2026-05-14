@@ -1,6 +1,3 @@
-from PyADRL.dtos.ngw_dtos import DroneState
-
-
 class NGW_Drone:
     def __init__(self, id: int, x: int, y: int, is_evader: bool):
         self.id: int = id
@@ -9,6 +6,3 @@ class NGW_Drone:
         self.name = f"evader_{id}" if is_evader else f"pursuer_{id}"
         self.is_evader = is_evader
         self.destroyed: bool = False
-
-    def to_dto(self) -> DroneState:
-        return DroneState(self.id, self.x, self.y, self.destroyed, self.is_evader)
