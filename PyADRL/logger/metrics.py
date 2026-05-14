@@ -53,6 +53,7 @@ def mean_capture_steps(episode_outcomes: list[dict]) -> list[float]:
 
     return mean_steps
 
+
 def capture_rate_at_k(episode_outcomes: list[dict]) -> dict[int, float]:
     capture_step_sequences = [
         outcome.get("capture_steps", []) for outcome in episode_outcomes
@@ -76,7 +77,7 @@ class MetricsCallback(RLlibCallback):
         super().__init__()
         self.episode_outcomes: list[EpisodeOutcome] = []
         self.capture_steps: list[int] = []  # Track steps at which evaders are captured
-        self.captured_evader_ids: set[int] = set() # evaders that have been captured
+        self.captured_evader_ids: set[int] = set()  # evaders that have been captured
         self.target_reached_ids: set[int] = set()
         self.pursuer_entered_target_count: int = 0
         self.drone_object_collision_ids: set[int] = set()
@@ -152,8 +153,8 @@ class MetricsCallback(RLlibCallback):
                 return env._infos[env_index]
             return env._infos[0] if env._infos else None
 
-        return env._infos 
-    
+        return env._infos
+
     def on_episode_start(
         self,
         *,
@@ -175,8 +176,12 @@ class MetricsCallback(RLlibCallback):
         self.timestep = 0
         infos = self._get_episode_info(env, env_index)
         if infos is not None:
-            self.evader_ids.update([d["drone"].id for d in infos.values() if d["drone"].is_evader])
-            self.pursuer_ids.update([d["drone"].id for d in infos.values() if not d["drone"].is_evader])
+            self.evader_ids.update(
+                [d["drone"].id for d in infos.values() if d["drone"].is_evader]
+            )
+            self.pursuer_ids.update(
+                [d["drone"].id for d in infos.values() if not d["drone"].is_evader]
+            )
 
     def on_episode_step(
         self,
@@ -216,7 +221,7 @@ class MetricsCallback(RLlibCallback):
         for coll_set in collision_events:
             evaders_in_coll = [x for x in coll_set if x in self.evader_ids]
             pursuers_in_coll = [x for x in coll_set if x in self.pursuer_ids]
-           
+
             # any collision event that includes at least one evader and one pursuer
             if evaders_in_coll and pursuers_in_coll:
                 evaders_caught.update(evaders_in_coll)
@@ -231,7 +236,6 @@ class MetricsCallback(RLlibCallback):
             if evader_id not in self.captured_evader_ids:
                 self.capture_steps.append(self.timestep)
                 self.captured_evader_ids.add(evader_id)
-
 
     def on_evaluate_start(
         self,
