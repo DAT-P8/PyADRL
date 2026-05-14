@@ -126,9 +126,9 @@ class CentralizedShield(Shield):
     ) -> set[int]:
         object_positions: list[NDArray[Any]] = []
 
-        if self.map.square_map != None:
+        if self.map.square_map is not None:
             for o in self.map.square_map.objects:
-                if o.square_object != None:
+                if o.square_object is not None:
                     object_positions.append(
                         np.array([o.square_object.x, o.square_object.y])
                     )

@@ -168,14 +168,14 @@ class ShieldingTests(unittest.TestCase):
         ]
         _, state = shield.shield(drone_actions, state)
 
-        if state == None:
+        if state is None:
             raise Exception("expected to find state, not None")
         if len(state.events) != 1:
             raise Exception(
                 f"Expected exactly 1 event, instead got {len(state.events)}"
             )
         for e in state.events:
-            if e.collision_event == None:
+            if e.collision_event is None:
                 raise Exception("Expected a collision event")
             if 1 not in e.collision_event.drone_ids:
                 raise Exception("Expected drone id 1 in out of bounds event")
@@ -198,14 +198,14 @@ class ShieldingTests(unittest.TestCase):
         ]
         _, state = shield.shield(drone_actions, state)
 
-        if state == None:
+        if state is None:
             raise Exception("expected to find state, not None")
         if len(state.events) != 1:
             raise Exception(
                 f"Expected exactly 1 event, instead got {len(state.events)}"
             )
         for e in state.events:
-            if e.drone_object_collision_event == None:
+            if e.drone_object_collision_event is None:
                 raise Exception("Expected a object collision event")
             if 1 not in e.drone_object_collision_event.drone_ids:
                 raise Exception("Expected drone id 1 in out of bounds event")
@@ -226,14 +226,14 @@ class ShieldingTests(unittest.TestCase):
         ]
         _, state = shield.shield(drone_actions, state)
 
-        if state == None:
+        if state is None:
             raise Exception("expected to find state, not None")
         if len(state.events) != 1:
             raise Exception(
                 f"Expected exactly 1 event, instead got {len(state.events)}"
             )
         for e in state.events:
-            if e.out_of_bounds_event == None:
+            if e.out_of_bounds_event is None:
                 raise Exception("Expected an out of bounds event")
             if 1 not in e.out_of_bounds_event.drone_ids:
                 raise Exception("Expected drone id 1 in out of bounds event")
@@ -241,15 +241,15 @@ class ShieldingTests(unittest.TestCase):
 
 def assert_safe_actions(actions: list[DroneAction], state: State, map: MapSpec):
     xb, yb = (0, 0)
-    if map.square_map != None:
+    if map.square_map is not None:
         xb, yb = map.square_map.width, map.square_map.height
     else:
         raise Exception("did not recognize map type")
 
     object_positions: list[NDArray[Any]] = []
-    if map.square_map != None:
+    if map.square_map is not None:
         for obj in map.square_map.objects:
-            if obj.square_object != None:
+            if obj.square_object is not None:
                 object_positions.append(
                     np.array([obj.square_object.x, obj.square_object.y])
                 )
