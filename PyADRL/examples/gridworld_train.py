@@ -59,6 +59,7 @@ def gridworld_train(
                 reward_function=GridWorldRewards(),
                 n_pursuers=n_pursuers,
                 n_evaders=n_evaders,
+                shielded=True,
             )
         ),
     )

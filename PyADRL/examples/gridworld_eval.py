@@ -38,6 +38,7 @@ def gridworld_eval(
                 n_pursuers=2,
                 n_evaders=1,
                 step_delay=delay,
+                shielded=True,
             )
         ),
     )
