@@ -17,6 +17,7 @@ from ..dtos.ngw_dtos import (
     State,
 )
 
+
 class CentralizedShield(Shield):
     def __init__(
         self,
@@ -25,7 +26,7 @@ class CentralizedShield(Shield):
         threshold: float = 1e-4,
         threshold_drone_collisions: float = 0.7,
         rand_seed: int = 42,
-        max_depth: int = 1000
+        max_depth: int = 1000,
     ) -> None:
         super().__init__()
         self.map = map
@@ -34,7 +35,7 @@ class CentralizedShield(Shield):
         self.max_velocity = max_velocity
         self.max_depth = max_depth
 
-        # this is the magic number that should not collide 
+        # this is the magic number that should not collide
         # when crossing diagonally, but collide otherwise
         # found by 0.5^2 + 0.5^2 = x^2
         # where 0.5 is half the length of a a square
@@ -55,15 +56,17 @@ class CentralizedShield(Shield):
 
         action_raw -= 1
         # we can view action_raw as the idx of a 2D array laid out in 1D
-        row_idx = action_raw // 8 # row idx is the velocity
-        col_idx = action_raw % 8 # col idx is the actual action value
+        row_idx = action_raw // 8  # row idx is the velocity
+        col_idx = action_raw % 8  # col idx is the actual action value
 
         # non-nothing action values go from 2-9 and col idx is 0-7
         action = Action(col_idx + 2)
 
         return DroneAction(id, row_idx + 1, action)
 
-    def out_of_bounds_shield(self, drones: dict[int, tuple[DroneState, DroneAction, NDArray[Any]]]) -> set[int]:
+    def out_of_bounds_shield(
+        self, drones: dict[int, tuple[DroneState, DroneAction, NDArray[Any]]]
+    ) -> set[int]:
         bounds: tuple[int, int] | None = None
         if self.map.square_map != None:
             y = self.map.square_map.height
@@ -77,14 +80,20 @@ class CentralizedShield(Shield):
         xb, yb = bounds
         for id in drones:
             _, _, new_position = drones[id]
-            if 0 <= new_position[0] and new_position[0] < xb and 0 <= new_position[1] and new_position[1] < yb:
+            if (
+                0 <= new_position[0]
+                and new_position[0] < xb
+                and 0 <= new_position[1]
+                and new_position[1] < yb
+            ):
                 continue
             invalid_actions.add(id)
 
         return invalid_actions
 
-
-    def drone_collisions_shield(self, drones: dict[int, tuple[DroneState, DroneAction, NDArray[Any]]]) -> set[tuple[int, int]]:
+    def drone_collisions_shield(
+        self, drones: dict[int, tuple[DroneState, DroneAction, NDArray[Any]]]
+    ) -> set[tuple[int, int]]:
         invalid_actions: set[tuple[int, int]] = set()
 
         seen_keys: set[int] = set()
@@ -102,7 +111,9 @@ class CentralizedShield(Shield):
                     continue
                 d2_before = np.array([d2_state.x, d2_state.y])
 
-                distance_vec = utility.sweep_pair(d1_before, d1_after, d2_before, d2_after)
+                distance_vec = utility.sweep_pair(
+                    d1_before, d1_after, d2_before, d2_after
+                )
                 distance_sq: float = distance_vec.dot(distance_vec)
                 if distance_sq > self.threshold_drone_collisions:
                     continue
@@ -111,13 +122,17 @@ class CentralizedShield(Shield):
 
         return invalid_actions
 
-    def objects_collision_shield(self, drones: dict[int, tuple[DroneState, DroneAction, NDArray[Any]]]) -> set[int]:
+    def objects_collision_shield(
+        self, drones: dict[int, tuple[DroneState, DroneAction, NDArray[Any]]]
+    ) -> set[int]:
         object_positions: list[NDArray[Any]] = []
 
         if self.map.square_map != None:
             for o in self.map.square_map.objects:
                 if o.square_object != None:
-                    object_positions.append(np.array([o.square_object.x, o.square_object.y]))
+                    object_positions.append(
+                        np.array([o.square_object.x, o.square_object.y])
+                    )
 
         invalid_actions: set[int] = set()
         for id in drones:
@@ -125,9 +140,11 @@ class CentralizedShield(Shield):
             drone_before = np.array([drone_state.x, drone_state.y])
 
             for obj in object_positions:
-                dist_to_point_vec = utility.sweep_pair(drone_before, drone_after, obj, obj)
+                dist_to_point_vec = utility.sweep_pair(
+                    drone_before, drone_after, obj, obj
+                )
                 distance_sq: float = dist_to_point_vec.dot(dist_to_point_vec)
-                
+
                 if distance_sq > self.threshold:
                     continue
 
@@ -136,14 +153,20 @@ class CentralizedShield(Shield):
 
         return invalid_actions
 
-
-    def get_drone_state_after_action(self, state: DroneState, action: DroneAction) -> DroneState:
-        new_pos = utility.action_to_vector(action.action) * action.velocity + np.array([state.x, state.y])
-        return DroneState(state.id, new_pos[0], new_pos[1], state.destroyed, state.is_evader)
-
+    def get_drone_state_after_action(
+        self, state: DroneState, action: DroneAction
+    ) -> DroneState:
+        new_pos = utility.action_to_vector(action.action) * action.velocity + np.array(
+            [state.x, state.y]
+        )
+        return DroneState(
+            state.id, new_pos[0], new_pos[1], state.destroyed, state.is_evader
+        )
 
     @override
-    def shield(self, actions: list[DroneAction], state: State) -> tuple[list[DroneAction], State | None]:
+    def shield(
+        self, actions: list[DroneAction], state: State
+    ) -> tuple[list[DroneAction], State | None]:
         drone_actions: dict[int, tuple[DroneState, DroneAction, NDArray[Any]]] = {}
 
         for drone in state.drone_states:
@@ -153,9 +176,10 @@ class CentralizedShield(Shield):
                     continue
                 action = a
                 break
-            new_pos = utility.action_to_vector(action.action) * action.velocity + np.array([drone.x, drone.y])
+            new_pos = utility.action_to_vector(
+                action.action
+            ) * action.velocity + np.array([drone.x, drone.y])
             drone_actions[drone.id] = (drone, action, new_pos)
-
 
         oob_ids = self.out_of_bounds_shield(drone_actions)
         oc_ids = self.objects_collision_shield(drone_actions)
@@ -165,29 +189,42 @@ class CentralizedShield(Shield):
         # Create an alternative state, which is the state that would have resulted from taking the initial actions
         destroyed_ids = oob_ids.union(oc_ids).union(dc_ids)
         alt_es: list[Event] = []
-        alt_ds: list[DroneState] = [self.get_drone_state_after_action(state, action) for state, action, _ in drone_actions.values()]
+        alt_ds: list[DroneState] = [
+            self.get_drone_state_after_action(state, action)
+            for state, action, _ in drone_actions.values()
+        ]
         for ds in alt_ds:
             if ds.id in destroyed_ids:
                 ds.destroyed = True
 
         if len(oc_ids) != 0:
-            alt_es.append(Event(drone_object_collision_event=DroneObjectCollisionEvent([id for id in oc_ids])))
+            alt_es.append(
+                Event(
+                    drone_object_collision_event=DroneObjectCollisionEvent(
+                        [id for id in oc_ids]
+                    )
+                )
+            )
 
         out_of_bounds_ids_filtered = [id for id in oob_ids if id not in oc_ids]
         if len(out_of_bounds_ids_filtered) != 0:
-            alt_es.append(Event(out_of_bounds_event=OutOfBoundsEvent(out_of_bounds_ids_filtered)))
+            alt_es.append(
+                Event(out_of_bounds_event=OutOfBoundsEvent(out_of_bounds_ids_filtered))
+            )
 
         for d1, d2 in dc_pairs:
             alt_es.append(Event(collision_event=CollisionEvent([d1, d2])))
 
         actions_to_replace = oc_ids.union(dc_ids.union(oob_ids))
         depth = 0
-        while (len(actions_to_replace) != 0 and depth < self.max_depth):
+        while len(actions_to_replace) != 0 and depth < self.max_depth:
             depth += 1
             for id in actions_to_replace:
                 s, _, _ = drone_actions[id]
                 action = self.get_random_drone_action(id)
-                new_pos = utility.action_to_vector(action.action) * action.velocity + np.array([s.x, s.y])
+                new_pos = utility.action_to_vector(
+                    action.action
+                ) * action.velocity + np.array([s.x, s.y])
                 drone_actions[id] = s, action, new_pos
 
             oob_ids = self.out_of_bounds_shield(drone_actions)
@@ -197,7 +234,9 @@ class CentralizedShield(Shield):
             actions_to_replace = oc_ids.union(dc_ids.union(oob_ids))
 
         if len(actions_to_replace) == 0:
-            alt_state = State(state.sim_id, state.terminated, alt_ds, alt_es, state.objects)
+            alt_state = State(
+                state.sim_id, state.terminated, alt_ds, alt_es, state.objects
+            )
             return [action for _, action, _ in drone_actions.values()], alt_state
 
         raise Exception(f"Exceeded maximum iteration of {self.max_depth}")

@@ -140,7 +140,6 @@ class NGWEnvironment(ParallelEnv):
             self.id = self.newest_state.sim_id
         else:
             self.newest_state = self.client.Reset(self.id)
-            
 
         for drone_state in self.newest_state.drone_states:
             is_evader = drone_state.is_evader
@@ -259,7 +258,9 @@ class NGWEnvironment(ParallelEnv):
                     "destroyed": d.destroyed,
                 }
 
-        name_to_reward: dict[str, float] = { name: rewards[name_to_drone[name].id] for name in self.agents }
+        name_to_reward: dict[str, float] = {
+            name: rewards[name_to_drone[name].id] for name in self.agents
+        }
 
         # Remove terminated agents
         if truncations["__all__"] or terminations["__all__"]:

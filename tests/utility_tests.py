@@ -5,6 +5,7 @@ import numpy as np
 from PyADRL.dtos.ngw_dtos import Action
 from PyADRL.utils import utility
 
+
 class UtilityUnitTests(unittest.TestCase):
     def test_action_to_vector(self):
         cases: list[tuple[Action, int, int]] = [
@@ -22,35 +23,34 @@ class UtilityUnitTests(unittest.TestCase):
         cases = [
             ## These 4 tests make sure a drone can pass through
             ## origin diagonally when objects are on left, right, up and down side of origin
-            ( # close to the right
+            (  # close to the right
                 np.array([1, 0]),
                 np.array([1, 0]),
                 np.array([-1, -1]),
                 np.array([1, 1]),
                 math.sqrt(0.5),
             ),
-            ( # close to the left
+            (  # close to the left
                 np.array([-1, 0]),
                 np.array([-1, 0]),
                 np.array([-1, -1]),
                 np.array([1, 1]),
                 math.sqrt(0.5),
             ),
-            ( # close above origo
+            (  # close above origo
                 np.array([0, 1]),
                 np.array([0, 1]),
                 np.array([-1, -1]),
                 np.array([1, 1]),
                 math.sqrt(0.5),
             ),
-            ( # close below origo
+            (  # close below origo
                 np.array([0, -1]),
                 np.array([0, -1]),
                 np.array([-1, -1]),
                 np.array([1, 1]),
                 math.sqrt(0.5),
             ),
-
             ### Direct collision of two drones should have a distance to point very low
             (
                 np.array([1, 1]),
@@ -58,7 +58,7 @@ class UtilityUnitTests(unittest.TestCase):
                 np.array([-1, -1]),
                 np.array([1, 1]),
                 math.sqrt(1e-5),
-            )
+            ),
         ]
 
         for b1, a1, b2, a2, max_distance in cases:

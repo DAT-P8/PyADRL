@@ -37,7 +37,7 @@ class GridWorldRewards(RewardFunction):
         time_limit_reached: bool,
     ) -> dict[int, float]:
         rewards: dict[int, float] = {a.id: 0 for a in drones}
-        all_drones = { d.id: d for d in drones }
+        all_drones = {d.id: d for d in drones}
         pursuer_drones = [d for d in all_drones.values() if not d.is_evader]
         evader_drones = [d for d in all_drones.values() if d.is_evader]
 

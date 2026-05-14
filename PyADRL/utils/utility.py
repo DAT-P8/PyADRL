@@ -1,7 +1,6 @@
 import numpy as np
-from ..dtos.ngw_dtos import (
-    Action
-)
+from ..dtos.ngw_dtos import Action
+
 
 def get_normalized_action_directions() -> list[tuple[Action, np.ndarray]]:
     actions = [
@@ -12,30 +11,32 @@ def get_normalized_action_directions() -> list[tuple[Action, np.ndarray]]:
         Action.ACTION_UP,
         Action.ACTION_RIGHT_UP,
         Action.ACTION_RIGHT,
-        Action.ACTION_RIGHT_DOWN
+        Action.ACTION_RIGHT_DOWN,
     ]
 
     actions = [(Action(x), normalized_action_to_vector(Action(x))) for x in actions]
 
     return [(action, vec / np.linalg.norm(vec)) for action, vec in actions]
 
+
 def action_to_vector(action: Action) -> np.ndarray:
     action_map: dict[int, np.ndarray] = {
-        Action.ACTION_NOTHING:    np.array([0, 0]),
-        Action.ACTION_RIGHT:      np.array([1, 0]),
-        Action.ACTION_LEFT:       np.array([-1, 0]),
-        Action.ACTION_UP:         np.array([0, 1]),
-        Action.ACTION_DOWN:       np.array([0, -1]),
-        Action.ACTION_RIGHT_UP:   np.array([1, 1]),
-        Action.ACTION_LEFT_UP:    np.array([-1, 1]),
+        Action.ACTION_NOTHING: np.array([0, 0]),
+        Action.ACTION_RIGHT: np.array([1, 0]),
+        Action.ACTION_LEFT: np.array([-1, 0]),
+        Action.ACTION_UP: np.array([0, 1]),
+        Action.ACTION_DOWN: np.array([0, -1]),
+        Action.ACTION_RIGHT_UP: np.array([1, 1]),
+        Action.ACTION_LEFT_UP: np.array([-1, 1]),
         Action.ACTION_RIGHT_DOWN: np.array([1, -1]),
-        Action.ACTION_LEFT_DOWN:  np.array([-1, -1]),
+        Action.ACTION_LEFT_DOWN: np.array([-1, -1]),
     }
     vec = action_map.get(action.val)
     if vec is None:
         raise ValueError(f"Did not recognize action: {action.val}")
-    
+
     return vec
+
 
 def normalized_action_to_vector(action: Action) -> np.ndarray:
     v = action_to_vector(action)
@@ -58,7 +59,10 @@ def sweep_pair(
 
     return project_point_onto_segment(P, A, B)
 
-def project_point_onto_segment(p: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+
+def project_point_onto_segment(
+    p: np.ndarray, a: np.ndarray, b: np.ndarray
+) -> np.ndarray:
     ab = b - a
     ap = p - a
 
