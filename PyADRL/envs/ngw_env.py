@@ -4,11 +4,17 @@ import numpy as np
 import time
 import grpc
 from ..utils.ngw2d_actions import get_drone_action
+from PyADRL.shielding.centralized_shield import CentralizedShield
+from PyADRL.shielding.shield import Shield
 from ..utils.ngw2d_client import NGWClient
 from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
 from ..logger.metricslogger import EpisodeOutcome
 from .ngw_drone import NGW_Drone
+from ..dtos.ngw_dtos import (
+    DroneAction,
+    State,
+)
 
 # Drone dictionary names
 EVADERS = "evaders"
@@ -30,6 +36,7 @@ class NGWEnvironment(ParallelEnv):
         drone_velocity: int = 1,
         time_limit: int = 100,
         step_delay: float = 0.0,
+        shielded: bool = False,
     ):
         self.id: int | None = None
         self.client = NGWClient(channel)
@@ -52,6 +59,7 @@ class NGWEnvironment(ParallelEnv):
         self.time_limit = time_limit
         self.agents = []
         self.one_hot = {}
+        self.newest_state: State | None = None
 
         # Pettingzoo wants all agents to have the same observation space, action space,
         # and wants possible agents to be defined
@@ -85,6 +93,10 @@ class NGWEnvironment(ParallelEnv):
         # 1 for nothing action, 8 * velocity for all actions with an actual direction
         self.act_space = Discrete(1 + (8 * drone_velocity))
 
+        self.shield: Shield | None = None
+        if shielded:
+            self.shield = CentralizedShield(map=map_config.get_map_spec())
+
     def _get_obs(self):
         obs = []
         for p in self.drones[PURSUERS]:
@@ -117,20 +129,20 @@ class NGWEnvironment(ParallelEnv):
         self.client.Close(self.id)
 
     def reset(self, seed=None, options=None):
-        state = None
         self.drones = {EVADERS: [], PURSUERS: []}
         self.agents = []
         self.timestep = 0
 
         if self.id is None:
-            state = self.client.New(
+            self.newest_state = self.client.New(
                 self.map_config.get_map_spec(), self.n_evaders, self.n_pursuers
             )
-            self.id = state.sim_id
+            self.id = self.newest_state.sim_id
         else:
-            state = self.client.Reset(self.id)
+            self.newest_state = self.client.Reset(self.id)
+            
 
-        for drone_state in state.drone_states:
+        for drone_state in self.newest_state.drone_states:
             is_evader = drone_state.is_evader
             drone = NGW_Drone(drone_state.id, drone_state.x, drone_state.y, is_evader)
             self.agents.append(drone.name)
@@ -139,7 +151,7 @@ class NGWEnvironment(ParallelEnv):
             else:
                 self.drones[PURSUERS].append(drone)
 
-        self.objects_state = state.objects
+        self.objects_state = self.newest_state.objects
 
         if len(self.drones[EVADERS]) == 0 or len(self.drones[PURSUERS]) == 0:
             raise ValueError(
@@ -167,21 +179,29 @@ class NGWEnvironment(ParallelEnv):
             time.sleep(self.step_delay)
 
         # Create the list of actions to send to the godot server
-        actions_send = []
+        actions_send: list[DroneAction] = []
         # Add drone action if it is not destroyed
         for drones in self.drones.values():
             for d in drones:
                 if not d.destroyed:
                     actions_send.append(get_drone_action(actions[d.name], d))
 
-        state = self.client.DoStep(self.id, actions_send)
+        alt_state: State | None = None
+        if self.shield != None:
+            if self.newest_state == None:
+                raise Exception("Tried shielding on a stateless simulation?")
+            new_acts, alt_state = self.shield.shield(actions_send, self.newest_state)
+            actions_send = new_acts
+
+        self.newest_state = self.client.DoStep(self.id, actions_send)
+        name_to_drone = {k.name: k for drones in self.drones.values() for k in drones}
 
         terminations: dict[str, bool] = {a: False for a in self.agents}
         truncations: dict[str, bool] = {a: False for a in self.agents}
         terminations["__all__"] = False
         truncations["__all__"] = False
 
-        for drone_state in state.drone_states:
+        for drone_state in self.newest_state.drone_states:
             key = EVADERS if drone_state.is_evader else PURSUERS
             # Mark destroyed drones as destroyed in python
             if drone_state.destroyed:
@@ -200,14 +220,13 @@ class NGWEnvironment(ParallelEnv):
 
         time_limit_reached = self.timestep >= self.time_limit
         rewards = self.reward_function.calculate_rewards(
-            new_state=state,
-            agents=self.agents,
-            drones=self.drones,
+            events=alt_state.events if alt_state != None else self.newest_state.events,
+            drones=[drone for drone in self.newest_state.drone_states],
             map_config=self.map_config,
             time_limit_reached=time_limit_reached,
         )
 
-        if state.terminated:
+        if self.newest_state.terminated:
             terminations = {a: True for a in self.agents}
             terminations["__all__"] = True
         elif time_limit_reached:
@@ -218,7 +237,7 @@ class NGWEnvironment(ParallelEnv):
 
         infos = {a: {} for a in self.agents}
 
-        if state.terminated or time_limit_reached:
+        if self.newest_state.terminated or time_limit_reached:
             episode_metrics = {
                 "captured": 1.0 if outcome.captured else 0.0,
                 "breached": 1.0 if outcome.breached else 0.0,
@@ -240,6 +259,8 @@ class NGWEnvironment(ParallelEnv):
                     "destroyed": d.destroyed,
                 }
 
+        name_to_reward: dict[str, float] = { name: rewards[name_to_drone[name].id] for name in self.agents }
+
         # Remove terminated agents
         if truncations["__all__"] or terminations["__all__"]:
             self.agents = []
@@ -250,7 +271,7 @@ class NGWEnvironment(ParallelEnv):
                 if not d.destroyed
             ]
 
-        return observations, rewards, terminations, truncations, infos
+        return observations, name_to_reward, terminations, truncations, infos
 
     def render(self):
         pass
