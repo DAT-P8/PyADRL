@@ -56,6 +56,14 @@ def mean_capture_steps(episode_outcomes: list[dict]) -> list[float]:
     return mean_steps
 
 
+def mean_capture(episode_outcomes: list[dict]):
+    capture_steps = [outcome.get("capture_steps", []) for outcome in episode_outcomes]
+
+    # filter out episodes with no captures
+    capture_steps = [np.mean(steps) for steps in capture_steps if len(steps) > 0]
+    return np.mean(capture_steps)
+
+
 def capture_rate_at_k(episode_outcomes: list[dict]) -> dict[int, float]:
     capture_step_sequences = [
         outcome.get("capture_steps", []) for outcome in episode_outcomes
@@ -299,11 +307,13 @@ class MetricsCallback(RLlibCallback):
         means = np.mean(outcomes_array, axis=0)
         mean_steps = mean_capture_steps(episode_outcomes)
         capture_rates = capture_rate_at_k(episode_outcomes)
+        average_capture_step = mean_capture(episode_outcomes)
 
         mean_summary = {
             "timestamp": datetime.now().isoformat(),
             "capture_rate_at_k": capture_rates,
-            "mean_capture_steps": mean_steps,
+            "mean_capture_step_at_k": mean_steps,
+            "mean_capture_step": average_capture_step,
             "mean_pursuer_entered_target_count": float(
                 np.mean(
                     [
