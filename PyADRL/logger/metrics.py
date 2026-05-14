@@ -89,7 +89,9 @@ class MetricsCallback(RLlibCallback):
         self.pursuer_ids: set[int] = set()
         self.timestep: int = 0
 
-    def on_algorithm_init(self, *, algorithm, metrics_oogger: MetricsLogger | None = None, **kwargs) -> None:
+    def on_algorithm_init(
+        self, *, algorithm, metrics_oogger: MetricsLogger | None = None, **kwargs
+    ) -> None:
         if algorithm.config is None or algorithm.config.env_config is None:
             raise ValueError(
                 "HeatmapCallback requires env_config to be set in the algorithm config"
@@ -326,10 +328,10 @@ class MetricsCallback(RLlibCallback):
         if results_dir.exists():
             with open(results_dir, "r") as f:
                 metrics_list = json.load(f)
-        
+
         # Append new metrics
         metrics_list.append(mean_summary)
-        
+
         # Write updated metrics
         with open(results_dir, "w") as f:
             json.dump(metrics_list, f, indent=4)

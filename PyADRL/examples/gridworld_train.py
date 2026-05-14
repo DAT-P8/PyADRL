@@ -204,12 +204,12 @@ def gridworld_train(
 
                 if len(opp_pool) != 0:
                     algo.learner_group.set_weights({frozen_policy: opp_pool[-1]})
-                
+
                 assert algo.learner_group is not None
                 # put the current training policy weights into the pool for future sampling
                 updated_weights = algo.learner_group.get_weights()[training_policy]
                 pool.append(updated_weights)
-                
+
                 # Save a checkpoint after each full stage (evader+pursuer training)
                 if label == "pursuer":
                     # {k + 1:05d} for zero padding e.g. stage_00012 instead of stage_12
