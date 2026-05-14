@@ -18,6 +18,7 @@ class HeatmapCallback(RLlibCallback):
         self.target_x = 0
         self.target_y = 0
         self.model_name = ""
+        self.objects = []
 
     def on_algorithm_init(
         self,
@@ -26,13 +27,6 @@ class HeatmapCallback(RLlibCallback):
         metrics_logger=None,
         **kwargs,
     ) -> None:
-        if algorithm and algorithm.config:
-            self.grid_w = algorithm.config.env_config.get("map_width", 0)
-            self.grid_h = algorithm.config.env_config.get("map_height", 0)
-            self.target_x = algorithm.config.env_config.get("target_x", 0)
-            self.target_y = algorithm.config.env_config.get("target_y", 0)
-            self.model_name = algorithm.config.env_config.get("model_name", "")
-
         if algorithm.config is None or algorithm.config.env_config is None:
             raise ValueError(
                 "HeatmapCallback requires env_config to be set in the algorithm config"
@@ -43,7 +37,7 @@ class HeatmapCallback(RLlibCallback):
         self.target_x = algorithm.config.env_config.get("target_x", 0)
         self.target_y = algorithm.config.env_config.get("target_y", 0)
         self.model_name = algorithm.config.env_config.get("model_name", "")
-
+        self.objects = algorithm.config.env_config.get("objects", [])
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
         episode.custom_data["pursuer_states"] = {}
@@ -216,6 +210,8 @@ class HeatmapCallback(RLlibCallback):
 
         # Draw the target square
         self._draw_target(ax)
+        # Draw objects as solid grey boxes
+        self._draw_objects(ax)
 
         plt.tight_layout()
         plt.savefig(filename, dpi=150)
@@ -347,6 +343,9 @@ class HeatmapCallback(RLlibCallback):
         # Draw the target square
         self._draw_target(ax)
 
+        # Draw objects as solid grey boxes
+        self._draw_objects(ax)
+
         ax.tick_params(axis="both", which="major", pad=8)
         ax.set_aspect("equal", adjustable="box")
         ax.legend(loc="upper right")
@@ -368,3 +367,31 @@ class HeatmapCallback(RLlibCallback):
             label="Target",
         )
         ax.add_patch(rect)
+
+    def _draw_objects(self, ax):
+        """Draw objects as solid grey 1x1 boxes. """
+        print(self.objects)
+        if not self.objects:
+            return
+
+        used_label = False
+        for obj in self.objects:
+            try:
+                x, y = obj
+            except Exception:
+                # skip malformed entries
+                continue
+
+            rect = patches.Rectangle(
+                (x, y),
+                1,
+                1,
+                linewidth=1,
+                edgecolor="black",
+                facecolor="grey",
+                alpha=1.0,
+                label=("Object" if not used_label else None),
+                zorder=5,
+            )
+            ax.add_patch(rect)
+            used_label = True

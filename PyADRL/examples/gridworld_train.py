@@ -72,6 +72,7 @@ def gridworld_train(
                 "map_height": map_config.height,
                 "target_x": map_config.target_x,
                 "target_y": map_config.target_y,
+                "objects": map_config.objects,
             },
         )
         .multi_agent(
