@@ -38,6 +38,7 @@ class HeatmapCallback(RLlibCallback):
         self.target_y = algorithm.config.env_config.get("target_y", 0)
         self.model_name = algorithm.config.env_config.get("model_name", "")
         self.objects = algorithm.config.env_config.get("objects", [])
+
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
         episode.custom_data["pursuer_states"] = {}
@@ -369,7 +370,7 @@ class HeatmapCallback(RLlibCallback):
         ax.add_patch(rect)
 
     def _draw_objects(self, ax):
-        """Draw objects as solid grey 1x1 boxes. """
+        """Draw objects as solid grey 1x1 boxes."""
         print(self.objects)
         if not self.objects:
             return
