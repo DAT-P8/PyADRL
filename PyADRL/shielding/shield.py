@@ -8,4 +8,4 @@ class Shield(metaclass=ABCMeta):
     def shield(
         self, actions: list[DroneAction], state: State
     ) -> tuple[list[DroneAction], State | None]:
-        raise NotImplemented("this method is abstract")
+        raise NotImplementedError("this method is abstract")

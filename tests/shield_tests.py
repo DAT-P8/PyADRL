@@ -6,7 +6,7 @@ from numpy._typing import NDArray
 
 from PyADRL.dtos.map_dtos import MapSpec, ObjectSpec, SquareMap, SquareObject
 from PyADRL.dtos.ngw_dtos import Action, DroneAction, DroneState, State
-from PyADRL.shielding.centralized_shield import CentralizedShield, Shield
+from PyADRL.shielding.centralized_shield import CentralizedShield
 from PyADRL.utils import utility
 
 
@@ -81,7 +81,7 @@ class ShieldingTests(unittest.TestCase):
             DroneState(1, 0, 0),
             DroneState(2, 9, 9),
         ]
-        state = State(0, False, drone_states, [])
+        state = State(0, False, drone_states, [], [])
 
         drone_actions: list[DroneAction] = [
             DroneAction(1, 2, Action(Action.ACTION_LEFT_DOWN)),
@@ -98,7 +98,7 @@ class ShieldingTests(unittest.TestCase):
             DroneState(1, 5, 3),
             DroneState(2, 6, 3),
         ]
-        state = State(0, False, drone_states, [])
+        state = State(0, False, drone_states, [], [])
 
         drone_actions: list[DroneAction] = [
             DroneAction(1, 2, Action(Action.ACTION_RIGHT)),
@@ -107,7 +107,7 @@ class ShieldingTests(unittest.TestCase):
 
         try:
             assert_safe_actions(drone_actions, state, map)
-        except:
+        except Exception:
             return
 
         raise Exception("assertion did not fail, as expected!")
@@ -122,7 +122,7 @@ class ShieldingTests(unittest.TestCase):
             DroneState(1, 3, 4),
             DroneState(2, 7, 8),
         ]
-        state = State(0, False, drone_states, [])
+        state = State(0, False, drone_states, [], [])
 
         drone_actions: list[DroneAction] = [
             DroneAction(1, 2, Action(Action.ACTION_DOWN)),
@@ -141,7 +141,7 @@ class ShieldingTests(unittest.TestCase):
             DroneState(1, 9, 8),
             DroneState(2, 9, 9),
         ]
-        state = State(0, False, drone_states, [])
+        state = State(0, False, drone_states, [], [])
 
         drone_actions: list[DroneAction] = [
             DroneAction(1, 2, Action(Action.ACTION_UP)),
@@ -160,7 +160,7 @@ class ShieldingTests(unittest.TestCase):
             DroneState(1, 0, 0),
             DroneState(2, 1, 0),
         ]
-        state = State(0, False, drone_states, [])
+        state = State(0, False, drone_states, [], [])
 
         drone_actions: list[DroneAction] = [
             DroneAction(1, 1, Action(Action.ACTION_RIGHT)),
@@ -191,7 +191,7 @@ class ShieldingTests(unittest.TestCase):
         drone_states: list[DroneState] = [
             DroneState(1, 3, 2),
         ]
-        state = State(0, False, drone_states, [])
+        state = State(0, False, drone_states, [], [])
 
         drone_actions: list[DroneAction] = [
             DroneAction(1, 1, Action(Action.ACTION_UP)),
@@ -219,7 +219,7 @@ class ShieldingTests(unittest.TestCase):
         drone_states: list[DroneState] = [
             DroneState(1, 0, 0),
         ]
-        state = State(0, False, drone_states, [])
+        state = State(0, False, drone_states, [], [])
 
         drone_actions: list[DroneAction] = [
             DroneAction(1, 2, Action(Action.ACTION_DOWN)),
