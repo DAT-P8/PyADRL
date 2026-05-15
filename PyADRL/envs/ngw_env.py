@@ -64,9 +64,8 @@ class NGWEnvironment(ParallelEnv):
         # Pettingzoo wants all agents to have the same observation space, action space,
         # and wants possible agents to be defined
         self.possible_agents = [
-            f"{agent_type}_{i}"
-            for agent_type in ["evader", "pursuer"]
-            for i in range(n_pursuers + n_evaders)
+            *[f"evader_{i}" for i in range(n_evaders)],
+            *[f"pursuer_{i}" for i in range(n_pursuers)],
         ]
 
         # one-hot agent ID, so drones can share a policy but still know who they are

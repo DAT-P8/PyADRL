@@ -43,7 +43,7 @@ def gridworld_eval(
         ),
     )
 
-    config: PPOConfig = (
+    config = (
         PPOConfig()
         .environment(
             "gridworld",
@@ -55,30 +55,34 @@ def gridworld_eval(
                 "model_name": checkpoint_path,
             },
         )
+        .training(lr=0.0, train_batch_size=1024, minibatch_size=102, num_epochs=10)
         .multi_agent(
             policies={"pursuer_policy", "evader_policy"},
             policy_mapping_fn=lambda agent_id, *args, **kwargs: (
                 "pursuer_policy" if "pursuer" in str(agent_id) else "evader_policy"
             ),
+            policies_to_train=[],
         )
         .env_runners(
             num_env_runners=1,
         )
         .callbacks(callbacks_class=[MetricsCallback, HeatmapCallback])
-        .evaluation(evaluation_num_env_runners=1)
+        .evaluation(evaluation_num_env_runners=0)
     )
 
     algo = config.build()
-    restore_testing(algo, checkpoint_path)
 
-    results = algo.evaluate()
-    eval_data = build_eval_data(results)
-    eval_episodes = eval_data.get("episodes", [])
-    eval_metrics_path = metrics_path("eval")
-    write_metrics(
-        eval_metrics_path,
-        build_eval(eval_episodes, fallback_summary=eval_data.get("summary", {})),
-    )
-    print_eval_summary(eval_data, eval_metrics_path)
-
-    algo.stop()
+    try:
+        restore_testing(algo, checkpoint_path)
+        result = algo.train()
+        eval_data = build_eval_data(result)
+        eval_episodes = eval_data.get("episodes", [])
+        eval_metrics_path = metrics_path("eval")
+        write_metrics(
+            eval_metrics_path,
+            build_eval(eval_episodes, fallback_summary=eval_data.get("summary", {})),
+        )
+        print_eval_summary(eval_data, eval_metrics_path)
+    finally:
+        algo.stop()
+        ray.shutdown()
