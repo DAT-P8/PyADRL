@@ -65,7 +65,7 @@ def mean_capture(episode_outcomes: list[dict]):
 
     # filter out episodes with no captures
     capture_steps = [np.mean(steps) for steps in capture_steps if len(steps) > 0]
-    return np.mean(capture_steps)
+    return np.mean(capture_steps) if capture_steps else -1.0
 
 
 def capture_rate_at_k(episode_outcomes: list[dict]) -> dict[int, float]:
@@ -109,7 +109,7 @@ class MetricsCallback(RLlibCallback):
         self.timestep: int = 0
 
     def on_algorithm_init(
-        self, *, algorithm, metrics_oogger: MetricsLogger | None = None, **kwargs
+        self, *, algorithm, metrics_logger: MetricsLogger | None = None, **kwargs
     ) -> None:
         if algorithm.config is None or algorithm.config.env_config is None:
             raise ValueError(
@@ -156,10 +156,10 @@ class MetricsCallback(RLlibCallback):
             ),
             evader_shield_intervention_rate=self.evader_shield_interventions
             / n_evaders
-            / self.timestep,
+            / self.timestep if self.timestep > 0 and n_evaders > 0 else 0.0,
             pursuer_shield_intervention_rate=self.pursuer_shield_interventions
             / n_pursuers
-            / self.timestep,
+            / self.timestep if self.timestep > 0 and n_pursuers > 0 else 0.0,
         )
         self.episode_outcomes.append(outcome_obj)
         if metrics_logger is not None:
@@ -200,6 +200,8 @@ class MetricsCallback(RLlibCallback):
         self.drone_out_of_bounds_ids = set()
         self.collision_ids = set()
         self.timestep = 0
+        self.evader_ids = set()
+        self.pursuer_ids = set()
         infos = self._get_episode_info(env, env_index)
         if infos is not None:
             self.evader_ids.update(
