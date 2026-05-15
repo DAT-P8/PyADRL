@@ -6,7 +6,7 @@ from ..utils.register_env import _register_gridworld_env
 from .trainables.alternate_training import alternate_trainable
 
 # Callbacks
-from ..logger.metricslogger import MetricsCallback
+from ..logger.metrics import MetricsCallback
 from ..logger.heatmaps import HeatmapCallback
 
 # Number of alternating stages and PPO iterations per stage

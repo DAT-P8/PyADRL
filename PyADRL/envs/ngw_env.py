@@ -9,7 +9,6 @@ from PyADRL.shielding.shield import Shield
 from ..utils.ngw2d_client import NGWClient
 from .reward_functions.rewards import RewardFunction
 from .map_configs.map_config import MapConfig
-from ..logger.metricslogger import EpisodeOutcome
 from .ngw_drone import NGW_Drone
 from ..dtos.ngw_dtos import (
     DroneAction,
@@ -163,6 +162,9 @@ class NGWEnvironment(ParallelEnv):
         observations = self._get_obs()
 
         infos = {a: {} for a in self.agents}
+        for d in self.drones[EVADERS] + self.drones[PURSUERS]:
+            if d.name in infos:
+                infos[d.name]["drone"] = d
 
         return (observations, infos)
 
@@ -218,8 +220,6 @@ class NGWEnvironment(ParallelEnv):
                         drone.x = drone_state.x
                         drone.y = drone_state.y
 
-        outcome = EpisodeOutcome(episode_length=self.timestep + 1)
-
         time_limit_reached = self.timestep >= self.time_limit
         rewards = self.reward_function.calculate_rewards(
             events=alt_state.events
@@ -241,18 +241,6 @@ class NGWEnvironment(ParallelEnv):
 
         infos = {a: {} for a in self.agents}
 
-        if self.newest_state.terminated or time_limit_reached:
-            episode_metrics = {
-                "captured": 1.0 if outcome.captured else 0.0,
-                "breached": 1.0 if outcome.breached else 0.0,
-                "capture_step": float(outcome.capture_step)
-                if outcome.capture_step is not None
-                else 100.0,
-                "episode_length": float(outcome.episode_length),
-            }
-            for a in self.agents:
-                infos[a]["episode_metrics"] = episode_metrics
-
         observations = self._get_obs()
 
         for d in self.drones[EVADERS] + self.drones[PURSUERS]:
@@ -262,6 +250,9 @@ class NGWEnvironment(ParallelEnv):
                     "y": d.y,
                     "destroyed": d.destroyed,
                 }
+                infos[d.name]["events"] = self.newest_state.events
+                if alt_state is not None:
+                    infos[d.name]["shield_events"] = alt_state.events
 
         name_to_reward: dict[str, float] = {
             name: rewards[name_to_drone[name].id] for name in self.agents

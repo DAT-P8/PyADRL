@@ -5,14 +5,7 @@ from ..envs.ngw_env import NGWEnvironment
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ..envs.reward_functions.grid_world_rewards import GridWorldRewards
 from ray.tune.registry import register_env
-from ..logger.metricslogger import (
-    MetricsCallback,
-    build_eval,
-    build_eval_data,
-    metrics_path,
-    print_eval_summary,
-    write_metrics,
-)
+from ..logger.metrics import MetricsCallback
 from ..logger.heatmaps import HeatmapCallback
 
 from ..utils.model_save import restore_testing
@@ -71,14 +64,6 @@ def gridworld_eval(
     algo = config.build()
     restore_testing(algo, checkpoint_path)
 
-    results = algo.evaluate()
-    eval_data = build_eval_data(results)
-    eval_episodes = eval_data.get("episodes", [])
-    eval_metrics_path = metrics_path("eval")
-    write_metrics(
-        eval_metrics_path,
-        build_eval(eval_episodes, fallback_summary=eval_data.get("summary", {})),
-    )
-    print_eval_summary(eval_data, eval_metrics_path)
+    algo.evaluate()
 
     algo.stop()
