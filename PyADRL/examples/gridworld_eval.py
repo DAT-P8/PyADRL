@@ -8,7 +8,7 @@ from ray.tune.registry import register_env
 from ..logger.metrics import MetricsCallback
 from ..logger.heatmaps import HeatmapCallback
 
-from ..utils.model_save import restore_testing
+from ..utils.path_utils import restore_testing
 from ..utils.map_load import load_map_config
 
 

@@ -6,7 +6,6 @@ import numpy as np
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.callbacks.callbacks import RLlibCallback
 from ray.rllib.utils.metrics.metrics_logger import MetricsLogger
-from PyADRL.utils.paths import get_model_dir
 
 
 @dataclass
@@ -90,7 +89,9 @@ def rate(ids, role_ids, n):
 class MetricsCallback(RLlibCallback):
     def __init__(self):
         super().__init__()
-        self.model_name = ""
+        self.metrics_path = None
+        self.n_pursuers = 0
+        self.n_evaders = 0
         self.episode_outcomes: list[EpisodeOutcome] = []
         self.capture_steps: list[int] = []  # Track steps at which evaders are captured
         self.captured_evader_ids: set[int] = set()  # evaders that have been captured
@@ -112,7 +113,9 @@ class MetricsCallback(RLlibCallback):
             raise ValueError(
                 "MetricsCallback requires env_config to be set in the algorithm config"
             )
-        self.model_name = algorithm.config.env_config.get("model_name", "")
+        self.metrics_path = algorithm.config.env_config.get("metrics_path")
+        self.n_pursuers = algorithm.config.env_config.get("n_pursuers", 0)
+        self.n_evaders = algorithm.config.env_config.get("n_evaders", 0)
 
     def on_episode_end(
         self,
@@ -398,18 +401,19 @@ class MetricsCallback(RLlibCallback):
             "mean_rewards": rewards_dict,
         }
 
-        results_dir = get_model_dir(self.model_name) / "evaluation_metrics.json"
+        if self.metrics_path:
+            results_dir = self.metrics_path / "evaluation_metrics.json"
 
-        # Load existing metrics or create new list
-        metrics_list = []
-        if results_dir.exists():
-            with open(results_dir, "r") as f:
-                metrics_list = json.load(f)
+            # Load existing metrics or create new list
+            metrics_list = []
+            if results_dir.exists():
+                with open(results_dir, "r") as f:
+                    metrics_list = json.load(f)
 
-        # Append new metrics
-        metrics_list.append(mean_summary)
+            # Append new metrics
+            metrics_list.append(mean_summary)
 
-        # Write updated metrics
-        with open(results_dir, "w") as f:
-            json.dump(metrics_list, f, indent=4)
-        print(f"Saved evaluation metrics to {results_dir}")
+            # Write updated metrics
+            with open(results_dir, "w") as f:
+                json.dump(metrics_list, f, indent=4)
+            print(f"Saved evaluation metrics to {results_dir}")

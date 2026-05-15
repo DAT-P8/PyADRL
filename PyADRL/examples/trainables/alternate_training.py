@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 from ray import tune
 from ray.rllib.callbacks.callbacks import RLlibCallback
 from ...utils.config_builder import _build_ppo_config
@@ -13,8 +14,8 @@ def _run_alternating_loop(
     n_stages: int,
     iters_per_stage: int,
     report_to_tune: bool = False,
-    checkpoint_dir: str | None = None,
-) -> tuple[list[dict], list[dict]]:
+    model_path: Path | None = None,
+) -> dict:
     """Core alternating self-play training loop.
 
     Used by both gridworld_train (with checkpointing/metrics) and
@@ -28,11 +29,10 @@ def _run_alternating_loop(
         checkpoint_dir: If set, save checkpoints after each full stage.
 
     Returns:
-        Tuple of (rewards list, episodes_data list).
+        Result dictionary from the last training
     """
-    rewards: list[dict] = []
-    episodes_data: list[dict] = []
     global_step = 0
+    result = {}
 
     pools = {EVADER: [], PURSUER: []}
     train_evader = True
@@ -66,10 +66,9 @@ def _run_alternating_loop(
                     policies=[f"{frozen}_policy"],
                 )
 
+        # Train stage
         for i in range(iters_per_stage):
             result = algo.train()
-            mean = result["env_runners"]["agent_episode_returns_mean"]
-            rewards.append(mean)
             global_step += 1
 
         assert algo.learner_group is not None
@@ -91,15 +90,15 @@ def _run_alternating_loop(
             tune.report(metrics={"mean_reward": total_mean_reward})
 
         # Save a checkpoint after each full stage (evader+pursuer training)
-        if checkpoint_dir and training == PURSUER:
-            print(f"Saving stage {k + 1} at {checkpoint_dir}/stage_{k + 1:05d}")
-            check = f"{checkpoint_dir}/stage_{k + 1:05d}"
-            algo.save(checkpoint_dir=check)
+        if model_path and training == PURSUER:
+            print(f"Saving stage {k + 1} at {model_path}/stage_{k + 1:05d}")
+            model_name = model_path / f"stage_{k + 1:05d}"
+            algo.save(str(model_name))
 
         # Alternate what policy gets trained
         train_evader = not train_evader
 
-    return rewards, episodes_data
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -107,10 +106,10 @@ def _run_alternating_loop(
 # ---------------------------------------------------------------------------
 def alternate_trainable(
     config: dict,
-    checkpoint_dir: str | None = None,
     n_stages: int = 4,
     iters_per_stage: int = 20,
     callbacks: list[type[RLlibCallback]] | None = None,
+    # checkpoint_dir: Path | None = None,
 ) -> None:  # type: ignore[type-arg]
     """Trainable function for Ray Tune.
 
@@ -119,27 +118,8 @@ def alternate_trainable(
     training iteration so ASHA can prune underperforming trials early.
     """
     ppo_config = _build_ppo_config(
-        lr=config["lr"],
-        gamma=config["gamma"],
-        lambda_=config["lambda_"],
-        clip_param=config["clip_param"],
-        vf_loss_coeff=config["vf_loss_coeff"],
-        entropy_coeff=config["entropy_coeff"],
-        train_batch_size=config["train_batch_size"],
-        minibatch_size=config["minibatch_size"],
-        num_epochs=config["num_epochs"],
-        # All in-process: no remote actors, no placement group conflicts
-        num_learners=config.get("num_learners", 0),
-        num_env_runners=config.get("num_env_runners", 0),
-        num_envs_per_env_runner=config.get("num_envs_per_env_runner", 10),
+        config=config,
         callbacks=callbacks,
-    )
-
-    # Configuration for evaluating policies after a stage
-    ppo_config = ppo_config.evaluation(
-        evaluation_interval=None,
-        evaluation_num_env_runners=0,
-        evaluation_duration=20,
     )
 
     algo = ppo_config.build_algo()
@@ -149,7 +129,7 @@ def alternate_trainable(
             n_stages=n_stages,
             iters_per_stage=iters_per_stage,
             report_to_tune=True,
-            checkpoint_dir=checkpoint_dir,
+            # checkpoint_dir=checkpoint_dir,
         )
     finally:
         algo.stop()
