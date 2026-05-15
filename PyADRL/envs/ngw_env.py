@@ -251,6 +251,8 @@ class NGWEnvironment(ParallelEnv):
                     "destroyed": d.destroyed,
                 }
                 infos[d.name]["events"] = self.newest_state.events
+                if alt_state is not None:
+                    infos[d.name]["shield_events"] = alt_state.events
 
         name_to_reward: dict[str, float] = {
             name: rewards[name_to_drone[name].id] for name in self.agents
