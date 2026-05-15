@@ -22,6 +22,8 @@ class EpisodeOutcome:
     evader_obstacle_collision_rate: float = 0.0
     pursuer_obstacle_collision_rate: float = 0.0
     pursuer_entered_target_count: int = 0
+    pursuer_out_of_bounds_rate: float = 0.0
+    evader_out_of_bounds_rate: float = 0.0
 
 
 def extract_episode_metrics(infos) -> dict | None:
@@ -92,6 +94,7 @@ class MetricsCallback(RLlibCallback):
         self.target_reached_ids: set[int] = set()
         self.pursuer_entered_target_count: int = 0
         self.drone_object_collision_ids: set[int] = set()
+        self.drone_out_of_bounds_ids: set[int] = set()
         self.collision_ids: set[int] = set()
         self.evader_ids: set[int] = set()
         self.pursuer_ids: set[int] = set()
@@ -130,6 +133,12 @@ class MetricsCallback(RLlibCallback):
         pursuer_obj_collided = len(
             [i for i in self.drone_object_collision_ids if i in self.pursuer_ids]
         )
+        evader_out_of_bounds = len(
+            [i for i in self.drone_out_of_bounds_ids if i in self.evader_ids]
+        )
+        pursuer_out_of_bounds = len(
+            [i for i in self.drone_out_of_bounds_ids if i in self.pursuer_ids]
+        )
 
         evader_drone_collision_rate = (
             evader_collided / n_evaders if n_evaders > 0 else 0.0
@@ -144,6 +153,12 @@ class MetricsCallback(RLlibCallback):
         pursuer_obstacle_collision_rate = (
             pursuer_obj_collided / n_pursuers if n_pursuers > 0 else 0.0
         )
+        evader_out_of_bounds_rate = (
+            evader_out_of_bounds / n_evaders if n_evaders > 0 else 0.0
+        )
+        pursuer_out_of_bounds_rate = (
+            pursuer_out_of_bounds / n_pursuers if n_pursuers > 0 else 0.0
+        )
 
         outcome_obj = EpisodeOutcome(
             capture_steps=capture_steps,
@@ -154,6 +169,8 @@ class MetricsCallback(RLlibCallback):
             evader_obstacle_collision_rate=evader_obstacle_collision_rate,
             pursuer_obstacle_collision_rate=pursuer_obstacle_collision_rate,
             pursuer_entered_target_count=self.pursuer_entered_target_count,
+            evader_out_of_bounds_rate=evader_out_of_bounds_rate,
+            pursuer_out_of_bounds_rate=pursuer_out_of_bounds_rate,
         )
 
         self.episode_outcomes.append(outcome_obj)
@@ -192,6 +209,7 @@ class MetricsCallback(RLlibCallback):
         self.target_reached_ids = set()
         self.pursuer_entered_target_count = 0
         self.drone_object_collision_ids = set()
+        self.drone_out_of_bounds_ids = set()
         self.collision_ids = set()
         self.timestep = 0
         infos = self._get_episode_info(env, env_index)
@@ -235,6 +253,8 @@ class MetricsCallback(RLlibCallback):
                 self.target_reached_ids.update(event.target_reached_event.drone_ids)
             elif event.collision_event is not None:
                 collision_events.append(set(event.collision_event.drone_ids))
+            elif event.out_of_bounds_event is not None:
+                self.drone_out_of_bounds_ids.update(event.out_of_bounds_event.drone_ids)
 
         # Check for captures:
         evaders_caught: set[int] = set()
@@ -299,6 +319,8 @@ class MetricsCallback(RLlibCallback):
                     outcome["pursuer_drone_collision_rate"],
                     outcome["evader_obstacle_collision_rate"],
                     outcome["pursuer_obstacle_collision_rate"],
+                    outcome["evader_out_of_bounds_rate"],
+                    outcome["pursuer_out_of_bounds_rate"],
                 ]
                 for outcome in episode_outcomes
             ]
@@ -328,6 +350,8 @@ class MetricsCallback(RLlibCallback):
             "mean_pursuer_drone_collision_rate": float(means[3]),
             "mean_evader_obstacle_collision_rate": float(means[4]),
             "mean_pursuer_obstacle_collision_rate": float(means[5]),
+            "mean_evader_out_of_bounds_rate": float(means[6]),
+            "mean_pursuer_out_of_bounds_rate": float(means[7]),
             "mean_rewards": rewards_dict,
         }
 
