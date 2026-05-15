@@ -84,6 +84,10 @@ def capture_rate_at_k(episode_outcomes: list[dict]) -> dict[int, float]:
     return capture_rates
 
 
+def rate(ids, role_ids, n):
+    return len([i for i in ids if i in role_ids]) / n if n > 0 else 0.0
+
+
 class MetricsCallback(RLlibCallback):
     def __init__(self):
         super().__init__()
@@ -122,63 +126,35 @@ class MetricsCallback(RLlibCallback):
     ) -> None:
         n_evaders = len(self.evader_ids)
         n_pursuers = len(self.pursuer_ids)
-        capture_steps = list(self.capture_steps)
-
-        evader_collided = len([i for i in self.collision_ids if i in self.evader_ids])
-        pursuer_collided = len([i for i in self.collision_ids if i in self.pursuer_ids])
-
-        evader_obj_collided = len(
-            [i for i in self.drone_object_collision_ids if i in self.evader_ids]
-        )
-        pursuer_obj_collided = len(
-            [i for i in self.drone_object_collision_ids if i in self.pursuer_ids]
-        )
-        evader_out_of_bounds = len(
-            [i for i in self.drone_out_of_bounds_ids if i in self.evader_ids]
-        )
-        pursuer_out_of_bounds = len(
-            [i for i in self.drone_out_of_bounds_ids if i in self.pursuer_ids]
-        )
-
-        evader_drone_collision_rate = (
-            evader_collided / n_evaders if n_evaders > 0 else 0.0
-        )
-        pursuer_drone_collision_rate = (
-            pursuer_collided / n_pursuers if n_pursuers > 0 else 0.0
-        )
-
-        evader_obstacle_collision_rate = (
-            evader_obj_collided / n_evaders if n_evaders > 0 else 0.0
-        )
-        pursuer_obstacle_collision_rate = (
-            pursuer_obj_collided / n_pursuers if n_pursuers > 0 else 0.0
-        )
-        evader_out_of_bounds_rate = (
-            evader_out_of_bounds / n_evaders if n_evaders > 0 else 0.0
-        )
-        pursuer_out_of_bounds_rate = (
-            pursuer_out_of_bounds / n_pursuers if n_pursuers > 0 else 0.0
-        )
 
         outcome_obj = EpisodeOutcome(
-            capture_steps=capture_steps,
+            capture_steps=list(self.capture_steps),
             breached=len(self.target_reached_ids) > 0,
             episode_length=self.timestep,
-            evader_drone_collision_rate=evader_drone_collision_rate,
-            pursuer_drone_collision_rate=pursuer_drone_collision_rate,
-            evader_obstacle_collision_rate=evader_obstacle_collision_rate,
-            pursuer_obstacle_collision_rate=pursuer_obstacle_collision_rate,
+            evader_drone_collision_rate=rate(
+                self.collision_ids, self.evader_ids, n_evaders
+            ),
+            pursuer_drone_collision_rate=rate(
+                self.collision_ids, self.pursuer_ids, n_pursuers
+            ),
+            evader_obstacle_collision_rate=rate(
+                self.drone_object_collision_ids, self.evader_ids, n_evaders
+            ),
+            pursuer_obstacle_collision_rate=rate(
+                self.drone_object_collision_ids, self.pursuer_ids, n_pursuers
+            ),
             pursuer_entered_target_count=self.pursuer_entered_target_count,
-            evader_out_of_bounds_rate=evader_out_of_bounds_rate,
-            pursuer_out_of_bounds_rate=pursuer_out_of_bounds_rate,
+            evader_out_of_bounds_rate=rate(
+                self.drone_out_of_bounds_ids, self.evader_ids, n_evaders
+            ),
+            pursuer_out_of_bounds_rate=rate(
+                self.drone_out_of_bounds_ids, self.pursuer_ids, n_pursuers
+            ),
         )
-
         self.episode_outcomes.append(outcome_obj)
         if metrics_logger is not None:
             metrics_logger.log_value(
-                "episode_outcomes",
-                asdict(outcome_obj),
-                reduce="item_series",
+                "episode_outcomes", asdict(outcome_obj), reduce="item_series"
             )
 
     def _get_episode_info(self, env, env_index: int):
