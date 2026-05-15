@@ -8,9 +8,6 @@ from ray.rllib.callbacks.callbacks import RLlibCallback
 from ray.rllib.utils.metrics.metrics_logger import MetricsLogger
 from PyADRL.utils.paths import get_model_dir
 
-EVADERS = "evaders"
-PURSUERS = "pursuers"
-
 
 @dataclass
 class EpisodeOutcome:
@@ -156,10 +153,14 @@ class MetricsCallback(RLlibCallback):
             ),
             evader_shield_intervention_rate=self.evader_shield_interventions
             / n_evaders
-            / self.timestep if self.timestep > 0 and n_evaders > 0 else 0.0,
+            / self.timestep
+            if self.timestep > 0 and n_evaders > 0
+            else 0.0,
             pursuer_shield_intervention_rate=self.pursuer_shield_interventions
             / n_pursuers
-            / self.timestep if self.timestep > 0 and n_pursuers > 0 else 0.0,
+            / self.timestep
+            if self.timestep > 0 and n_pursuers > 0
+            else 0.0,
         )
         self.episode_outcomes.append(outcome_obj)
         if metrics_logger is not None:
