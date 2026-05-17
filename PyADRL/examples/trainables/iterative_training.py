@@ -1,15 +1,24 @@
+import torch
 from ray import tune
 from pathlib import Path
 from ...utils.config_builder import _build_ppo_config
 from ray.rllib.callbacks.callbacks import RLlibCallback
+from ...logger.metrics import summarize_evaluation
 
 
 def iterative_trainable(
     config: dict,
     iterations: int = 25,
     callbacks: list[type[RLlibCallback]] | None = None,
-    # model_path: Path | None = None,
 ) -> None:  # type: ignore[type-arg]
+    # Pin this trial's process to single-threaded PyTorch (see Tune concurrency notes)
+    torch.set_num_threads(1)  # pyright: ignore[reportPrivateImportUsage]
+    try:
+        torch.set_num_interop_threads(1)  # pyright: ignore[reportPrivateImportUsage]
+    except RuntimeError:
+        # Already set in this process (reuse_actors=True). Safe to ignore.
+        pass
+
     ppo_config = _build_ppo_config(
         config=config,
         callbacks=callbacks,
@@ -21,7 +30,6 @@ def iterative_trainable(
             algo,
             iterations=iterations,
             report_to_tune=True,
-            # model_path=model_path,
         )
     finally:
         algo.stop()
@@ -33,6 +41,11 @@ def _run_iterative_loop(
     report_to_tune=False,
     model_path: Path | None = None,
 ) -> dict:
+    # Pull n_evaders once — needed to know what counts as a "full capture".
+    n_evaders = 1
+    if algo.config is not None and algo.config.env_config is not None:
+        n_evaders = algo.config.env_config.get("n_evaders", 1)
+
     result = {}
     for i in range(1, iterations + 1):
         print(f"Training iteration {i}")
@@ -44,9 +57,6 @@ def _run_iterative_loop(
 
         eval_result = algo.evaluate()
         if report_to_tune:
-            eval_mean = eval_result["env_runners"]["agent_episode_returns_mean"]
-            total_mean_reward = (
-                sum(eval_mean.values()) if isinstance(eval_mean, dict) else eval_mean
-            )
-            tune.report(metrics={"mean_reward": total_mean_reward})
+            metrics = summarize_evaluation(eval_result, n_evaders=n_evaders)
+            tune.report(metrics=metrics)
     return result

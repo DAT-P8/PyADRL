@@ -1,8 +1,10 @@
 import random
+import torch
 from pathlib import Path
 from ray import tune
 from ray.rllib.callbacks.callbacks import RLlibCallback
 from ...utils.config_builder import _build_ppo_config
+from ...logger.metrics import summarize_evaluation
 
 
 EVADER = "evader"
@@ -33,6 +35,11 @@ def _run_alternating_loop(
     """
     global_step = 0
     result = {}
+
+    # Pull n_evaders once — needed to compute "full capture" rate during eval.
+    n_evaders = 1
+    if algo.config is not None and algo.config.env_config is not None:
+        n_evaders = algo.config.env_config.get("n_evaders", 1)
 
     pools = {EVADER: [], PURSUER: []}
     train_evader = True
@@ -83,11 +90,8 @@ def _run_alternating_loop(
 
         # Report to Tune so ASHA can prune bad trials early
         if report_to_tune:
-            eval_mean = eval_result["env_runners"]["agent_episode_returns_mean"]
-            total_mean_reward = (
-                sum(eval_mean.values()) if isinstance(eval_mean, dict) else eval_mean
-            )
-            tune.report(metrics={"mean_reward": total_mean_reward})
+            metrics = summarize_evaluation(eval_result, n_evaders=n_evaders)
+            tune.report(metrics=metrics)
 
         # Save a checkpoint after each full stage (evader+pursuer training)
         if model_path and training == PURSUER:
@@ -117,6 +121,13 @@ def alternate_trainable(
     alternating self-play loop, and reports metrics back to Tune after every
     training iteration so ASHA can prune underperforming trials early.
     """
+    # Pin this trial's process to single-threaded PyTorch (see Tune concurrency notes)
+    torch.set_num_threads(1)  # pyright: ignore[reportPrivateImportUsage]
+    try:
+        torch.set_num_interop_threads(1)  # pyright: ignore[reportPrivateImportUsage]
+    except RuntimeError:
+        pass
+
     ppo_config = _build_ppo_config(
         config=config,
         callbacks=callbacks,

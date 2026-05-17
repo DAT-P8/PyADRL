@@ -86,6 +86,82 @@ def rate(ids, role_ids, n):
     return len([i for i in ids if i in role_ids]) / n if n > 0 else 0.0
 
 
+def summarize_evaluation(eval_result: dict, n_evaders: int) -> dict:
+    """Flatten an algo.evaluate() result into a dict of scalar metrics for tune.report.
+
+    Pulls the per-episode outcomes that MetricsCallback logs via
+    metrics_logger.log_value("episode_outcomes", ..., reduce="item_series")
+    and aggregates them into single numbers suitable for Tune's metric tracking
+    and ASHA scheduling.
+
+    Args:
+        eval_result: Return value of algo.evaluate().
+        n_evaders: Number of evaders per episode. Used to determine what counts
+            as a "full" capture (all evaders caught).
+
+    Returns:
+        Flat dict of scalar metrics. Always contains 'mean_reward' so existing
+        ASHA configs keep working unchanged.
+    """
+    env_runners = eval_result.get("env_runners", {}) or {}
+    rewards_dict = env_runners.get("agent_episode_returns_mean", {}) or {}
+    episode_outcomes = env_runners.get("episode_outcomes") or []
+
+    # Legacy metric: sum of per-agent mean returns. Kept so ASHA's default
+    # metric="mean_reward" keeps working without code changes.
+    if isinstance(rewards_dict, dict):
+        mean_reward = float(sum(rewards_dict.values()))
+        pursuer_reward = float(
+            sum(v for k, v in rewards_dict.items() if "pursuer" in str(k))
+        )
+        evader_reward = float(
+            sum(v for k, v in rewards_dict.items() if "evader" in str(k))
+        )
+    else:
+        mean_reward = float(rewards_dict)
+        pursuer_reward = 0.0
+        evader_reward = 0.0
+
+    # Defaults for the case where no episodes completed in this eval window.
+    full_capture_rate = 0.0
+    any_capture_rate = 0.0
+    breach_rate = 0.0
+    mean_episode_length = 0.0
+    mean_capture_step = -1.0
+
+    if episode_outcomes:
+        capture_rates = capture_rate_at_k(episode_outcomes)
+        # Fraction of episodes where every evader was caught.
+        full_capture_rate = float(capture_rates.get(n_evaders, 0.0))
+        # Fraction of episodes where at least one capture happened.
+        any_capture_rate = float(sum(v for k, v in capture_rates.items() if k > 0))
+
+        breach_rate = float(
+            np.mean([float(o.get("breached", False)) for o in episode_outcomes])
+        )
+        mean_episode_length = float(
+            np.mean([o.get("episode_length", 0) for o in episode_outcomes])
+        )
+        mean_capture_step = float(mean_capture(episode_outcomes))
+
+    return {
+        # Legacy — keep so existing ASHA config keeps working.
+        "mean_reward": mean_reward,
+        # Per-side rewards — useful when you care about one role specifically.
+        "pursuer_reward": pursuer_reward,
+        "evader_reward": evader_reward,
+        # Task-grounded metrics — bounded in [0, 1], reward-shaping-invariant.
+        "full_capture_rate": full_capture_rate,
+        "any_capture_rate": any_capture_rate,
+        "breach_rate": breach_rate,
+        "mean_episode_length": mean_episode_length,
+        "mean_capture_step": mean_capture_step,
+        # Composite: positive means pursuers winning, negative means evaders winning.
+        # Useful as an ASHA metric when you care about pursuer success specifically.
+        "pursuer_success": full_capture_rate - breach_rate,
+    }
+
+
 class MetricsCallback(RLlibCallback):
     def __init__(self):
         super().__init__()

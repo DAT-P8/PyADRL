@@ -31,7 +31,6 @@ class HeatmapCallback(RLlibCallback):
         self.target_x = algorithm.config.env_config.get("target_x", 0)
         self.target_y = algorithm.config.env_config.get("target_y", 0)
         self.figure_path = algorithm.config.env_config.get("figure_path")
-        print(self.grid_w, self.grid_h)
 
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}

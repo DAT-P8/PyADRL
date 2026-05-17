@@ -11,6 +11,7 @@ from .gridworld_train import gridworld_train
 from ..utils.save_info import save_info, make_strategy_dict
 from ..utils.path_utils import setup_experiment_dirs
 from ..utils.map_load import load_map_dict
+from ..logger.metrics import MetricsCallback
 
 # === Training specifications ===
 # Training types
@@ -23,12 +24,12 @@ ITERS_PER_STAGE = 10
 ALTERNATING_GRACE = N_STAGES * ITERS_PER_STAGE * 2
 
 # Simultaneous training specifications
-ITERATIONS = 400
+ITERATIONS = 100
 SIMULTANEOUS_GRACE = ITERATIONS // 2
 
 
 # === Experiment Configurations ===
-EXPERIMENT_NUM = 1
+EXPERIMENT_NUM = 3
 
 # Amount of hyperparameter configurations we pick for training
 NUM_CONFIGS = 3
@@ -46,12 +47,31 @@ N_EVADERS = 1
 # Shielding
 SHIELDING = False
 
+# === Metric selection ===
+# Metric ASHA uses to cull trials during the search. "mean_reward" gives
+# the earliest learning signal (works from iteration 1); capture/breach rates
+# are often zero in early training and provide poor discrimination.
+ASHA_METRIC = "mean_reward"
+
+# Metric used to pick the top-N configs after the search finishes. This is
+# where you encode what you actually care about — typically a task-grounded
+# metric, not the noisy reward sum. Options exposed by summarize_evaluation:
+#   "mean_reward"          - legacy sum-of-agent-rewards (matches ASHA default)
+#   "pursuer_reward"       - sum of pursuer agents' returns only
+#   "evader_reward"        - sum of evader agents' returns only
+#   "full_capture_rate"    - fraction of episodes where all evaders were caught
+#   "any_capture_rate"     - fraction of episodes with at least one capture
+#   "breach_rate"          - fraction of episodes where an evader reached target
+#   "mean_episode_length"  - average steps per episode
+#   "pursuer_success"      - full_capture_rate - breach_rate
+SELECTION_METRIC = "pursuer_success"
+
 
 def gridworld_tune(
     map: str,
     tuner_dir: str,
-    num_samples: int = 8,
-    max_concurrent_trials: int = 4,
+    num_samples: int = 32,
+    max_concurrent_trials: int = 16,
 ) -> tune.ResultGrid:
     """Run a Ray Tune hyperparameter search over the alternating self-play loop.
 
@@ -91,7 +111,7 @@ def gridworld_tune(
         # --- Resource params (all in-process to avoid placement group errors) ---
         "num_learners": 0,
         "num_env_runners": 0,
-        "num_envs_per_env_runner": 10,
+        "num_envs_per_env_runner": 128,
     }
 
     # Define scheduler
@@ -102,23 +122,30 @@ def gridworld_tune(
         max_time = N_STAGES * ITERS_PER_STAGE
 
     scheduler = ASHAScheduler(
-        metric="mean_reward",
+        metric=ASHA_METRIC,
         mode="max",
         max_t=max_time,
         # Let each trial finish at least one full phase
-        grace_period=grace,
-        # Let top 1/3 trials continue to next stage (rung) while the rest are stopped
-        reduction_factor=3,
+        grace_period=20,
+        # Let top 1/4 trials continue to next stage (rung) while the rest are stopped
+        reduction_factor=4,
     )
 
     # Setup tuner
     tuner = tune.Tuner(
-        get_tune_trainable(),
+        # MetricsCallback must be wired through here, otherwise the rich
+        # metrics summarize_evaluation reads from eval_result["env_runners"]
+        # ["episode_outcomes"] will not exist and you only get mean_reward.
+        get_tune_trainable(callbacks=[MetricsCallback]),
         param_space=search_space,
         tune_config=tune.TuneConfig(
             num_samples=num_samples,
             scheduler=scheduler,
             max_concurrent_trials=max_concurrent_trials,
+            # Reuse trial actors across configs so each trial doesn't pay the
+            # ~90s setup tax (env registration, 128 sim connections) every time.
+            # Big throughput win for searches with many samples.
+            reuse_actors=True,
         ),
         # We likely don't need this, but it's nice to have for safety
         run_config=tune.RunConfig(
@@ -147,7 +174,10 @@ def gridworld_tune(
                     raise ValueError("Trial has missing data")
 
                 print(f"\n=== Training trail {i + 1} ===")
-                print(f"Reward:\n{trial.metrics.get('mean_reward')}")
+                print(f"{SELECTION_METRIC}: {trial.metrics.get(SELECTION_METRIC)}")
+                print(f"mean_reward: {trial.metrics.get('mean_reward')}")
+                print(f"full_capture_rate: {trial.metrics.get('full_capture_rate')}")
+                print(f"breach_rate: {trial.metrics.get('breach_rate')}")
                 print(f"Config:\n{trial.config}")
 
                 for model_num in range(1, TRAIN_PER_CONFIG + 1):
@@ -161,16 +191,28 @@ def gridworld_tune(
                         training_path=training_dir,
                         shielding=SHIELDING,
                     )
-    except RuntimeError:
-        print("\nNo successful trials. Check error logs above for details.")
+    except (RuntimeError, FileExistsError, ValueError) as e:
+        print(f"\nPost-tune step failed: {e}")
+        print(f"Tune results saved at: {tuner_dir}")
 
     ray.shutdown()
     return results
 
 
-def get_best_n(results: ResultGrid, n: int):
+def get_best_n(results: ResultGrid, n: int, metric: str = SELECTION_METRIC):
+    """Pick the top-N trials by the chosen metric, falling back to mean_reward
+    for trials where the metric is missing (e.g., ASHA culled them before any
+    episode finished, so capture/breach stats never landed)."""
     result_dataframe = results.get_dataframe()
-    top_n_indices = result_dataframe.nlargest(n, "mean_reward").index
+    if metric not in result_dataframe.columns:
+        print(
+            f"Warning: metric '{metric}' not found in results. "
+            f"Falling back to 'mean_reward' for selection."
+        )
+        metric = "mean_reward"
+    # Drop trials where the metric is NaN before ranking.
+    valid = result_dataframe.dropna(subset=[metric])
+    top_n_indices = valid.nlargest(n, metric).index
     top_n_results = [results[i] for i in top_n_indices]
     return top_n_results
 
