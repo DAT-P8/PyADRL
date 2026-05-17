@@ -57,5 +57,8 @@ def _build_ppo_config(
             evaluation_interval=None,
             evaluation_num_env_runners=config.get("evaluation_num_env_runners", 0),
             evaluation_duration=config.get("evaluation_duration", 200),
+            evaluation_config={
+                "num_envs_per_env_runner": 1,  # force eval to use 1 env per worker
+            },
         )
     )

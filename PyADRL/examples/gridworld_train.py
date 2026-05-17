@@ -135,7 +135,8 @@ def evaluate_model(
     training_path, model_config, map_dict, figure_path, n_pursuers, n_evaders
 ):
     evaluation_duration = 1000
-    model_config["evaluation_num_env_runners"] = 4
+    model_config = dict(model_config)
+    model_config["evaluation_num_env_runners"] = 1
     model_config["evaluation_duration"] = evaluation_duration
     callbacks = [MetricsCallback, HeatmapCallback]
     ppo_config = _build_ppo_config(

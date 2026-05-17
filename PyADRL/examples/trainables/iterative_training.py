@@ -1,3 +1,4 @@
+import torch
 from ray import tune
 from pathlib import Path
 from ...utils.config_builder import _build_ppo_config
@@ -10,6 +11,13 @@ def iterative_trainable(
     callbacks: list[type[RLlibCallback]] | None = None,
     # model_path: Path | None = None,
 ) -> None:  # type: ignore[type-arg]
+    torch.set_num_threads(1)
+    try:
+        torch.set_num_interop_threads(1)
+    except RuntimeError:
+        # Can only be set once per process; with reuse_actors=True
+        # the second trial in the same actor will hit this. Safe to ignore.
+        pass
     ppo_config = _build_ppo_config(
         config=config,
         callbacks=callbacks,

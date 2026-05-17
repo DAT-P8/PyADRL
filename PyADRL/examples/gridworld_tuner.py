@@ -23,12 +23,12 @@ ITERS_PER_STAGE = 10
 ALTERNATING_GRACE = N_STAGES * ITERS_PER_STAGE * 2
 
 # Simultaneous training specifications
-ITERATIONS = 400
-SIMULTANEOUS_GRACE = ITERATIONS // 2
+ITERATIONS = 200
+SIMULTANEOUS_GRACE = 20
 
 
 # === Experiment Configurations ===
-EXPERIMENT_NUM = 1
+EXPERIMENT_NUM = 2
 
 # Amount of hyperparameter configurations we pick for training
 NUM_CONFIGS = 3
@@ -50,8 +50,8 @@ SHIELDING = False
 def gridworld_tune(
     map: str,
     tuner_dir: str,
-    num_samples: int = 8,
-    max_concurrent_trials: int = 4,
+    num_samples: int = 56,
+    max_concurrent_trials: int = 14,
 ) -> tune.ResultGrid:
     """Run a Ray Tune hyperparameter search over the alternating self-play loop.
 
@@ -91,7 +91,7 @@ def gridworld_tune(
         # --- Resource params (all in-process to avoid placement group errors) ---
         "num_learners": 0,
         "num_env_runners": 0,
-        "num_envs_per_env_runner": 10,
+        "num_envs_per_env_runner": 128,
     }
 
     # Define scheduler
@@ -108,7 +108,7 @@ def gridworld_tune(
         # Let each trial finish at least one full phase
         grace_period=grace,
         # Let top 1/3 trials continue to next stage (rung) while the rest are stopped
-        reduction_factor=3,
+        reduction_factor=4,
     )
 
     # Setup tuner
@@ -119,6 +119,7 @@ def gridworld_tune(
             num_samples=num_samples,
             scheduler=scheduler,
             max_concurrent_trials=max_concurrent_trials,
+            reuse_actors=True,
         ),
         # We likely don't need this, but it's nice to have for safety
         run_config=tune.RunConfig(
