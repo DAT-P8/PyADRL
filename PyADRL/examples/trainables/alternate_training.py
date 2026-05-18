@@ -118,8 +118,10 @@ def alternate_trainable(
     """Trainable function for Ray Tune.
 
     Each trial builds an algo with sampled hyperparameters, runs the full
-    alternating self-play loop, and reports metrics back to Tune after every
-    training iteration so ASHA can prune underperforming trials early.
+    alternating self-play loop, and reports metrics back to Tune after each
+    stage half (i.e., every `iters_per_stage` algo.train() calls). With the
+    defaults N_STAGES=8 and ITERS_PER_STAGE=10, that's 16 reports per
+    fully-trained trial, enough for ASHA to prune underperforming trials.
     """
     # Pin this trial's process to single-threaded PyTorch (see Tune concurrency notes)
     torch.set_num_threads(1)  # pyright: ignore[reportPrivateImportUsage]

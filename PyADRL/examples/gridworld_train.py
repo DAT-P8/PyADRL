@@ -38,7 +38,9 @@ DEFAULT_CONFIG = {
     "train_batch_size": 10000,
     "minibatch_size": 512,
     "num_epochs": 10,
-    # --- Resource params (all in-process to avoid placement group errors) ---
+    # --- Resource params ---
+    # Defaults for standalone gridworld_train calls. Note: when called from
+    # gridworld_tune, model_config is the trial.config so these are overridden.
     "num_learners": 1,
     "num_env_runners": 4,
     "num_envs_per_env_runner": 5,

@@ -61,7 +61,7 @@ def _build_ppo_config(
             # onto the simulation server during the post-training eval phase.
             evaluation_config={
                 "num_envs_per_env_runner": config.get(
-                    "evaluation_num_envs_per_env_runner", 8
+                    "evaluation_num_envs_per_env_runner", 4
                 ),
             },
         )

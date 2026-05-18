@@ -21,15 +21,21 @@ SIMULTANEOUS = "simultaneous"
 # Alternating training specifications
 N_STAGES = 8
 ITERS_PER_STAGE = 10
-ALTERNATING_GRACE = N_STAGES * ITERS_PER_STAGE * 2
+# Each stage has 2 halves (train evader, then pursuer), so total algo.train()
+# calls = N_STAGES * ITERS_PER_STAGE * 2. Previous formula had max_t < total,
+# which silently disabled ASHA culling because grace > max_t.
+ALTERNATING_MAX_T = N_STAGES * ITERS_PER_STAGE * 2
+ALTERNATING_GRACE = ALTERNATING_MAX_T // 2
 
 # Simultaneous training specifications
-ITERATIONS = 100
-SIMULTANEOUS_GRACE = ITERATIONS // 2
+# Convergence analysis showed trials reach peak ~70% through training;
+# 250 iterations gives slow-learning configs room to actually converge.
+ITERATIONS = 250
+SIMULTANEOUS_GRACE = 50
 
 
 # === Experiment Configurations ===
-EXPERIMENT_NUM = 3
+EXPERIMENT_NUM = 4
 
 # Amount of hyperparameter configurations we pick for training
 NUM_CONFIGS = 3
@@ -70,8 +76,8 @@ SELECTION_METRIC = "pursuer_success"
 def gridworld_tune(
     map: str,
     tuner_dir: str,
-    num_samples: int = 32,
-    max_concurrent_trials: int = 16,
+    num_samples: int = 20,
+    max_concurrent_trials: int = 12,
 ) -> tune.ResultGrid:
     """Run a Ray Tune hyperparameter search over the alternating self-play loop.
 
@@ -95,23 +101,37 @@ def gridworld_tune(
         shielding=SHIELDING,
     )
 
-    # Define what hyperparameter values to try
+    # Define what hyperparameter values to try.
+    # Boundaries narrowed and architecture choices reduced based on analysis
+    # of 32-trial preliminary search (see methodology notes):
+    #   - lr<5e-5 winners never appeared in top performers
+    #   - gamma>0.99 underperformed (winners cluster 0.95-0.985)
+    #   - clip_param<0.15 underperformed
+    #   - train_batch_size=5000 markedly worse (mean 0.08 vs 0.35-0.36 for 10k/20k);
+    #     10k and 20k statistically tied, picked 10k for ~30% per-iteration speedup
+    #   - minibatch_size=512 markedly worse in both short and long trained trials
+    #   - num_epochs={5,20} both underperformed among long-trained trials
     search_space = {
         # --- Training params ---
-        "lr": tune.loguniform(1e-5, 1e-3),
-        "gamma": tune.uniform(0.95, 0.999),
+        "lr": tune.loguniform(5e-5, 1e-3),
+        "gamma": tune.uniform(0.95, 0.99),
         "lambda_": tune.uniform(0.9, 1.0),
-        "clip_param": tune.uniform(0.1, 0.3),
+        "clip_param": tune.uniform(0.15, 0.3),
         "vf_loss_coeff": tune.uniform(0.25, 1.0),
         "entropy_coeff": tune.loguniform(0.001, 0.05),
-        # --- Architecture params ---
-        "train_batch_size": tune.choice([5000, 10000, 20000]),
-        "minibatch_size": tune.choice([256, 512, 1024]),
-        "num_epochs": tune.choice([5, 10, 15, 20]),
+        # --- Architecture params (fixed/narrowed based on data) ---
+        "train_batch_size": 10000,
+        "minibatch_size": tune.choice([256, 1024]),
+        "num_epochs": tune.choice([10, 15]),
         # --- Resource params (all in-process to avoid placement group errors) ---
         "num_learners": 0,
         "num_env_runners": 0,
-        "num_envs_per_env_runner": 128,
+        # 64 envs per runner cuts the sequential gRPC overhead in half vs the
+        # earlier 128 (SyncVectorMultiAgentEnv steps envs sequentially). With
+        # train_batch_size=10000 and 64 envs, that's ~156 vector steps per
+        # iteration instead of 78, but each vector step is 2x faster on the
+        # I/O side. Net: ~10-20% faster per iteration.
+        "num_envs_per_env_runner": 64,
     }
 
     # Define scheduler
@@ -119,16 +139,17 @@ def gridworld_tune(
     max_time = ITERATIONS
     if TRAINING_LOOP == ALTERNATING:
         grace = ALTERNATING_GRACE
-        max_time = N_STAGES * ITERS_PER_STAGE
+        max_time = ALTERNATING_MAX_T
 
     scheduler = ASHAScheduler(
         metric=ASHA_METRIC,
         mode="max",
         max_t=max_time,
-        # Let each trial finish at least one full phase
-        grace_period=20,
-        # Let top 1/4 trials continue to next stage (rung) while the rest are stopped
-        reduction_factor=4,
+        # Let slow-converging trials show their potential before culling.
+        # With grace=50 and reduction_factor=3, rungs are at 50/150/450,
+        # giving 2 effective cull rounds within max_t=250.
+        grace_period=grace,
+        reduction_factor=3,
     )
 
     # Setup tuner
@@ -199,22 +220,75 @@ def gridworld_tune(
     return results
 
 
-def get_best_n(results: ResultGrid, n: int, metric: str = SELECTION_METRIC):
-    """Pick the top-N trials by the chosen metric, falling back to mean_reward
-    for trials where the metric is missing (e.g., ASHA culled them before any
-    episode finished, so capture/breach stats never landed)."""
-    result_dataframe = results.get_dataframe()
-    if metric not in result_dataframe.columns:
+def get_best_n(
+    results: ResultGrid,
+    n: int,
+    metric: str = SELECTION_METRIC,
+    window: int = 5,
+    min_iters: int = 100,
+):
+    """Pick top-N trials by mean of the last `window` reports of `metric`,
+    among trials that reached at least `min_iters` training iterations.
+
+    Why a window: RL evaluation reward is noisy iteration-to-iteration.
+    A trial that hit 0.9 once and dropped to 0.4 should rank below a trial
+    that consistently stayed around 0.75. Averaging the last `window`
+    reports captures stable performance instead of best-single-eval.
+
+    Why a min_iters filter: ASHA culls poor trials early. Their final
+    metric reflects a partially-trained policy, not converged performance.
+    Picking the "best" trial from a mix of converged + half-trained
+    trials systematically biases toward fast-but-shallow learners.
+    With eval_interval=5 in the tune trainable, each report covers 5
+    iterations, so window=5 ≈ 25 iterations of recent history.
+    """
+    import json
+    from pathlib import Path
+
+    def trial_stable_score(trial):
+        """Returns (mean_score_over_window, final_training_iteration) or None."""
+        if trial.path is None:
+            return None
+        result_file = Path(trial.path) / "result.json"
+        if not result_file.exists():
+            return None
+        with open(result_file) as f:
+            history = [json.loads(line) for line in f if line.strip()]
+        if not history:
+            return None
+        final_iter = history[-1].get("training_iteration", 0)
+        values = [h.get(metric) for h in history if h.get(metric) is not None]
+        if not values:
+            return None
+        recent = values[-window:]
+        return sum(recent) / len(recent), final_iter
+
+    # Score every trial that produced any data
+    scored = []
+    for trial in results:
+        s = trial_stable_score(trial)
+        if s is None:
+            continue
+        scored.append((trial, s[0], s[1]))
+
+    # Prefer trials that reached min_iters; if we don't have enough,
+    # fall back to all scored trials rather than failing.
+    long_trained = [t for t in scored if t[2] >= min_iters]
+    if len(long_trained) >= n:
+        candidates = long_trained
         print(
-            f"Warning: metric '{metric}' not found in results. "
-            f"Falling back to 'mean_reward' for selection."
+            f"Selecting top-{n} from {len(long_trained)} long-trained trials "
+            f"(≥{min_iters} iters)"
         )
-        metric = "mean_reward"
-    # Drop trials where the metric is NaN before ranking.
-    valid = result_dataframe.dropna(subset=[metric])
-    top_n_indices = valid.nlargest(n, metric).index
-    top_n_results = [results[i] for i in top_n_indices]
-    return top_n_results
+    else:
+        print(
+            f"Warning: only {len(long_trained)} trials reached {min_iters} iters; "
+            f"falling back to all {len(scored)} trials"
+        )
+        candidates = scored
+
+    candidates.sort(key=lambda x: x[1], reverse=True)
+    return [t[0] for t in candidates[:n]]
 
 
 def make_experiment_dirs(n_best, training_config, map):
