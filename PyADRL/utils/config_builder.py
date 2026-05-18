@@ -39,6 +39,7 @@ def _build_ppo_config(
         .env_runners(
             num_env_runners=config.get("num_env_runners", 4),
             num_envs_per_env_runner=config.get("num_envs_per_env_runner", 5),
+            create_env_on_local_worker=config.get("create_env_on_local_worker", True),
         )
         .training(
             train_batch_size=config.get("train_batch_size", 10000),
