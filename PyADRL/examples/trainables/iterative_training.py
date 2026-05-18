@@ -67,5 +67,10 @@ def _run_iterative_loop(
             eval_result = algo.evaluate()
             if report_to_tune:
                 metrics = summarize_evaluation(eval_result, n_evaders=n_evaders)
+                # Include the actual algo.train() iteration count so ASHA can
+                # use it as time_attr. Ray's automatic training_iteration only
+                # counts tune.report() calls, which with eval_interval=5 ticks
+                # 5x slower than real iterations — would break grace_period.
+                metrics["algo_iteration"] = i
                 tune.report(metrics=metrics)
     return result

@@ -142,10 +142,13 @@ def gridworld_tune(
         max_time = ALTERNATING_MAX_T
 
     scheduler = ASHAScheduler(
+        time_attr="algo_iteration",
         metric=ASHA_METRIC,
         mode="max",
         max_t=max_time,
         # Let slow-converging trials show their potential before culling.
+        # max_t and grace_period are in algo.train() iteration space (not
+        # tune.report() call count), thanks to time_attr="algo_iteration".
         # With grace=50 and reduction_factor=3, rungs are at 50/150/450,
         # giving 2 effective cull rounds within max_t=250.
         grace_period=grace,
@@ -246,7 +249,7 @@ def get_best_n(
     from pathlib import Path
 
     def trial_stable_score(trial):
-        """Returns (mean_score_over_window, final_training_iteration) or None."""
+        """Returns (mean_score_over_window, final_algo_iteration) or None."""
         if trial.path is None:
             return None
         result_file = Path(trial.path) / "result.json"
@@ -256,7 +259,10 @@ def get_best_n(
             history = [json.loads(line) for line in f if line.strip()]
         if not history:
             return None
-        final_iter = history[-1].get("training_iteration", 0)
+        # algo_iteration is the actual algo.train() call count we emit in
+        # the trainable. Ray's auto "training_iteration" only counts
+        # tune.report() calls and lags by a factor of eval_interval.
+        final_iter = history[-1].get("algo_iteration", 0)
         values = [h.get(metric) for h in history if h.get(metric) is not None]
         if not values:
             return None
