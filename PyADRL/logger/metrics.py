@@ -298,11 +298,13 @@ class MetricsCallback(RLlibCallback):
                 elif (id1 in self.evader_ids and id2 in self.pursuer_ids) or (
                     id1 in self.pursuer_ids and id2 in self.evader_ids
                 ):
-                    self.capture_steps.append(self.timestep)
-                    if id1 in self.evader_ids:
-                        self.captured_evader_ids.add(id1)
-                    else:
-                        self.captured_evader_ids.add(id2)
+                    # Only count a capture of the same evader once
+                    if id1 not in self.captured_evader_ids and id2 not in self.captured_evader_ids:
+                        self.capture_steps.append(self.timestep)
+                        if id1 in self.evader_ids:
+                            self.captured_evader_ids.add(id1)
+                        else:
+                            self.captured_evader_ids.add(id2)
 
         # Count shield interventions for collisions, but only for drones "saved" by the shield
         shield_drone_collision_ids = shield_drone_collision_ids.difference(
