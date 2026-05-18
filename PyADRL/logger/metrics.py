@@ -269,7 +269,6 @@ class MetricsCallback(RLlibCallback):
             if event.collision_event is not None:
                 shield_drone_collision_ids.update(event.collision_event.drone_ids)
 
-        collision_events: list[set[int]] = []
         actual_drone_collision_ids = set()
 
         for event in episode_info[agent_ids[0]].get("events", []):
@@ -286,7 +285,6 @@ class MetricsCallback(RLlibCallback):
             elif event.out_of_bounds_event is not None:
                 self.drone_out_of_bounds_ids.update(event.out_of_bounds_event.drone_ids)
             elif event.collision_event is not None:
-                collision_events.append(set(event.collision_event.drone_ids))
                 actual_drone_collision_ids.update(event.collision_event.drone_ids)
                 id1, id2 = event.collision_event.drone_ids
                 # Same team collisions (evader-evader or pursuer-pursuer)
@@ -299,7 +297,10 @@ class MetricsCallback(RLlibCallback):
                     id1 in self.pursuer_ids and id2 in self.evader_ids
                 ):
                     # Only count a capture of the same evader once
-                    if id1 not in self.captured_evader_ids and id2 not in self.captured_evader_ids:
+                    if (
+                        id1 not in self.captured_evader_ids
+                        and id2 not in self.captured_evader_ids
+                    ):
                         self.capture_steps.append(self.timestep)
                         if id1 in self.evader_ids:
                             self.captured_evader_ids.add(id1)
