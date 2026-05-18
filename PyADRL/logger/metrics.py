@@ -232,6 +232,8 @@ class MetricsCallback(RLlibCallback):
         self.timestep += 1
         agent_ids = list(episode_info.keys())
 
+        shield_drone_collision_ids = set()
+
         # count shield interventions by iterating alt_state events
         for event in episode_info[agent_ids[0]].get("shield_events", []):
             if event.drone_object_collision_event is not None:
@@ -265,22 +267,10 @@ class MetricsCallback(RLlibCallback):
                     ]
                 )
             if event.collision_event is not None:
-                self.evader_shield_interventions += len(
-                    [
-                        id
-                        for id in event.collision_event.drone_ids
-                        if id in self.evader_ids
-                    ]
-                )
-                self.pursuer_shield_interventions += len(
-                    [
-                        id
-                        for id in event.collision_event.drone_ids
-                        if id in self.pursuer_ids
-                    ]
-                )
+                shield_drone_collision_ids.update(event.collision_event.drone_ids)
 
         collision_events: list[set[int]] = []
+        actual_drone_collision_ids = set()
 
         for event in episode_info[agent_ids[0]].get("events", []):
             if event.drone_object_collision_event is not None:
@@ -295,8 +285,20 @@ class MetricsCallback(RLlibCallback):
                 self.target_reached_ids.update(event.target_reached_event.drone_ids)
             elif event.collision_event is not None:
                 collision_events.append(set(event.collision_event.drone_ids))
+                actual_drone_collision_ids.update(event.collision_event.drone_ids)
             elif event.out_of_bounds_event is not None:
                 self.drone_out_of_bounds_ids.update(event.out_of_bounds_event.drone_ids)
+
+        # Count shield interventions for collisions, but only for drones "saved" by the shield
+        shield_drone_collision_ids = shield_drone_collision_ids.difference(
+            actual_drone_collision_ids
+        )
+        self.evader_shield_interventions += len(
+            [id for id in shield_drone_collision_ids if id in self.evader_ids]
+        )
+        self.pursuer_shield_interventions += len(
+            [id for id in shield_drone_collision_ids if id in self.pursuer_ids]
+        )
 
         # Check for captures:
         evaders_caught: set[int] = set()
