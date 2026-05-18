@@ -19,6 +19,7 @@ def setup_checkpoints_dir(model_name: str | None = None) -> Path:
 
     return get_checkpoints_dir(model_name)
 
+
 def setup_model_dir() -> Path:
     """Create dir for saving checkpoints. Creates a model with the current time: YYMMDD_HHMM"""
     model_name = get_current_time_as_str()
