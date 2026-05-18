@@ -10,6 +10,7 @@ from ..logger.heatmaps import HeatmapCallback
 
 from ..utils.path_utils import restore_testing
 from ..utils.map_load import load_map_config
+from pathlib import Path
 
 
 def gridworld_eval(
@@ -20,6 +21,9 @@ def gridworld_eval(
     ray.init()
 
     map_config = load_map_config(map)
+    # Create experiments directory for heatmaps
+    experiments_dir = Path("experiments")
+    experiments_dir.mkdir(exist_ok=True)
 
     register_env(
         "gridworld",
@@ -41,11 +45,12 @@ def gridworld_eval(
         .environment(
             "gridworld",
             env_config={
-                "map_width": map_config.width,
-                "map_height": map_config.height,
+                "width": map_config.width,
+                "height": map_config.height,
                 "target_x": map_config.target_x,
                 "target_y": map_config.target_y,
                 "model_name": checkpoint_path,
+                "figure_path": Path(experiments_dir),
             },
         )
         .multi_agent(
