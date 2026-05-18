@@ -19,6 +19,19 @@ def setup_checkpoints_dir(model_name: str | None = None) -> Path:
 
     return get_checkpoints_dir(model_name)
 
+def setup_model_dir() -> Path:
+    """Create dir for saving checkpoints. Creates a model with the current time: YYMMDD_HHMM"""
+    model_name = get_current_time_as_str()
+
+    model_dir = get_experiments_dir() / model_name
+
+    if os.path.isdir(model_dir):  # model_name provided with --name flag
+        raise ValueError(
+            f"Model name {model_name} already exists. Please choose a different name or delete the existing model."
+        )
+
+    return model_dir
+
 
 def setup_model_dir() -> Path:
     """Create dir for saving checkpoints. Creates a model with the current time: YYMMDD_HHMM"""
