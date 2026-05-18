@@ -10,6 +10,7 @@ from ..logger.heatmaps import HeatmapCallback
 
 from ..utils.path_utils import restore_testing
 from ..utils.map_load import load_map_config
+from ..utils.paths import get_experiments_dir
 from pathlib import Path
 
 
@@ -21,8 +22,7 @@ def gridworld_eval(
     ray.init()
 
     map_config = load_map_config(map)
-    # Create experiments directory for heatmaps
-    experiments_dir = Path("experiments")
+    experiments_dir = get_experiments_dir() / checkpoint_path
     experiments_dir.mkdir(exist_ok=True)
 
     register_env(
@@ -51,6 +51,7 @@ def gridworld_eval(
                 "target_y": map_config.target_y,
                 "model_name": checkpoint_path,
                 "figure_path": Path(experiments_dir),
+                "metrics_path": Path(experiments_dir),
             },
         )
         .multi_agent(

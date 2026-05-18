@@ -407,7 +407,8 @@ class MetricsCallback(RLlibCallback):
             metrics_list = []
             if results_dir.exists():
                 with open(results_dir, "r") as f:
-                    metrics_list = json.load(f)
+                    loaded = json.load(f)
+                    metrics_list = loaded if isinstance(loaded, list) else [loaded]
 
             # Append new metrics
             metrics_list.append(mean_summary)
