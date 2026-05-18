@@ -163,24 +163,42 @@ def summarize_evaluation(eval_result: dict, n_evaders: int) -> dict:
 
 
 class MetricsCallback(RLlibCallback):
+    # Per-episode state lives in episode.custom_data["state"], NOT on self.
+    # With vectorized environments (num_envs_per_env_runner > 1), many
+    # episodes run concurrently on the same callback instance. Storing
+    # per-episode tracking on self.X would mix events across episodes.
+    # Cross-episode state (the accumulated episode_outcomes buffer, the
+    # config values from env_config) is correctly kept on self.
+
     def __init__(self):
         super().__init__()
+        # Config — set once at on_algorithm_init, immutable thereafter.
         self.metrics_path = None
         self.n_pursuers = 0
         self.n_evaders = 0
+        # Cross-episode buffer — appended on each on_episode_end across all
+        # concurrent envs, drained on on_evaluate_start.
         self.episode_outcomes: list[EpisodeOutcome] = []
-        self.capture_steps: list[int] = []  # Track steps at which evaders are captured
-        self.captured_evader_ids: set[int] = set()  # evaders that have been captured
-        self.target_reached_ids: set[int] = set()
-        self.pursuer_entered_target_count: int = 0
-        self.drone_object_collision_ids: set[int] = set()
-        self.drone_out_of_bounds_ids: set[int] = set()
-        self.collision_ids: set[int] = set()
-        self.evader_ids: set[int] = set()
-        self.pursuer_ids: set[int] = set()
-        self.evader_shield_interventions: int = 0
-        self.pursuer_shield_interventions: int = 0
-        self.timestep: int = 0
+
+    @staticmethod
+    def _init_episode_state(episode) -> dict:
+        """Create a fresh per-episode state dict on episode.custom_data."""
+        state = {
+            "capture_steps": [],
+            "captured_evader_ids": set(),
+            "target_reached_ids": set(),
+            "pursuer_entered_target_count": 0,
+            "evader_shield_interventions": 0,
+            "pursuer_shield_interventions": 0,
+            "drone_object_collision_ids": set(),
+            "drone_out_of_bounds_ids": set(),
+            "collision_ids": set(),
+            "timestep": 0,
+            "evader_ids": set(),
+            "pursuer_ids": set(),
+        }
+        episode.custom_data["metrics_state"] = state
+        return state
 
     def on_algorithm_init(
         self, *, algorithm, metrics_logger: MetricsLogger | None = None, **kwargs
@@ -204,41 +222,49 @@ class MetricsCallback(RLlibCallback):
         rl_module=None,
         **kwargs,
     ) -> None:
-        n_evaders = len(self.evader_ids)
-        n_pursuers = len(self.pursuer_ids)
+        state = episode.custom_data.get("metrics_state")
+        if state is None:
+            # No state ever tracked for this episode — skip.
+            return
+
+        evader_ids = state["evader_ids"]
+        pursuer_ids = state["pursuer_ids"]
+        n_evaders = len(evader_ids)
+        n_pursuers = len(pursuer_ids)
+        timestep = state["timestep"]
 
         outcome_obj = EpisodeOutcome(
-            capture_steps=list(self.capture_steps),
-            breached=len(self.target_reached_ids) > 0,
-            episode_length=self.timestep,
+            capture_steps=list(state["capture_steps"]),
+            breached=len(state["target_reached_ids"]) > 0,
+            episode_length=timestep,
             evader_drone_collision_rate=rate(
-                self.collision_ids, self.evader_ids, n_evaders
+                state["collision_ids"], evader_ids, n_evaders
             ),
             pursuer_drone_collision_rate=rate(
-                self.collision_ids, self.pursuer_ids, n_pursuers
+                state["collision_ids"], pursuer_ids, n_pursuers
             ),
             evader_obstacle_collision_rate=rate(
-                self.drone_object_collision_ids, self.evader_ids, n_evaders
+                state["drone_object_collision_ids"], evader_ids, n_evaders
             ),
             pursuer_obstacle_collision_rate=rate(
-                self.drone_object_collision_ids, self.pursuer_ids, n_pursuers
+                state["drone_object_collision_ids"], pursuer_ids, n_pursuers
             ),
-            pursuer_entered_target_count=self.pursuer_entered_target_count,
+            pursuer_entered_target_count=state["pursuer_entered_target_count"],
             evader_out_of_bounds_rate=rate(
-                self.drone_out_of_bounds_ids, self.evader_ids, n_evaders
+                state["drone_out_of_bounds_ids"], evader_ids, n_evaders
             ),
             pursuer_out_of_bounds_rate=rate(
-                self.drone_out_of_bounds_ids, self.pursuer_ids, n_pursuers
+                state["drone_out_of_bounds_ids"], pursuer_ids, n_pursuers
             ),
-            evader_shield_intervention_rate=self.evader_shield_interventions
+            evader_shield_intervention_rate=state["evader_shield_interventions"]
             / n_evaders
-            / self.timestep
-            if self.timestep > 0 and n_evaders > 0
+            / timestep
+            if timestep > 0 and n_evaders > 0
             else 0.0,
-            pursuer_shield_intervention_rate=self.pursuer_shield_interventions
+            pursuer_shield_intervention_rate=state["pursuer_shield_interventions"]
             / n_pursuers
-            / self.timestep
-            if self.timestep > 0 and n_pursuers > 0
+            / timestep
+            if timestep > 0 and n_pursuers > 0
             else 0.0,
         )
         self.episode_outcomes.append(outcome_obj)
@@ -269,25 +295,15 @@ class MetricsCallback(RLlibCallback):
         rl_module=None,
         **kwargs,
     ):
-        # Reset episode-specific tracking variables
-        self.capture_steps = []
-        self.captured_evader_ids = set()
-        self.target_reached_ids = set()
-        self.pursuer_entered_target_count = 0
-        self.evader_shield_interventions = 0
-        self.pursuer_shield_interventions = 0
-        self.drone_object_collision_ids = set()
-        self.drone_out_of_bounds_ids = set()
-        self.collision_ids = set()
-        self.timestep = 0
-        self.evader_ids = set()
-        self.pursuer_ids = set()
+        # Fresh per-episode tracking dict on the episode object itself.
+        # Avoids contamination across concurrent vectorized episodes.
+        state = self._init_episode_state(episode)
         infos = self._get_episode_info(env, env_index)
         if infos is not None:
-            self.evader_ids.update(
+            state["evader_ids"].update(
                 [d["drone"].id for d in infos.values() if d["drone"].is_evader]
             )
-            self.pursuer_ids.update(
+            state["pursuer_ids"].update(
                 [d["drone"].id for d in infos.values() if not d["drone"].is_evader]
             )
 
@@ -305,80 +321,83 @@ class MetricsCallback(RLlibCallback):
         episode_info = self._get_episode_info(env, env_index)
         if episode_info is None:
             return
-        self.timestep += 1
+        # Read the per-episode state for THIS episode (not shared).
+        state = episode.custom_data.get("metrics_state")
+        if state is None:
+            # Defensive: on_episode_step fired before on_episode_start landed,
+            # or state was lost somehow. Init now to avoid crashing.
+            state = self._init_episode_state(episode)
+        state["timestep"] += 1
         agent_ids = list(episode_info.keys())
+
+        evader_ids = state["evader_ids"]
+        pursuer_ids = state["pursuer_ids"]
 
         # count shield interventions by iterating alt_state events
         for event in episode_info[agent_ids[0]].get("shield_events", []):
             if event.drone_object_collision_event is not None:
-                self.evader_shield_interventions += len(
+                state["evader_shield_interventions"] += len(
                     [
                         id
                         for id in event.drone_object_collision_event.drone_ids
-                        if id in self.evader_ids
+                        if id in evader_ids
                     ]
                 )
-                self.pursuer_shield_interventions += len(
+                state["pursuer_shield_interventions"] += len(
                     [
                         id
                         for id in event.drone_object_collision_event.drone_ids
-                        if id in self.pursuer_ids
+                        if id in pursuer_ids
                     ]
                 )
             if event.out_of_bounds_event is not None:
-                self.evader_shield_interventions += len(
+                state["evader_shield_interventions"] += len(
                     [
                         id
                         for id in event.out_of_bounds_event.drone_ids
-                        if id in self.evader_ids
+                        if id in evader_ids
                     ]
                 )
-                self.pursuer_shield_interventions += len(
+                state["pursuer_shield_interventions"] += len(
                     [
                         id
                         for id in event.out_of_bounds_event.drone_ids
-                        if id in self.pursuer_ids
+                        if id in pursuer_ids
                     ]
                 )
             if event.collision_event is not None:
-                self.evader_shield_interventions += len(
-                    [
-                        id
-                        for id in event.collision_event.drone_ids
-                        if id in self.evader_ids
-                    ]
+                state["evader_shield_interventions"] += len(
+                    [id for id in event.collision_event.drone_ids if id in evader_ids]
                 )
-                self.pursuer_shield_interventions += len(
-                    [
-                        id
-                        for id in event.collision_event.drone_ids
-                        if id in self.pursuer_ids
-                    ]
+                state["pursuer_shield_interventions"] += len(
+                    [id for id in event.collision_event.drone_ids if id in pursuer_ids]
                 )
 
         collision_events: list[set[int]] = []
 
         for event in episode_info[agent_ids[0]].get("events", []):
             if event.drone_object_collision_event is not None:
-                self.drone_object_collision_ids.update(
+                state["drone_object_collision_ids"].update(
                     event.drone_object_collision_event.drone_ids
                 )
             elif event.pursuer_entered_target_event is not None:
-                self.pursuer_entered_target_count += len(
+                state["pursuer_entered_target_count"] += len(
                     event.pursuer_entered_target_event.drone_ids
                 )
             elif event.target_reached_event is not None:
-                self.target_reached_ids.update(event.target_reached_event.drone_ids)
+                state["target_reached_ids"].update(event.target_reached_event.drone_ids)
             elif event.collision_event is not None:
                 collision_events.append(set(event.collision_event.drone_ids))
             elif event.out_of_bounds_event is not None:
-                self.drone_out_of_bounds_ids.update(event.out_of_bounds_event.drone_ids)
+                state["drone_out_of_bounds_ids"].update(
+                    event.out_of_bounds_event.drone_ids
+                )
 
         # Check for captures:
         evaders_caught: set[int] = set()
         for coll_set in collision_events:
-            evaders_in_coll = [x for x in coll_set if x in self.evader_ids]
-            pursuers_in_coll = [x for x in coll_set if x in self.pursuer_ids]
+            evaders_in_coll = [x for x in coll_set if x in evader_ids]
+            pursuers_in_coll = [x for x in coll_set if x in pursuer_ids]
 
             # any collision event that includes at least one evader and one pursuer
             if evaders_in_coll and pursuers_in_coll:
@@ -386,14 +405,14 @@ class MetricsCallback(RLlibCallback):
             # Count collisions only for events with one team.
             # Mixed-team events are capture events and are excluded from collision_ids.
             elif evaders_in_coll and not pursuers_in_coll:
-                self.collision_ids.update(evaders_in_coll)
+                state["collision_ids"].update(evaders_in_coll)
             elif pursuers_in_coll and not evaders_in_coll:
-                self.collision_ids.update(pursuers_in_coll)
+                state["collision_ids"].update(pursuers_in_coll)
 
         for evader_id in evaders_caught:
-            if evader_id not in self.captured_evader_ids:
-                self.capture_steps.append(self.timestep)
-                self.captured_evader_ids.add(evader_id)
+            if evader_id not in state["captured_evader_ids"]:
+                state["capture_steps"].append(state["timestep"])
+                state["captured_evader_ids"].add(evader_id)
 
     def on_evaluate_start(
         self,
