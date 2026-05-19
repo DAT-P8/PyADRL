@@ -253,6 +253,13 @@ class NGWEnvironment(ParallelEnv):
                 infos[d.name]["events"] = self.newest_state.events
                 if alt_state is not None:
                     infos[d.name]["shield_events"] = alt_state.events
+                    for unsafe_ds in alt_state.drone_states:
+                        if unsafe_ds.id == d.id:
+                            infos[d.name]["unsafe_drone_state"] = {
+                                "x": unsafe_ds.x,
+                                "y": unsafe_ds.y,
+                            }
+                            break
 
         name_to_reward: dict[str, float] = {
             name: rewards[name_to_drone[name].id] for name in self.agents
