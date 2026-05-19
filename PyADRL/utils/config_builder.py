@@ -55,7 +55,6 @@ def _build_ppo_config(
             evaluation_interval=None,
             evaluation_num_env_runners=config.get("evaluation_num_env_runners", 0),
             evaluation_duration=config.get("evaluation_duration", 200),
-
             # Override the training-time vectorization for evaluation. Without
             # this, eval workers inherit num_envs_per_env_runner from the
             # training config, which can be high (e.g. 128) and pile huge load

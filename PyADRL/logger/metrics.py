@@ -391,14 +391,20 @@ class MetricsCallback(RLlibCallback):
                     event.out_of_bounds_event.drone_ids
                 )
             elif event.collision_event is not None:
-                evaders_in_coll: set[int] = set([x for x in event.collision_event.drone_ids if x in evader_ids])
-                pursuers_in_coll = set([x for x in event.collision_event.drone_ids if x in pursuer_ids])
+                evaders_in_coll: set[int] = set(
+                    [x for x in event.collision_event.drone_ids if x in evader_ids]
+                )
+                pursuers_in_coll = set(
+                    [x for x in event.collision_event.drone_ids if x in pursuer_ids]
+                )
 
                 n_caught = 0
 
                 # any collision event that includes at least one evader and one pursuer
                 if evaders_in_coll and pursuers_in_coll:
-                    n_caught += len(evaders_in_coll) - len(evaders_caught.intersection(evaders_in_coll))
+                    n_caught += len(evaders_in_coll) - len(
+                        evaders_caught.intersection(evaders_in_coll)
+                    )
                     evaders_caught.update(evaders_in_coll)
                 # Count collisions only for events with one team.
                 # Mixed-team events are capture events and are excluded from collision_ids.
