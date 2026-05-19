@@ -12,6 +12,7 @@ class HeatmapCallback(RLlibCallback):
         self.grid_h = 0
         self.target_x = 0
         self.target_y = 0
+        self.objects = []
         self.figure_path = None
 
     def on_algorithm_init(
@@ -30,8 +31,8 @@ class HeatmapCallback(RLlibCallback):
         self.grid_h = algorithm.config.env_config.get("height", 0)
         self.target_x = algorithm.config.env_config.get("target_x", 0)
         self.target_y = algorithm.config.env_config.get("target_y", 0)
+        self.objects = algorithm.config.env_config.get("objects", [])
         self.figure_path = algorithm.config.env_config.get("figure_path")
-        print(self.grid_w, self.grid_h)
 
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
@@ -201,6 +202,8 @@ class HeatmapCallback(RLlibCallback):
 
         # Draw the target square
         self._draw_target(ax)
+        # Draw objects as solid grey boxes
+        self._draw_objects(ax)
 
         plt.tight_layout()
 
@@ -335,6 +338,9 @@ class HeatmapCallback(RLlibCallback):
         # Draw the target square
         self._draw_target(ax)
 
+        # Draw objects as solid grey boxes
+        self._draw_objects(ax)
+
         ax.tick_params(axis="both", which="major", pad=8)
         ax.set_aspect("equal", adjustable="box")
         ax.legend(loc="upper right")
@@ -359,3 +365,31 @@ class HeatmapCallback(RLlibCallback):
             label="Target",
         )
         ax.add_patch(rect)
+
+    def _draw_objects(self, ax):
+        """Draw objects as solid grey 1x1 boxes."""
+        print(self.objects)
+        if not self.objects:
+            return
+
+        used_label = False
+        for obj in self.objects:
+            try:
+                x, y = obj
+            except Exception:
+                # skip malformed entries
+                continue
+
+            rect = patches.Rectangle(
+                (x, y),
+                1,
+                1,
+                linewidth=1,
+                edgecolor="black",
+                facecolor="grey",
+                alpha=1.0,
+                label=("Object" if not used_label else None),
+                zorder=5,
+            )
+            ax.add_patch(rect)
+            used_label = True

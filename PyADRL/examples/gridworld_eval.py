@@ -50,6 +50,7 @@ def gridworld_eval(
                 "target_x": map_config.target_x,
                 "target_y": map_config.target_y,
                 "model_name": checkpoint_path,
+                "objects": map_config.objects,
                 "figure_path": Path(experiments_dir),
                 "metrics_path": Path(experiments_dir),
             },
