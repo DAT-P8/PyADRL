@@ -186,6 +186,14 @@ class HeatmapCallback(RLlibCallback):
             filename="heatmap_pursuer",
             color="Blues",
         )
+        self._plot_capture_heatmap(
+            [
+                cap
+                for episode in drone_states
+                for cap in episode.get("capture_positions", [])
+            ],
+            filename="heatmap_captures",
+        )
 
         # For trace maps, show one representative episode instead of concatenating paths.
         evader_episodes = [episode.get("evader_states", {}) for episode in drone_states]
@@ -304,10 +312,45 @@ class HeatmapCallback(RLlibCallback):
         plt.close(fig)
         print(f"Heatmap Saved in {filename}")
 
-    def _plot_capture_heatmap(self, episode_states, *, filename, color):
-        # This method can be implemented to plot heatmaps of capture locations
-        # This method would require additional data collection
-        pass
+    def _plot_capture_heatmap(self, all_capture_positions, *, filename):
+        grid = np.zeros((self.grid_h, self.grid_w), dtype=int)
+        for cap in all_capture_positions:
+            try:
+                x, y = int(cap["x"]), int(cap["y"])
+                if 0 <= x < self.grid_w and 0 <= y < self.grid_h:
+                    grid[y, x] += 1
+            except (TypeError, KeyError, ValueError):
+                continue
+
+        if grid.sum() == 0:
+            print(f"[HeatmapCallback] No captures collected for {filename}, skipping.")
+            return
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.heatmap(
+            grid,
+            cmap="Purples",
+            linewidths=0.3,
+            linecolor="grey",
+            annot=(self.grid_w <= 20 and self.grid_h <= 20),
+            fmt="d",
+            ax=ax,
+            cbar_kws={"label": "Capture count"},
+        )
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.invert_yaxis()
+
+        self._draw_target(ax)
+        self._draw_objects(ax)
+
+        plt.tight_layout()
+
+        if self.figure_path:
+            path = self.figure_path / f"{filename}.svg"
+            plt.savefig(path, dpi=150)
+        plt.close(fig)
+        print(f"Capture Heatmap Saved in {filename}")
 
     def _plot_trace_map(
         self,
