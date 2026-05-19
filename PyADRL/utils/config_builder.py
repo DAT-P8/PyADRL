@@ -51,11 +51,19 @@ def _build_ppo_config(
             vf_loss_coeff=config.get("vf_loss_coeff", 0.5),
             entropy_coeff=config.get("entropy_coeff", 0.01),
         )
-        .evaluation(evaluation_num_env_runners=0)
-        .callbacks(callbacks)
         .evaluation(
             evaluation_interval=None,
             evaluation_num_env_runners=config.get("evaluation_num_env_runners", 0),
             evaluation_duration=config.get("evaluation_duration", 200),
+            # Override the training-time vectorization for evaluation. Without
+            # this, eval workers inherit num_envs_per_env_runner from the
+            # training config, which can be high (e.g. 128) and pile huge load
+            # onto the simulation server during the post-training eval phase.
+            evaluation_config={
+                "num_envs_per_env_runner": config.get(
+                    "evaluation_num_envs_per_env_runner", 4
+                ),
+            },
         )
+        .callbacks(callbacks)
     )

@@ -1,8 +1,10 @@
 import random
+import torch
 from pathlib import Path
 from ray import tune
 from ray.rllib.callbacks.callbacks import RLlibCallback
 from ...utils.config_builder import _build_ppo_config
+from ...logger.metrics import summarize_evaluation
 
 
 EVADER = "evader"
@@ -33,6 +35,11 @@ def _run_alternating_loop(
     """
     global_step = 0
     result = {}
+
+    # Pull n_evaders once — needed to compute "full capture" rate during eval.
+    n_evaders = 1
+    if algo.config is not None and algo.config.env_config is not None:
+        n_evaders = algo.config.env_config.get("n_evaders", 1)
 
     pools = {EVADER: [], PURSUER: []}
     train_evader = True
@@ -83,11 +90,12 @@ def _run_alternating_loop(
 
         # Report to Tune so ASHA can prune bad trials early
         if report_to_tune:
-            eval_mean = eval_result["env_runners"]["agent_episode_returns_mean"]
-            total_mean_reward = (
-                sum(eval_mean.values()) if isinstance(eval_mean, dict) else eval_mean
-            )
-            tune.report(metrics={"mean_reward": total_mean_reward})
+            metrics = summarize_evaluation(eval_result, n_evaders=n_evaders)
+            # global_step tracks total algo.train() calls across all stages.
+            # ASHA reads this as time_attr so grace_period/max_t semantics
+            # are in real iteration space, not tune.report() call count.
+            metrics["algo_iteration"] = global_step
+            tune.report(metrics=metrics)
 
         # Save a checkpoint after each full stage (evader+pursuer training)
         if model_path and training == PURSUER:
@@ -114,9 +122,18 @@ def alternate_trainable(
     """Trainable function for Ray Tune.
 
     Each trial builds an algo with sampled hyperparameters, runs the full
-    alternating self-play loop, and reports metrics back to Tune after every
-    training iteration so ASHA can prune underperforming trials early.
+    alternating self-play loop, and reports metrics back to Tune after each
+    stage half (i.e., every `iters_per_stage` algo.train() calls). With the
+    defaults N_STAGES=8 and ITERS_PER_STAGE=10, that's 16 reports per
+    fully-trained trial, enough for ASHA to prune underperforming trials.
     """
+    # Pin this trial's process to single-threaded PyTorch (see Tune concurrency notes)
+    torch.set_num_threads(1)  # pyright: ignore[reportPrivateImportUsage]
+    try:
+        torch.set_num_interop_threads(1)  # pyright: ignore[reportPrivateImportUsage]
+    except RuntimeError:
+        pass
+
     ppo_config = _build_ppo_config(
         config=config,
         callbacks=callbacks,

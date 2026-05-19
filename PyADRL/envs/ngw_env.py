@@ -138,7 +138,26 @@ class NGWEnvironment(ParallelEnv):
             )
             self.id = self.newest_state.sim_id
         else:
-            self.newest_state = self.client.Reset(self.id)
+            try:
+                self.newest_state = self.client.Reset(self.id)
+            except (ValueError, grpc.RpcError) as e:
+                # Two recovery paths, same response:
+                #   ValueError: server returned a structured error in the response
+                #     body (e.g. "simulation doesn't exist" after a TTL reap).
+                #   grpc.RpcError: server handler threw an unhandled exception
+                #     The sim may be in an inconsistent state.
+                # In both cases, discard the sim and create a fresh one rather
+                # than killing the whole training trial.
+                print(
+                    f"Reset failed for sim {self.id} ({type(e).__name__}: {e}); "
+                    f"creating a new sim"
+                )
+                self.newest_state = self.client.New(
+                    self.map_config.get_map_spec(),
+                    self.n_evaders,
+                    self.n_pursuers,
+                )
+                self.id = self.newest_state.sim_id
 
         for drone_state in self.newest_state.drone_states:
             is_evader = drone_state.is_evader
