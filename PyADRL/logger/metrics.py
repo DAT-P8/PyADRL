@@ -107,8 +107,6 @@ def summarize_evaluation(eval_result: dict, n_evaders: int) -> dict:
     rewards_dict = env_runners.get("agent_episode_returns_mean", {}) or {}
     episode_outcomes = env_runners.get("episode_outcomes") or []
 
-    # Legacy metric: sum of per-agent mean returns. Kept so ASHA's default
-    # metric="mean_reward" keeps working without code changes.
     if isinstance(rewards_dict, dict):
         mean_reward = float(sum(rewards_dict.values()))
         pursuer_reward = float(
@@ -145,7 +143,6 @@ def summarize_evaluation(eval_result: dict, n_evaders: int) -> dict:
         mean_capture_step = float(mean_capture(episode_outcomes))
 
     return {
-        # Legacy — keep so existing ASHA config keeps working.
         "mean_reward": mean_reward,
         # Per-side rewards — useful when you care about one role specifically.
         "pursuer_reward": pursuer_reward,

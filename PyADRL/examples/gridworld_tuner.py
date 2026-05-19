@@ -126,11 +126,6 @@ def gridworld_tune(
         # --- Resource params (all in-process to avoid placement group errors) ---
         "num_learners": 0,
         "num_env_runners": 0,
-        # 64 envs per runner cuts the sequential gRPC overhead in half vs the
-        # earlier 128 (SyncVectorMultiAgentEnv steps envs sequentially). With
-        # train_batch_size=10000 and 64 envs, that's ~156 vector steps per
-        # iteration instead of 78, but each vector step is 2x faster on the
-        # I/O side. Net: ~10-20% faster per iteration.
         "num_envs_per_env_runner": 64,
     }
 
@@ -146,29 +141,18 @@ def gridworld_tune(
         metric=ASHA_METRIC,
         mode="max",
         max_t=max_time,
-        # Let slow-converging trials show their potential before culling.
-        # max_t and grace_period are in algo.train() iteration space (not
-        # tune.report() call count), thanks to time_attr="algo_iteration".
-        # With grace=50 and reduction_factor=3, rungs are at 50/150/450,
-        # giving 2 effective cull rounds within max_t=250.
         grace_period=grace,
         reduction_factor=3,
     )
 
     # Setup tuner
     tuner = tune.Tuner(
-        # MetricsCallback must be wired through here, otherwise the rich
-        # metrics summarize_evaluation reads from eval_result["env_runners"]
-        # ["episode_outcomes"] will not exist and you only get mean_reward.
         get_tune_trainable(callbacks=[MetricsCallback]),
         param_space=search_space,
         tune_config=tune.TuneConfig(
             num_samples=num_samples,
             scheduler=scheduler,
             max_concurrent_trials=max_concurrent_trials,
-            # Reuse trial actors across configs so each trial doesn't pay the
-            # ~90s setup tax (env registration, 128 sim connections) every time.
-            # Big throughput win for searches with many samples.
             reuse_actors=True,
         ),
         # We likely don't need this, but it's nice to have for safety
