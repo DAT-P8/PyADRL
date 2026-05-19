@@ -34,9 +34,22 @@ class HeatmapCallback(RLlibCallback):
         self.objects = algorithm.config.env_config.get("objects", [])
         self.figure_path = algorithm.config.env_config.get("figure_path")
 
+    # Shield type constants used as keys in shield_data and legend labels.
+    SHIELD_DRONE_OBJ = "drone_object_collision"
+    SHIELD_OUT_OF_BOUNDS = "out_of_bounds"
+    SHIELD_COLLISION = "collision"
+
+    SHIELD_COLORS = {
+        SHIELD_DRONE_OBJ: "#e31a1c",
+        SHIELD_OUT_OF_BOUNDS: "#ff7f00",
+        SHIELD_COLLISION: "#6a3d9a",
+    }
+
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
         episode.custom_data["pursuer_states"] = {}
+        episode.custom_data["evader_shield_data"] = {}
+        episode.custom_data["pursuer_shield_data"] = {}
 
     def _get_episode_info(self, env, env_index: int):
         if not env or not getattr(env, "_infos", None):
@@ -64,20 +77,46 @@ class HeatmapCallback(RLlibCallback):
         if not episode_info:
             return
 
+        # Build a map of drone_id -> set of shield types activated this step.
+        # shield_events are shared across agents, so we only need to scan once.
+        step_shield_map: dict[int, str] = {}
+        first_agent_info = next(iter(episode_info.values()), {})
+        for event in first_agent_info.get("shield_events", []):
+            if event.drone_object_collision_event is not None:
+                for did in event.drone_object_collision_event.drone_ids:
+                    step_shield_map.setdefault(did, self.SHIELD_DRONE_OBJ)
+            elif event.out_of_bounds_event is not None:
+                for did in event.out_of_bounds_event.drone_ids:
+                    step_shield_map.setdefault(did, self.SHIELD_OUT_OF_BOUNDS)
+            elif event.collision_event is not None:
+                for did in event.collision_event.drone_ids:
+                    step_shield_map.setdefault(did, self.SHIELD_COLLISION)
+
         for agent_id, agent_info in episode_info.items():
             drone = agent_info.get("drone_state", {})
             x, y = drone.get("x"), drone.get("y")
 
             if agent_id.startswith("evader"):
                 states = episode.custom_data["evader_states"]
+                shield_data = episode.custom_data["evader_shield_data"]
             elif agent_id.startswith("pursuer"):
                 states = episode.custom_data["pursuer_states"]
+                shield_data = episode.custom_data["pursuer_shield_data"]
             else:
                 raise ValueError(f"Unknown agent_id {agent_id} in HeatmapCallback")
 
             if agent_id not in states:
                 states[agent_id] = []
+                shield_data[agent_id] = []
+
             states[agent_id].append([x, y])
+
+            # Drone id is the integer suffix of the agent name (evader_2 -> 2).
+            try:
+                drone_id = int(agent_id.rsplit("_", 1)[-1])
+            except ValueError:
+                drone_id = -1
+            shield_data[agent_id].append(step_shield_map.get(drone_id))
 
     def on_episode_end(
         self,
@@ -96,6 +135,8 @@ class HeatmapCallback(RLlibCallback):
         drone_states = {
             "evader_states": episode.custom_data.get("evader_states", {}),
             "pursuer_states": episode.custom_data.get("pursuer_states", {}),
+            "evader_shield_data": episode.custom_data.get("evader_shield_data", {}),
+            "pursuer_shield_data": episode.custom_data.get("pursuer_shield_data", {}),
         }
         metrics_logger.log_value("drone_states", drone_states, reduce="item_series")
 
@@ -128,13 +169,23 @@ class HeatmapCallback(RLlibCallback):
         )
 
         # For trace maps, show one representative episode instead of concatenating paths.
-        evader_episode, pursuer_episode = self._select_representative_episode(
-            [episode.get("evader_states", {}) for episode in drone_states],
-            [episode.get("pursuer_states", {}) for episode in drone_states],
+        evader_episodes = [episode.get("evader_states", {}) for episode in drone_states]
+        pursuer_episodes = [episode.get("pursuer_states", {}) for episode in drone_states]
+        evader_episode, pursuer_episode, best_idx = self._select_representative_episode(
+            evader_episodes,
+            pursuer_episodes,
+        )
+        evader_shield = (
+            drone_states[best_idx].get("evader_shield_data", {}) if best_idx >= 0 else {}
+        )
+        pursuer_shield = (
+            drone_states[best_idx].get("pursuer_shield_data", {}) if best_idx >= 0 else {}
         )
         self._plot_trace_map(
             evader_episode,
             pursuer_episode,
+            evader_shield_data=evader_shield,
+            pursuer_shield_data=pursuer_shield,
             title="Agent Trace Map (Single Example Episode)",
             filename="trace_map",
         )
@@ -160,9 +211,9 @@ class HeatmapCallback(RLlibCallback):
                 best_idx = idx
 
         if best_idx < 0:
-            return {}, {}
+            return {}, {}, -1
 
-        return evader_episodes[best_idx], pursuer_episodes[best_idx]
+        return evader_episodes[best_idx], pursuer_episodes[best_idx], best_idx
 
     # PLOTTING METHODS
     def _plot_occupancy_heatmap(self, episode_states, *, title, filename, color):
@@ -224,32 +275,46 @@ class HeatmapCallback(RLlibCallback):
         evader_episode_states,
         pursuer_episode_states,
         *,
+        evader_shield_data: dict | None = None,
+        pursuer_shield_data: dict | None = None,
         title,
         filename,
     ):
         fig, ax = plt.subplots(figsize=(8, 8))
 
-        def _plot_group(episode_states, *, color, role_name):
+        # shield_type -> list of (x, y) across all agents/groups
+        shield_positions: dict[str, list[tuple[float, float]]] = {
+            k: [] for k in self.SHIELD_COLORS
+        }
+
+        def _plot_group(episode_states, shield_data, *, color, role_name):
             plotted_any = False
             used_label = False
 
             if not isinstance(episode_states, dict):
                 return False
 
-            for positions in episode_states.values():
+            for agent_id, positions in episode_states.items():
                 if not positions:
                     continue
 
-                cleaned = [
-                    (x, y)
-                    for x, y in positions
+                shields = (shield_data or {}).get(agent_id, [])
+
+                valid_indices = [
+                    i
+                    for i, (x, y) in enumerate(positions)
                     if isinstance(x, (int, float))
                     and isinstance(y, (int, float))
                     and 0 <= x < self.grid_w
                     and 0 <= y < self.grid_h
                 ]
-                if not cleaned:
+                if not valid_indices:
                     continue
+
+                cleaned = [positions[i] for i in valid_indices]
+                cleaned_shields = [
+                    shields[i] if i < len(shields) else None for i in valid_indices
+                ]
 
                 # Draw agent paths at cell centers so markers sit inside cells.
                 xs = [p[0] + 0.5 for p in cleaned]
@@ -257,43 +322,22 @@ class HeatmapCallback(RLlibCallback):
                 label = role_name if not used_label else None
 
                 if len(cleaned) == 1:
-                    ax.scatter(
-                        xs,
-                        ys,
-                        color=color,
-                        alpha=0.4,
-                        s=20,
-                        label=label,
-                    )
+                    ax.scatter(xs, ys, color=color, alpha=0.4, s=20, label=label)
                 else:
-                    ax.plot(
-                        xs,
-                        ys,
-                        color=color,
-                        alpha=0.7,
-                        linewidth=1.5,
-                        label=label,
-                    )
+                    ax.plot(xs, ys, color=color, alpha=0.7, linewidth=1.5, label=label)
 
                 # Mark trajectory start/end so movement direction is visible.
                 ax.scatter(
-                    xs[0],
-                    ys[0],
-                    marker="o",  # start
-                    color=color,
-                    edgecolors="black",
-                    linewidths=0.3,
-                    s=28,
-                    alpha=0.8,
+                    xs[0], ys[0],
+                    marker="o", color=color, edgecolors="black",
+                    linewidths=0.3, s=28, alpha=0.8,
                 )
-                ax.scatter(
-                    xs[-1],
-                    ys[-1],
-                    marker="x",  # end
-                    color=color,
-                    s=30,
-                    alpha=0.9,
-                )
+                ax.scatter(xs[-1], ys[-1], marker="x", color=color, s=30, alpha=0.9)
+
+                # Collect shielded positions for overlay after all paths are drawn.
+                for (x, y), shield_type in zip(cleaned, cleaned_shields):
+                    if shield_type in shield_positions:
+                        shield_positions[shield_type].append((x + 0.5, y + 0.5))
 
                 used_label = True
                 plotted_any = True
@@ -301,13 +345,34 @@ class HeatmapCallback(RLlibCallback):
             return plotted_any
 
         has_evaders = _plot_group(
-            evader_episode_states, color="#d95f02", role_name="Evader"
+            evader_episode_states, evader_shield_data, color="#d95f02", role_name="Evader"
         )
         has_pursuers = _plot_group(
-            pursuer_episode_states,
-            color="#1f77b4",
-            role_name="Pursuer",
+            pursuer_episode_states, pursuer_shield_data, color="#1f77b4", role_name="Pursuer"
         )
+
+        # Overlay shield activation markers on top of trajectories.
+        shield_labels = {
+            self.SHIELD_DRONE_OBJ: "Shield: drone-object collision",
+            self.SHIELD_OUT_OF_BOUNDS: "Shield: out of bounds",
+            self.SHIELD_COLLISION: "Shield: drone-drone collision",
+        }
+        for shield_type, color in self.SHIELD_COLORS.items():
+            pts = shield_positions[shield_type]
+            if not pts:
+                continue
+            sx, sy = zip(*pts)
+            ax.scatter(
+                sx, sy,
+                marker="D",
+                color=color,
+                edgecolors="black",
+                linewidths=0.4,
+                s=40,
+                alpha=0.9,
+                zorder=5,
+                label=shield_labels[shield_type],
+            )
 
         if not (has_evaders or has_pursuers):
             plt.close(fig)
