@@ -39,9 +39,9 @@ DEFAULT_CONFIG = {
     "minibatch_size": 512,
     "num_epochs": 10,
     # --- Resource params (all in-process to avoid placement group errors) ---
-    "num_learners": 1,
-    "num_env_runners": 4,
-    "num_envs_per_env_runner": 5,
+    "num_learners": 0,
+    "num_env_runners": 0,
+    "num_envs_per_env_runner": 10,
 }
 
 
