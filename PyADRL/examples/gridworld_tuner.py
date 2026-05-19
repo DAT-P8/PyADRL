@@ -101,16 +101,6 @@ def gridworld_tune(
         shielding=SHIELDING,
     )
 
-    # Define what hyperparameter values to try.
-    # Boundaries narrowed and architecture choices reduced based on analysis
-    # of 32-trial preliminary search (see methodology notes):
-    #   - lr<5e-5 winners never appeared in top performers
-    #   - gamma>0.99 underperformed (winners cluster 0.95-0.985)
-    #   - clip_param<0.15 underperformed
-    #   - train_batch_size=5000 markedly worse (mean 0.08 vs 0.35-0.36 for 10k/20k);
-    #     10k and 20k statistically tied, picked 10k for ~30% per-iteration speedup
-    #   - minibatch_size=512 markedly worse in both short and long trained trials
-    #   - num_epochs={5,20} both underperformed among long-trained trials
     search_space = {
         # --- Training params ---
         "lr": tune.loguniform(5e-5, 1e-3),
