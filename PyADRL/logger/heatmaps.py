@@ -52,6 +52,8 @@ class HeatmapCallback(RLlibCallback):
         episode.custom_data["pursuer_states"] = {}
         episode.custom_data["evader_shield_data"] = {}
         episode.custom_data["pursuer_shield_data"] = {}
+        episode.custom_data["evader_unsafe_positions"] = {}
+        episode.custom_data["pursuer_unsafe_positions"] = {}
 
     def _get_episode_info(self, env, env_index: int):
         if not env or not getattr(env, "_infos", None):
@@ -101,15 +103,18 @@ class HeatmapCallback(RLlibCallback):
             if agent_id.startswith("evader"):
                 states = episode.custom_data["evader_states"]
                 shield_data = episode.custom_data["evader_shield_data"]
+                unsafe_positions = episode.custom_data["evader_unsafe_positions"]
             elif agent_id.startswith("pursuer"):
                 states = episode.custom_data["pursuer_states"]
                 shield_data = episode.custom_data["pursuer_shield_data"]
+                unsafe_positions = episode.custom_data["pursuer_unsafe_positions"]
             else:
                 raise ValueError(f"Unknown agent_id {agent_id} in HeatmapCallback")
 
             if agent_id not in states:
                 states[agent_id] = []
                 shield_data[agent_id] = []
+                unsafe_positions[agent_id] = []
 
             states[agent_id].append([x, y])
 
@@ -119,6 +124,9 @@ class HeatmapCallback(RLlibCallback):
             except ValueError:
                 drone_id = -1
             shield_data[agent_id].append(step_shield_map.get(drone_id))
+
+            unsafe = agent_info.get("unsafe_drone_state")
+            unsafe_positions[agent_id].append(unsafe)
 
     def on_episode_end(
         self,
@@ -139,6 +147,8 @@ class HeatmapCallback(RLlibCallback):
             "pursuer_states": episode.custom_data.get("pursuer_states", {}),
             "evader_shield_data": episode.custom_data.get("evader_shield_data", {}),
             "pursuer_shield_data": episode.custom_data.get("pursuer_shield_data", {}),
+            "evader_unsafe_positions": episode.custom_data.get("evader_unsafe_positions", {}),
+            "pursuer_unsafe_positions": episode.custom_data.get("pursuer_unsafe_positions", {}),
         }
         metrics_logger.log_value("drone_states", drone_states, reduce="item_series")
 
@@ -181,11 +191,19 @@ class HeatmapCallback(RLlibCallback):
         pursuer_shield = (
             drone_states[best_idx].get("pursuer_shield_data", {}) if best_idx >= 0 else {}
         )
+        evader_unsafe = (
+            drone_states[best_idx].get("evader_unsafe_positions", {}) if best_idx >= 0 else {}
+        )
+        pursuer_unsafe = (
+            drone_states[best_idx].get("pursuer_unsafe_positions", {}) if best_idx >= 0 else {}
+        )
         self._plot_trace_map(
             evader_episode,
             pursuer_episode,
             evader_shield_data=evader_shield,
             pursuer_shield_data=pursuer_shield,
+            evader_unsafe_data=evader_unsafe,
+            pursuer_unsafe_data=pursuer_unsafe,
             filename="trace_map",
         )
 
@@ -275,17 +293,26 @@ class HeatmapCallback(RLlibCallback):
         *,
         evader_shield_data: dict | None = None,
         pursuer_shield_data: dict | None = None,
+        evader_unsafe_data: dict | None = None,
+        pursuer_unsafe_data: dict | None = None,
         filename,
     ):
         fig, ax = plt.subplots(figsize=(8, 8))
+
+        # Draw the target square
+        self._draw_target(ax)
+        # Draw objects as solid grey boxes
+        self._draw_objects(ax)
 
         # shield_type -> list of (x, y) across all agents/groups
         shield_positions: dict[str, list[tuple[float, float]]] = {
             k: [] for k in self.SHIELD_COLORS
         }
         legend_handles = []
+        shield_arrow_legend_added = False
 
-        def _plot_group(episode_states, shield_data, *, color, role_name):
+        def _plot_group(episode_states, shield_data, unsafe_data, *, color, role_name):
+            nonlocal shield_arrow_legend_added
             plotted_any = False
             first_agent = True
 
@@ -297,6 +324,7 @@ class HeatmapCallback(RLlibCallback):
                     continue
 
                 shields = (shield_data or {}).get(agent_id, [])
+                unsafe_list = (unsafe_data or {}).get(agent_id, [])
 
                 valid_indices = [
                     i
@@ -313,6 +341,9 @@ class HeatmapCallback(RLlibCallback):
                 cleaned_shields = [
                     shields[i] if i < len(shields) else None for i in valid_indices
                 ]
+                cleaned_unsafe = [
+                    unsafe_list[i] if i < len(unsafe_list) else None for i in valid_indices
+                ]
 
                 # Draw agent paths at cell centers so markers sit inside cells.
                 xs = [p[0] + 0.5 for p in cleaned]
@@ -324,24 +355,116 @@ class HeatmapCallback(RLlibCallback):
                     n_seg = len(xs) - 1
                     ax.plot(xs, ys, color=color, alpha=0.4, linewidth=1.5, zorder=2)
 
-                    # Directional arrow on every move.
                     for i in range(n_seg):
                         dx = xs[i + 1] - xs[i]
                         dy = ys[i + 1] - ys[i]
-                        if abs(dx) > 1e-6 or abs(dy) > 1e-6:
-                            ax.annotate(
-                                "",
-                                xy=(xs[i + 1], ys[i + 1]),
-                                xytext=(xs[i], ys[i]),
-                                arrowprops=dict(
-                                    arrowstyle="-|>",
-                                    color=color,
-                                    alpha=0.4,
-                                    lw=0.5,
-                                    mutation_scale=5,
-                                ),
-                                zorder=3,
-                            )
+                        # cleaned_shields[i+1] is set when the move TO position i+1 was shielded
+                        is_shielded = cleaned_shields[i + 1] is not None
+
+                        if is_shielded:
+                            # Green arrow: safe action the shield substituted.
+                            # If dx=dy=0 the shield chose "stay in place" — draw a dot instead.
+                            if abs(dx) > 1e-6 or abs(dy) > 1e-6:
+                                ax.annotate(
+                                    "",
+                                    xy=(xs[i + 1], ys[i + 1]),
+                                    xytext=(xs[i], ys[i]),
+                                    annotation_clip=False,
+                                    arrowprops=dict(
+                                        arrowstyle="-|>",
+                                        color="#2ca02c",
+                                        alpha=0.8,
+                                        lw=1.5,
+                                        mutation_scale=7,
+                                    ),
+                                    zorder=7,
+                                )
+                            else:
+                                ax.scatter(
+                                    xs[i], ys[i],
+                                    marker="o", color="#2ca02c",
+                                    s=5, alpha=0.8, zorder=7,
+                                )
+                            # Dashed red arrow: action blocked by shield.
+                            # Draw shaft and head separately — FancyArrowPatch with linestyle="dashed"
+                            # mangles the arrowhead tip.
+                            # Use float() to handle numpy scalars (np.float64 not subclass of float in NumPy 2.x).
+                            unsafe = cleaned_unsafe[i + 1]
+                            if unsafe is not None:
+                                try:
+                                    ux = float(unsafe.get("x")) + 0.5
+                                    uy = float(unsafe.get("y")) + 0.5
+                                    udx, udy = ux - xs[i], uy - ys[i]
+                                    if abs(udx) > 1e-6 or abs(udy) > 1e-6:
+                                        # Dashed shaft — stop before the arrowhead tip
+                                        dist = (udx**2 + udy**2) ** 0.5
+                                        nx, ny = udx / dist, udy / dist
+                                        head_len = min(0.25, dist * 0.3)
+                                        ax.plot(
+                                            [xs[i], ux - nx * head_len],
+                                            [ys[i], uy - ny * head_len],
+                                            color="#d62728", alpha=0.7,
+                                            lw=1.5, linestyle="dashed",
+                                            zorder=7,
+                                        )
+                                        # Solid arrowhead only
+                                        ax.annotate(
+                                            "",
+                                            xy=(ux, uy),
+                                            xytext=(ux - nx * head_len, uy - ny * head_len),
+                                            annotation_clip=False,
+                                            arrowprops=dict(
+                                                arrowstyle="-|>",
+                                                color="#d62728",
+                                                alpha=0.7,
+                                                lw=1.5,
+                                                mutation_scale=7,
+                                            ),
+                                            zorder=7,
+                                        )
+                                    else:
+                                        # Drone was stationary — another drone moved into it.
+                                        # Mark its position with a red × (no direction to arrow).
+                                        ax.scatter(
+                                            xs[i], ys[i],
+                                            marker="x", color="#d62728",
+                                            s=60, linewidths=1.5, alpha=0.8,
+                                            zorder=7,
+                                        )
+                                except (TypeError, ValueError):
+                                    pass
+                            if not shield_arrow_legend_added:
+                                legend_handles.append(
+                                    mlines.Line2D(
+                                        [], [],
+                                        color="#2ca02c", linewidth=1.5,
+                                        label="Shield: safe action taken",
+                                    )
+                                )
+                                legend_handles.append(
+                                    mlines.Line2D(
+                                        [], [],
+                                        color="#d62728", linewidth=1.5,
+                                        linestyle="dashed",
+                                        label="Shield: blocked action",
+                                    )
+                                )
+                                shield_arrow_legend_added = True
+                        else:
+                            if abs(dx) > 1e-6 or abs(dy) > 1e-6:
+                                ax.annotate(
+                                    "",
+                                    xy=(xs[i + 1], ys[i + 1]),
+                                    xytext=(xs[i], ys[i]),
+                                    arrowprops=dict(
+                                        arrowstyle="-|>",
+                                        color=color,
+                                        alpha=0.4,
+                                        lw=0.5,
+                                        mutation_scale=5,
+                                    ),
+                                    zorder=3,
+                                )
 
                 # Mark trajectory start (circle) and end (×).
                 ax.scatter(
@@ -369,10 +492,12 @@ class HeatmapCallback(RLlibCallback):
             return plotted_any
 
         has_evaders = _plot_group(
-            evader_episode_states, evader_shield_data, color="#d95f02", role_name="Evader"
+            evader_episode_states, evader_shield_data, evader_unsafe_data,
+            color="#d95f02", role_name="Evader",
         )
         has_pursuers = _plot_group(
-            pursuer_episode_states, pursuer_shield_data, color="#1f77b4", role_name="Pursuer"
+            pursuer_episode_states, pursuer_shield_data, pursuer_unsafe_data,
+            color="#1f77b4", role_name="Pursuer",
         )
 
         # Overlay shield activation markers on top of trajectories.
@@ -394,7 +519,7 @@ class HeatmapCallback(RLlibCallback):
                 linewidths=0.4,
                 s=40,
                 alpha=0.9,
-                zorder=5,
+                zorder=6,
             )
             legend_handles.append(
                 mlines.Line2D(
@@ -434,12 +559,6 @@ class HeatmapCallback(RLlibCallback):
         ax.set_xticks(np.arange(0, self.grid_w + 1, 1), minor=True)
         ax.set_yticks(np.arange(0, self.grid_h + 1, 1), minor=True)
         ax.grid(True, which="minor", linewidth=0.3, alpha=0.4)
-
-        # Draw the target square
-        self._draw_target(ax)
-
-        # Draw objects as solid grey boxes
-        self._draw_objects(ax)
 
         ax.tick_params(axis="both", which="major", pad=8)
         ax.set_aspect("equal", adjustable="box")
