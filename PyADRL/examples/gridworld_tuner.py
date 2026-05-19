@@ -28,8 +28,6 @@ ALTERNATING_MAX_T = N_STAGES * ITERS_PER_STAGE * 2
 ALTERNATING_GRACE = ALTERNATING_MAX_T // 2
 
 # Simultaneous training specifications
-# Convergence analysis showed trials reach peak ~70% through training;
-# 250 iterations gives slow-learning configs room to actually converge.
 ITERATIONS = 250
 SIMULTANEOUS_GRACE = 50
 
@@ -53,15 +51,15 @@ N_EVADERS = 1
 # Shielding
 SHIELDING = False
 
+# TODO: change later
 # === Metric selection ===
 # Metric ASHA uses to cull trials during the search. "mean_reward" gives
 # the earliest learning signal (works from iteration 1); capture/breach rates
 # are often zero in early training and provide poor discrimination.
 ASHA_METRIC = "mean_reward"
 
-# Metric used to pick the top-N configs after the search finishes. This is
-# where you encode what you actually care about — typically a task-grounded
-# metric, not the noisy reward sum. Options exposed by summarize_evaluation:
+# Metric used to pick the top-N configs after the search finishes.
+# Options exposed:
 #   "mean_reward"          - legacy sum-of-agent-rewards (matches ASHA default)
 #   "pursuer_reward"       - sum of pursuer agents' returns only
 #   "evader_reward"        - sum of evader agents' returns only
@@ -72,12 +70,16 @@ ASHA_METRIC = "mean_reward"
 #   "pursuer_success"      - full_capture_rate - breach_rate
 SELECTION_METRIC = "pursuer_success"
 
+# TODO: ASHA currently prunes too many for iterative training
+NUM_SAMPLES = 20
+MAX_CONCURRENT_TRIALS = 12
+
 
 def gridworld_tune(
     map: str,
     tuner_dir: str,
-    num_samples: int = 20,
-    max_concurrent_trials: int = 12,
+    num_samples: int = NUM_SAMPLES,
+    max_concurrent_trials: int = MAX_CONCURRENT_TRIALS,
 ) -> tune.ResultGrid:
     """Run a Ray Tune hyperparameter search over the alternating self-play loop.
 
@@ -103,6 +105,7 @@ def gridworld_tune(
 
     search_space = {
         # --- Training params ---
+        # TODO: Settle on these final params - could be from "surprising effectiveness of ..." paper
         "lr": tune.loguniform(5e-5, 1e-3),
         "gamma": tune.uniform(0.95, 0.99),
         "lambda_": tune.uniform(0.9, 1.0),
@@ -111,7 +114,8 @@ def gridworld_tune(
         "entropy_coeff": tune.loguniform(0.001, 0.05),
         # --- Architecture params (fixed/narrowed based on data) ---
         "train_batch_size": 10000,
-        "minibatch_size": tune.choice([256, 1024]),
+        # TODO: This is from the paper "surprising effectiveness of..."
+        "minibatch_size": tune.choice([10000]),
         "num_epochs": tune.choice([10, 15]),
         # --- Resource params (all in-process to avoid placement group errors) ---
         "num_learners": 0,
@@ -204,15 +208,15 @@ def get_best_n(
     window: int = 5,
     min_iters: int = 100,
 ):
-    """Pick top-N trials by mean of the last `window` reports of `metric`,
+    """Pick top-N trials by mean of the last reports of metrics,
     among trials that reached at least `min_iters` training iterations.
 
-    Why a window: RL evaluation reward is noisy iteration-to-iteration.
+    Window: RL evaluation reward is noisy iteration-to-iteration.
     A trial that hit 0.9 once and dropped to 0.4 should rank below a trial
-    that consistently stayed around 0.75. Averaging the last `window`
+    that consistently stayed around 0.75. Averaging the last
     reports captures stable performance instead of best-single-eval.
 
-    Why a min_iters filter: ASHA culls poor trials early. Their final
+    min_iters: ASHA culls poor trials early. Their final
     metric reflects a partially-trained policy, not converged performance.
     Picking the "best" trial from a mix of converged + half-trained
     trials systematically biases toward fast-but-shallow learners.

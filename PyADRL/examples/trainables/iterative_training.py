@@ -31,9 +31,7 @@ def iterative_trainable(
             iterations=iterations,
             report_to_tune=True,
             # During tune, evaluate every 5 iterations instead of every one.
-            # Eval costs ~as much as a train iter on this env, so this is a
-            # ~40% wall-clock win per trial. ASHA still gets enough data
-            # points (grace_period=50 → 10 reports before first cull).
+            # (grace_period=50 → 10 reports before first cull).
             eval_interval=5,
         )
     finally:
@@ -47,7 +45,7 @@ def _run_iterative_loop(
     model_path: Path | None = None,
     eval_interval: int = 1,
 ) -> dict:
-    # Pull n_evaders once — needed to know what counts as a "full capture".
+    # Pull n_evaders once for "full capture".
     n_evaders = 1
     if algo.config is not None and algo.config.env_config is not None:
         n_evaders = algo.config.env_config.get("n_evaders", 1)

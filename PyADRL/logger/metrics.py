@@ -423,7 +423,6 @@ class MetricsCallback(RLlibCallback):
             actual_drone_collision_ids
         )
 
-
     def on_evaluate_start(
         self,
         *,

@@ -145,9 +145,7 @@ class NGWEnvironment(ParallelEnv):
                 #   ValueError: server returned a structured error in the response
                 #     body (e.g. "simulation doesn't exist" after a TTL reap).
                 #   grpc.RpcError: server handler threw an unhandled exception
-                #     (e.g. spawn-position generation hit its iteration cap due
-                #     to a thread-unsafe RNG, or any other server-side handler
-                #     fault). The sim may be in an inconsistent state.
+                #     The sim may be in an inconsistent state.
                 # In both cases, discard the sim and create a fresh one rather
                 # than killing the whole training trial.
                 print(
