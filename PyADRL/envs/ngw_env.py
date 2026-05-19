@@ -207,11 +207,13 @@ class NGWEnvironment(ParallelEnv):
 
         for drone_state in self.newest_state.drone_states:
             key = EVADERS if drone_state.is_evader else PURSUERS
-            # Mark destroyed drones as destroyed in python
             if drone_state.destroyed:
                 for drone in self.drones[key]:
                     if drone_state.id == drone.id:
                         drone.destroyed = True
+                        # Update to final position so final step is shown in the trace map.
+                        drone.x = drone_state.x
+                        drone.y = drone_state.y
                         terminations[drone.name] = True
                         break
             else:  # Update positions
@@ -254,11 +256,16 @@ class NGWEnvironment(ParallelEnv):
                 if alt_state is not None:
                     infos[d.name]["shield_events"] = alt_state.events
                     for unsafe_ds in alt_state.drone_states:
-                        if unsafe_ds.id == d.id:
+                        if unsafe_ds.id == d.id and unsafe_ds.is_evader == d.is_evader:
                             infos[d.name]["unsafe_drone_state"] = {
                                 "x": unsafe_ds.x,
                                 "y": unsafe_ds.y,
                             }
+                            break
+                if d.is_evader and d.destroyed:
+                    for ds in self.newest_state.drone_states:
+                        if ds.id == d.id and ds.is_evader:
+                            infos[d.name]["capture_position"] = {"x": ds.x, "y": ds.y}
                             break
 
         name_to_reward: dict[str, float] = {

@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import matplotlib.lines as mlines
 import seaborn as sns
 
 from ray.rllib.callbacks.callbacks import RLlibCallback
@@ -54,6 +53,7 @@ class HeatmapCallback(RLlibCallback):
         episode.custom_data["pursuer_shield_data"] = {}
         episode.custom_data["evader_unsafe_positions"] = {}
         episode.custom_data["pursuer_unsafe_positions"] = {}
+        episode.custom_data["capture_positions"] = []
 
     def _get_episode_info(self, env, env_index: int):
         if not env or not getattr(env, "_infos", None):
@@ -128,6 +128,10 @@ class HeatmapCallback(RLlibCallback):
             unsafe = agent_info.get("unsafe_drone_state")
             unsafe_positions[agent_id].append(unsafe)
 
+            capture = agent_info.get("capture_position")
+            if capture is not None:
+                episode.custom_data["capture_positions"].append(capture)
+
     def on_episode_end(
         self,
         *,
@@ -149,6 +153,7 @@ class HeatmapCallback(RLlibCallback):
             "pursuer_shield_data": episode.custom_data.get("pursuer_shield_data", {}),
             "evader_unsafe_positions": episode.custom_data.get("evader_unsafe_positions", {}),
             "pursuer_unsafe_positions": episode.custom_data.get("pursuer_unsafe_positions", {}),
+            "capture_positions": episode.custom_data.get("capture_positions", []),
         }
         metrics_logger.log_value("drone_states", drone_states, reduce="item_series")
 
@@ -197,6 +202,9 @@ class HeatmapCallback(RLlibCallback):
         pursuer_unsafe = (
             drone_states[best_idx].get("pursuer_unsafe_positions", {}) if best_idx >= 0 else {}
         )
+        capture_positions = (
+            drone_states[best_idx].get("capture_positions", []) if best_idx >= 0 else []
+        )
         self._plot_trace_map(
             evader_episode,
             pursuer_episode,
@@ -204,6 +212,7 @@ class HeatmapCallback(RLlibCallback):
             pursuer_shield_data=pursuer_shield,
             evader_unsafe_data=evader_unsafe,
             pursuer_unsafe_data=pursuer_unsafe,
+            capture_positions=capture_positions,
             filename="trace_map",
         )
 
@@ -295,9 +304,26 @@ class HeatmapCallback(RLlibCallback):
         pursuer_shield_data: dict | None = None,
         evader_unsafe_data: dict | None = None,
         pursuer_unsafe_data: dict | None = None,
+        capture_positions: list | None = None,
         filename,
     ):
         fig, ax = plt.subplots(figsize=(8, 8))
+
+        # Fill capture cells purple (below everything else).
+        for cap in capture_positions or []:
+            try:
+                cx, cy = int(cap["x"]), int(cap["y"])
+                ax.add_patch(
+                    patches.Rectangle(
+                        (cx, cy), 1, 1,
+                        facecolor="#9467bd",
+                        edgecolor="none",
+                        alpha=0.6,
+                        zorder=1,
+                    )
+                )
+            except (TypeError, KeyError, ValueError):
+                pass
 
         # Draw the target square
         self._draw_target(ax)
@@ -308,13 +334,8 @@ class HeatmapCallback(RLlibCallback):
         shield_positions: dict[str, list[tuple[float, float]]] = {
             k: [] for k in self.SHIELD_COLORS
         }
-        legend_handles = []
-        shield_arrow_legend_added = False
-
-        def _plot_group(episode_states, shield_data, unsafe_data, *, color, role_name):
-            nonlocal shield_arrow_legend_added
+        def _plot_group(episode_states, shield_data, unsafe_data, *, color):
             plotted_any = False
-            first_agent = True
 
             if not isinstance(episode_states, dict):
                 return False
@@ -433,23 +454,6 @@ class HeatmapCallback(RLlibCallback):
                                         )
                                 except (TypeError, ValueError):
                                     pass
-                            if not shield_arrow_legend_added:
-                                legend_handles.append(
-                                    mlines.Line2D(
-                                        [], [],
-                                        color="#2ca02c", linewidth=1.5,
-                                        label="Shield: safe action taken",
-                                    )
-                                )
-                                legend_handles.append(
-                                    mlines.Line2D(
-                                        [], [],
-                                        color="#d62728", linewidth=1.5,
-                                        linestyle="dashed",
-                                        label="Shield: blocked action",
-                                    )
-                                )
-                                shield_arrow_legend_added = True
                         else:
                             if abs(dx) > 1e-6 or abs(dy) > 1e-6:
                                 ax.annotate(
@@ -482,30 +486,20 @@ class HeatmapCallback(RLlibCallback):
                         px, py = cleaned[i - 1] if i > 0 else (x, y)
                         shield_positions[shield_type].append((px + 0.5, py + 0.5))
 
-                if first_agent:
-                    legend_handles.append(
-                        mlines.Line2D([], [], color=color, linewidth=1.5, label=role_name)
-                    )
-                    first_agent = False
                 plotted_any = True
 
             return plotted_any
 
         has_evaders = _plot_group(
             evader_episode_states, evader_shield_data, evader_unsafe_data,
-            color="#d95f02", role_name="Evader",
+            color="#d95f02",
         )
         has_pursuers = _plot_group(
             pursuer_episode_states, pursuer_shield_data, pursuer_unsafe_data,
-            color="#1f77b4", role_name="Pursuer",
+            color="#1f77b4",
         )
 
         # Overlay shield activation markers on top of trajectories.
-        shield_labels = {
-            self.SHIELD_DRONE_OBJ: "Shield: drone-object collision",
-            self.SHIELD_OUT_OF_BOUNDS: "Shield: out of bounds",
-            self.SHIELD_COLLISION: "Shield: drone-drone collision",
-        }
         for shield_type, shield_color in self.SHIELD_COLORS.items():
             pts = shield_positions[shield_type]
             if not pts:
@@ -521,15 +515,6 @@ class HeatmapCallback(RLlibCallback):
                 alpha=0.9,
                 zorder=6,
             )
-            legend_handles.append(
-                mlines.Line2D(
-                    [], [],
-                    marker="D", linestyle="None",
-                    color=shield_color, markeredgecolor="black",
-                    markeredgewidth=0.4, markersize=6,
-                    label=shield_labels[shield_type],
-                )
-            )
 
         if not (has_evaders or has_pursuers):
             plt.close(fig)
@@ -537,10 +522,6 @@ class HeatmapCallback(RLlibCallback):
                 "[HeatmapCallback] No valid trajectories collected, skipping trace map."
             )
             return
-
-        legend_handles.append(
-            patches.Patch(facecolor="green", edgecolor="green", alpha=0.3, label="Target")
-        )
 
         ax.set_xlabel("x")
         ax.set_ylabel("y")
@@ -562,7 +543,6 @@ class HeatmapCallback(RLlibCallback):
 
         ax.tick_params(axis="both", which="major", pad=8)
         ax.set_aspect("equal", adjustable="box")
-        ax.legend(handles=legend_handles, loc="upper right")
 
         plt.tight_layout()
 
