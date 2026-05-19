@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.lines as mlines
 import seaborn as sns
+
 from ray.rllib.callbacks.callbacks import RLlibCallback
 
 
@@ -157,13 +159,11 @@ class HeatmapCallback(RLlibCallback):
         # Plot the results
         self._plot_occupancy_heatmap(
             [episode.get("evader_states", {}) for episode in drone_states],
-            title="Evader Position Heatmap",
             filename="heatmap_evader",
             color="YlOrRd",
         )
         self._plot_occupancy_heatmap(
             [episode.get("pursuer_states", {}) for episode in drone_states],
-            title="Pursuer Position Heatmap",
             filename="heatmap_pursuer",
             color="Blues",
         )
@@ -186,7 +186,6 @@ class HeatmapCallback(RLlibCallback):
             pursuer_episode,
             evader_shield_data=evader_shield,
             pursuer_shield_data=pursuer_shield,
-            title="Agent Trace Map (Single Example Episode)",
             filename="trace_map",
         )
 
@@ -216,7 +215,7 @@ class HeatmapCallback(RLlibCallback):
         return evader_episodes[best_idx], pursuer_episodes[best_idx], best_idx
 
     # PLOTTING METHODS
-    def _plot_occupancy_heatmap(self, episode_states, *, title, filename, color):
+    def _plot_occupancy_heatmap(self, episode_states, *, filename, color):
         all_positions = [
             pos
             for episode in episode_states
@@ -225,7 +224,7 @@ class HeatmapCallback(RLlibCallback):
         ]
 
         if not all_positions:
-            print(f"[HeatmapCallback] No positions collected for {title}, skipping.")
+            print(f"[HeatmapCallback] No positions collected for {filename}, skipping.")
             return
 
         grid = np.zeros((self.grid_h, self.grid_w), dtype=int)
@@ -246,7 +245,6 @@ class HeatmapCallback(RLlibCallback):
             ax=ax,
             cbar_kws={"label": "Visit count"},
         )
-        ax.set_title(title)
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.invert_yaxis()
@@ -265,7 +263,7 @@ class HeatmapCallback(RLlibCallback):
         plt.close(fig)
         print(f"Heatmap Saved in {filename}")
 
-    def _plot_capture_heatmap(self, episode_states, *, title, filename, color):
+    def _plot_capture_heatmap(self, episode_states, *, filename, color):
         # This method can be implemented to plot heatmaps of capture locations
         # This method would require additional data collection
         pass
@@ -277,7 +275,6 @@ class HeatmapCallback(RLlibCallback):
         *,
         evader_shield_data: dict | None = None,
         pursuer_shield_data: dict | None = None,
-        title,
         filename,
     ):
         fig, ax = plt.subplots(figsize=(8, 8))
@@ -286,10 +283,11 @@ class HeatmapCallback(RLlibCallback):
         shield_positions: dict[str, list[tuple[float, float]]] = {
             k: [] for k in self.SHIELD_COLORS
         }
+        legend_handles = []
 
         def _plot_group(episode_states, shield_data, *, color, role_name):
             plotted_any = False
-            used_label = False
+            first_agent = True
 
             if not isinstance(episode_states, dict):
                 return False
@@ -319,27 +317,53 @@ class HeatmapCallback(RLlibCallback):
                 # Draw agent paths at cell centers so markers sit inside cells.
                 xs = [p[0] + 0.5 for p in cleaned]
                 ys = [p[1] + 0.5 for p in cleaned]
-                label = role_name if not used_label else None
 
                 if len(cleaned) == 1:
-                    ax.scatter(xs, ys, color=color, alpha=0.4, s=20, label=label)
+                    ax.scatter(xs, ys, color=color, alpha=0.4, s=20)
                 else:
-                    ax.plot(xs, ys, color=color, alpha=0.7, linewidth=1.5, label=label)
+                    n_seg = len(xs) - 1
+                    ax.plot(xs, ys, color=color, alpha=0.4, linewidth=1.5, zorder=2)
 
-                # Mark trajectory start/end so movement direction is visible.
+                    # Directional arrow on every move.
+                    for i in range(n_seg):
+                        dx = xs[i + 1] - xs[i]
+                        dy = ys[i + 1] - ys[i]
+                        if abs(dx) > 1e-6 or abs(dy) > 1e-6:
+                            ax.annotate(
+                                "",
+                                xy=(xs[i + 1], ys[i + 1]),
+                                xytext=(xs[i], ys[i]),
+                                arrowprops=dict(
+                                    arrowstyle="-|>",
+                                    color=color,
+                                    alpha=0.4,
+                                    lw=0.5,
+                                    mutation_scale=5,
+                                ),
+                                zorder=3,
+                            )
+
+                # Mark trajectory start (circle) and end (×).
                 ax.scatter(
                     xs[0], ys[0],
                     marker="o", color=color, edgecolors="black",
-                    linewidths=0.3, s=28, alpha=0.8,
+                    linewidths=0.3, s=28, alpha=0.8, zorder=4,
                 )
-                ax.scatter(xs[-1], ys[-1], marker="x", color=color, s=30, alpha=0.9)
+                ax.scatter(xs[-1], ys[-1], marker="x", color=color, s=30, alpha=0.9, zorder=4)
 
                 # Collect shielded positions for overlay after all paths are drawn.
-                for (x, y), shield_type in zip(cleaned, cleaned_shields):
+                # Shield fires when trying to move FROM the previous position,
+                # so mark position i-1 (fall back to i for the first step).
+                for i, ((x, y), shield_type) in enumerate(zip(cleaned, cleaned_shields)):
                     if shield_type in shield_positions:
-                        shield_positions[shield_type].append((x + 0.5, y + 0.5))
+                        px, py = cleaned[i - 1] if i > 0 else (x, y)
+                        shield_positions[shield_type].append((px + 0.5, py + 0.5))
 
-                used_label = True
+                if first_agent:
+                    legend_handles.append(
+                        mlines.Line2D([], [], color=color, linewidth=1.5, label=role_name)
+                    )
+                    first_agent = False
                 plotted_any = True
 
             return plotted_any
@@ -357,7 +381,7 @@ class HeatmapCallback(RLlibCallback):
             self.SHIELD_OUT_OF_BOUNDS: "Shield: out of bounds",
             self.SHIELD_COLLISION: "Shield: drone-drone collision",
         }
-        for shield_type, color in self.SHIELD_COLORS.items():
+        for shield_type, shield_color in self.SHIELD_COLORS.items():
             pts = shield_positions[shield_type]
             if not pts:
                 continue
@@ -365,13 +389,21 @@ class HeatmapCallback(RLlibCallback):
             ax.scatter(
                 sx, sy,
                 marker="D",
-                color=color,
+                color=shield_color,
                 edgecolors="black",
                 linewidths=0.4,
                 s=40,
                 alpha=0.9,
                 zorder=5,
-                label=shield_labels[shield_type],
+            )
+            legend_handles.append(
+                mlines.Line2D(
+                    [], [],
+                    marker="D", linestyle="None",
+                    color=shield_color, markeredgecolor="black",
+                    markeredgewidth=0.4, markersize=6,
+                    label=shield_labels[shield_type],
+                )
             )
 
         if not (has_evaders or has_pursuers):
@@ -381,7 +413,10 @@ class HeatmapCallback(RLlibCallback):
             )
             return
 
-        ax.set_title(title)
+        legend_handles.append(
+            patches.Patch(facecolor="green", edgecolor="green", alpha=0.3, label="Target")
+        )
+
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.set_xlim(0, self.grid_w)
@@ -408,7 +443,7 @@ class HeatmapCallback(RLlibCallback):
 
         ax.tick_params(axis="both", which="major", pad=8)
         ax.set_aspect("equal", adjustable="box")
-        ax.legend(loc="upper right")
+        ax.legend(handles=legend_handles, loc="upper right")
 
         plt.tight_layout()
 
@@ -433,7 +468,6 @@ class HeatmapCallback(RLlibCallback):
 
     def _draw_objects(self, ax):
         """Draw objects as solid grey 1x1 boxes."""
-        print(self.objects)
         if not self.objects:
             return
 
