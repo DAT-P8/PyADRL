@@ -423,10 +423,6 @@ class MetricsCallback(RLlibCallback):
             actual_drone_collision_ids
         )
 
-        for evader_id in evaders_caught:
-            if evader_id not in state["captured_evader_ids"]:
-                state["capture_steps"].append(state["timestep"])
-                state["captured_evader_ids"].add(evader_id)
 
     def on_evaluate_start(
         self,
