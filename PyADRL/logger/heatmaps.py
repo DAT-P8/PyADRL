@@ -348,7 +348,7 @@ class HeatmapCallback(RLlibCallback):
 
         # shield_type -> list of (x, y) across all agents/groups
         shield_positions: dict[str, list[tuple[float, float]]] = {
-            k: [] for k in self.SHIELD_COLORS
+            k: [] for k in SHIELD_COLORS
         }
 
         def _plot_group(episode_states, shield_data, unsafe_data, *, color):
@@ -545,7 +545,7 @@ class HeatmapCallback(RLlibCallback):
         )
 
         # Overlay shield activation markers on top of trajectories.
-        for shield_type, shield_color in self.SHIELD_COLORS.items():
+        for shield_type, shield_color in SHIELD_COLORS.items():
             pts = shield_positions[shield_type]
             if not pts:
                 continue
