@@ -5,6 +5,17 @@ import seaborn as sns
 
 from ray.rllib.callbacks.callbacks import RLlibCallback
 
+# Shield type constants used as keys in shield_data and legend labels.
+SHIELD_DRONE_OBJ = "drone_object_collision"
+SHIELD_OUT_OF_BOUNDS = "out_of_bounds"
+SHIELD_COLLISION = "collision"
+
+SHIELD_COLORS = {
+    SHIELD_DRONE_OBJ: "#e31a1c",
+    SHIELD_OUT_OF_BOUNDS: "#ff7f00",
+    SHIELD_COLLISION: "#6a3d9a",
+}
+
 
 class HeatmapCallback(RLlibCallback):
     def __init__(self):
@@ -34,17 +45,6 @@ class HeatmapCallback(RLlibCallback):
         self.target_y = algorithm.config.env_config.get("target_y", 0)
         self.objects = algorithm.config.env_config.get("objects", [])
         self.figure_path = algorithm.config.env_config.get("figure_path")
-
-    # Shield type constants used as keys in shield_data and legend labels.
-    SHIELD_DRONE_OBJ = "drone_object_collision"
-    SHIELD_OUT_OF_BOUNDS = "out_of_bounds"
-    SHIELD_COLLISION = "collision"
-
-    SHIELD_COLORS = {
-        SHIELD_DRONE_OBJ: "#e31a1c",
-        SHIELD_OUT_OF_BOUNDS: "#ff7f00",
-        SHIELD_COLLISION: "#6a3d9a",
-    }
 
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
@@ -88,13 +88,13 @@ class HeatmapCallback(RLlibCallback):
         for event in first_agent_info.get("shield_events", []):
             if event.drone_object_collision_event is not None:
                 for did in event.drone_object_collision_event.drone_ids:
-                    step_shield_map.setdefault(did, self.SHIELD_DRONE_OBJ)
+                    step_shield_map.setdefault(did, SHIELD_DRONE_OBJ)
             elif event.out_of_bounds_event is not None:
                 for did in event.out_of_bounds_event.drone_ids:
-                    step_shield_map.setdefault(did, self.SHIELD_OUT_OF_BOUNDS)
+                    step_shield_map.setdefault(did, SHIELD_OUT_OF_BOUNDS)
             elif event.collision_event is not None:
                 for did in event.collision_event.drone_ids:
-                    step_shield_map.setdefault(did, self.SHIELD_COLLISION)
+                    step_shield_map.setdefault(did, SHIELD_COLLISION)
 
         for agent_id, agent_info in episode_info.items():
             drone = agent_info.get("drone_state", {})
@@ -151,8 +151,12 @@ class HeatmapCallback(RLlibCallback):
             "pursuer_states": episode.custom_data.get("pursuer_states", {}),
             "evader_shield_data": episode.custom_data.get("evader_shield_data", {}),
             "pursuer_shield_data": episode.custom_data.get("pursuer_shield_data", {}),
-            "evader_unsafe_positions": episode.custom_data.get("evader_unsafe_positions", {}),
-            "pursuer_unsafe_positions": episode.custom_data.get("pursuer_unsafe_positions", {}),
+            "evader_unsafe_positions": episode.custom_data.get(
+                "evader_unsafe_positions", {}
+            ),
+            "pursuer_unsafe_positions": episode.custom_data.get(
+                "pursuer_unsafe_positions", {}
+            ),
             "capture_positions": episode.custom_data.get("capture_positions", []),
         }
         metrics_logger.log_value("drone_states", drone_states, reduce="item_series")
@@ -185,22 +189,32 @@ class HeatmapCallback(RLlibCallback):
 
         # For trace maps, show one representative episode instead of concatenating paths.
         evader_episodes = [episode.get("evader_states", {}) for episode in drone_states]
-        pursuer_episodes = [episode.get("pursuer_states", {}) for episode in drone_states]
+        pursuer_episodes = [
+            episode.get("pursuer_states", {}) for episode in drone_states
+        ]
         evader_episode, pursuer_episode, best_idx = self._select_representative_episode(
             evader_episodes,
             pursuer_episodes,
         )
         evader_shield = (
-            drone_states[best_idx].get("evader_shield_data", {}) if best_idx >= 0 else {}
+            drone_states[best_idx].get("evader_shield_data", {})
+            if best_idx >= 0
+            else {}
         )
         pursuer_shield = (
-            drone_states[best_idx].get("pursuer_shield_data", {}) if best_idx >= 0 else {}
+            drone_states[best_idx].get("pursuer_shield_data", {})
+            if best_idx >= 0
+            else {}
         )
         evader_unsafe = (
-            drone_states[best_idx].get("evader_unsafe_positions", {}) if best_idx >= 0 else {}
+            drone_states[best_idx].get("evader_unsafe_positions", {})
+            if best_idx >= 0
+            else {}
         )
         pursuer_unsafe = (
-            drone_states[best_idx].get("pursuer_unsafe_positions", {}) if best_idx >= 0 else {}
+            drone_states[best_idx].get("pursuer_unsafe_positions", {})
+            if best_idx >= 0
+            else {}
         )
         capture_positions = (
             drone_states[best_idx].get("capture_positions", []) if best_idx >= 0 else []
@@ -315,7 +329,9 @@ class HeatmapCallback(RLlibCallback):
                 cx, cy = int(cap["x"]), int(cap["y"])
                 ax.add_patch(
                     patches.Rectangle(
-                        (cx, cy), 1, 1,
+                        (cx, cy),
+                        1,
+                        1,
                         facecolor="#9467bd",
                         edgecolor="none",
                         alpha=0.6,
@@ -334,6 +350,7 @@ class HeatmapCallback(RLlibCallback):
         shield_positions: dict[str, list[tuple[float, float]]] = {
             k: [] for k in self.SHIELD_COLORS
         }
+
         def _plot_group(episode_states, shield_data, unsafe_data, *, color):
             plotted_any = False
 
@@ -363,7 +380,8 @@ class HeatmapCallback(RLlibCallback):
                     shields[i] if i < len(shields) else None for i in valid_indices
                 ]
                 cleaned_unsafe = [
-                    unsafe_list[i] if i < len(unsafe_list) else None for i in valid_indices
+                    unsafe_list[i] if i < len(unsafe_list) else None
+                    for i in valid_indices
                 ]
 
                 # Draw agent paths at cell centers so markers sit inside cells.
@@ -402,9 +420,13 @@ class HeatmapCallback(RLlibCallback):
                                 )
                             else:
                                 ax.scatter(
-                                    xs[i], ys[i],
-                                    marker="o", color="#2ca02c",
-                                    s=5, alpha=0.8, zorder=7,
+                                    xs[i],
+                                    ys[i],
+                                    marker="o",
+                                    color="#2ca02c",
+                                    s=5,
+                                    alpha=0.8,
+                                    zorder=7,
                                 )
                             # Dashed red arrow: action blocked by shield.
                             # Draw shaft and head separately — FancyArrowPatch with linestyle="dashed"
@@ -424,15 +446,20 @@ class HeatmapCallback(RLlibCallback):
                                         ax.plot(
                                             [xs[i], ux - nx * head_len],
                                             [ys[i], uy - ny * head_len],
-                                            color="#d62728", alpha=0.7,
-                                            lw=1.5, linestyle="dashed",
+                                            color="#d62728",
+                                            alpha=0.7,
+                                            lw=1.5,
+                                            linestyle="dashed",
                                             zorder=7,
                                         )
                                         # Solid arrowhead only
                                         ax.annotate(
                                             "",
                                             xy=(ux, uy),
-                                            xytext=(ux - nx * head_len, uy - ny * head_len),
+                                            xytext=(
+                                                ux - nx * head_len,
+                                                uy - ny * head_len,
+                                            ),
                                             annotation_clip=False,
                                             arrowprops=dict(
                                                 arrowstyle="-|>",
@@ -447,9 +474,13 @@ class HeatmapCallback(RLlibCallback):
                                         # Drone was stationary — another drone moved into it.
                                         # Mark its position with a red × (no direction to arrow).
                                         ax.scatter(
-                                            xs[i], ys[i],
-                                            marker="x", color="#d62728",
-                                            s=60, linewidths=1.5, alpha=0.8,
+                                            xs[i],
+                                            ys[i],
+                                            marker="x",
+                                            color="#d62728",
+                                            s=60,
+                                            linewidths=1.5,
+                                            alpha=0.8,
                                             zorder=7,
                                         )
                                 except (TypeError, ValueError):
@@ -472,16 +503,26 @@ class HeatmapCallback(RLlibCallback):
 
                 # Mark trajectory start (circle) and end (×).
                 ax.scatter(
-                    xs[0], ys[0],
-                    marker="o", color=color, edgecolors="black",
-                    linewidths=0.3, s=28, alpha=0.8, zorder=4,
+                    xs[0],
+                    ys[0],
+                    marker="o",
+                    color=color,
+                    edgecolors="black",
+                    linewidths=0.3,
+                    s=28,
+                    alpha=0.8,
+                    zorder=4,
                 )
-                ax.scatter(xs[-1], ys[-1], marker="x", color=color, s=30, alpha=0.9, zorder=4)
+                ax.scatter(
+                    xs[-1], ys[-1], marker="x", color=color, s=30, alpha=0.9, zorder=4
+                )
 
                 # Collect shielded positions for overlay after all paths are drawn.
                 # Shield fires when trying to move FROM the previous position,
                 # so mark position i-1 (fall back to i for the first step).
-                for i, ((x, y), shield_type) in enumerate(zip(cleaned, cleaned_shields)):
+                for i, ((x, y), shield_type) in enumerate(
+                    zip(cleaned, cleaned_shields)
+                ):
                     if shield_type in shield_positions:
                         px, py = cleaned[i - 1] if i > 0 else (x, y)
                         shield_positions[shield_type].append((px + 0.5, py + 0.5))
@@ -491,11 +532,15 @@ class HeatmapCallback(RLlibCallback):
             return plotted_any
 
         has_evaders = _plot_group(
-            evader_episode_states, evader_shield_data, evader_unsafe_data,
+            evader_episode_states,
+            evader_shield_data,
+            evader_unsafe_data,
             color="#d95f02",
         )
         has_pursuers = _plot_group(
-            pursuer_episode_states, pursuer_shield_data, pursuer_unsafe_data,
+            pursuer_episode_states,
+            pursuer_shield_data,
+            pursuer_unsafe_data,
             color="#1f77b4",
         )
 
@@ -506,7 +551,8 @@ class HeatmapCallback(RLlibCallback):
                 continue
             sx, sy = zip(*pts)
             ax.scatter(
-                sx, sy,
+                sx,
+                sy,
                 marker="D",
                 color=shield_color,
                 edgecolors="black",
