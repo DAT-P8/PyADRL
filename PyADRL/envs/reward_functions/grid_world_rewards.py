@@ -1,6 +1,5 @@
-from ...dtos.ngw_dtos import State
+from ...dtos.ngw_dtos import DroneState, Event
 from .rewards import RewardFunction
-from ..ngw_drone import NGW_Drone
 from ..map_configs.map_config import MapConfig
 from ...utils.chebeshyv import chebyshev_distance
 
@@ -31,16 +30,15 @@ class GridWorldRewards(RewardFunction):
 
     def calculate_rewards(
         self,
-        new_state: State,
-        agents: list[str],
-        drones: dict[str, list[NGW_Drone]],
+        events: list[Event],
+        drones: list[DroneState],
         map_config: MapConfig,
         time_limit_reached: bool,
-    ) -> dict[str, float]:
-        rewards: dict[str, float] = {a: 0 for a in agents}
-        all_drones = {
-            d.id: d for d in drones["evaders"] + drones["pursuers"] if d.name in agents
-        }
+    ) -> dict[int, float]:
+        rewards: dict[int, float] = {a.id: 0 for a in drones}
+        all_drones = {d.id: d for d in drones}
+        pursuer_drones = [d for d in all_drones.values() if not d.is_evader]
+        evader_drones = [d for d in all_drones.values() if d.is_evader]
 
         target_reached_set: set[int] = set()
         out_of_bounds_set: set[int] = set()
@@ -50,7 +48,7 @@ class GridWorldRewards(RewardFunction):
         collision_dict: dict[int, set[int]] = {}
         evaders_caught: set[int] = set()
 
-        for event in new_state.events:
+        for event in events:
             if event.drone_object_collision_event is not None:
                 drone_object_collision_set.update(
                     event.drone_object_collision_event.drone_ids
@@ -74,18 +72,19 @@ class GridWorldRewards(RewardFunction):
         for id in target_reached_set:
             drone = all_drones[id]
             if drone.is_evader:
-                rewards[drone.name] += self.REWARD_EVADER_TARGET_REACHED_SELF
+                rewards[drone.id] += self.REWARD_EVADER_TARGET_REACHED_SELF
+
             # Give all pursuer drones the reward
-            for pursuer_drone in all_drones.values():
+            for pursuer_drone in pursuer_drones:
                 if not pursuer_drone.is_evader:
-                    rewards[pursuer_drone.name] += self.REWARD_PURSUER_TARGET_REACHED
+                    rewards[pursuer_drone.id] += self.REWARD_PURSUER_TARGET_REACHED
 
         for id in out_of_bounds_set:
             drone = all_drones[id]
             if drone.is_evader:
-                rewards[drone.name] += self.REWARD_EVADER_OUT_OF_BOUNDS
+                rewards[drone.id] += self.REWARD_EVADER_OUT_OF_BOUNDS
             else:
-                rewards[drone.name] += self.REWARD_PURSUER_OUT_OF_BOUNDS
+                rewards[drone.id] += self.REWARD_PURSUER_OUT_OF_BOUNDS
 
         for id in collision_dict:
             collision_set = collision_dict[id]
@@ -99,17 +98,17 @@ class GridWorldRewards(RewardFunction):
                 evaders_caught.update(evaders)
 
                 if drone.is_evader:
-                    rewards[drone.name] += self.REWARD_EVADER_CAUGHT
+                    rewards[drone.id] += self.REWARD_EVADER_CAUGHT
                 else:
-                    rewards[drone.name] += (
+                    rewards[drone.id] += (
                         len(evaders) * self.REWARD_PURSUER_CAUGHT_EVADER_SELF
                     )
 
             else:
                 if drone.is_evader:
-                    rewards[drone.name] += self.REWARD_EVADER_DESTROYED
+                    rewards[drone.id] += self.REWARD_EVADER_DESTROYED
                 else:
-                    rewards[drone.name] += self.REWARD_PURSUER_DESTROYED
+                    rewards[drone.id] += self.REWARD_PURSUER_DESTROYED
 
         for id in all_drones:
             drone = all_drones[id]
@@ -117,27 +116,27 @@ class GridWorldRewards(RewardFunction):
             # TODO: this rewards the actual catcher twice, once for catching, once for shared reward
             # It is intentional, but maybe we should talk about it
             if not drone.is_evader:
-                rewards[drone.name] += (
+                rewards[drone.id] += (
                     len(evaders_caught) * self.REWARD_PURSUER_CAUGHT_EVADER_OTHERS
                 )
 
             # evaders get positive rewards for target reached by other evader
             if drone.is_evader:
-                rewards[drone.name] += (
+                rewards[drone.id] += (
                     len(target_reached_set) * self.REWARD_EVADER_TARGET_REACHED_OTHERS
                 )
 
         for id in pursuer_entered_target_set:
             drone = all_drones[id]
             if not drone.is_evader:
-                rewards[drone.name] += self.REWARD_PURSUER_ENTERED_TARGET
+                rewards[drone.id] += self.REWARD_PURSUER_ENTERED_TARGET
 
         for id in drone_object_collision_set:
             drone = all_drones[id]
             if drone.is_evader:
-                rewards[drone.name] += self.REWARD_EVADER_COLLISION_OBJECT
+                rewards[drone.id] += self.REWARD_EVADER_COLLISION_OBJECT
             else:
-                rewards[drone.name] += self.REWARD_PURSUER_COLLISION_OBJECT
+                rewards[drone.id] += self.REWARD_PURSUER_COLLISION_OBJECT
 
         for drone in all_drones.values():
             if drone.is_evader:
@@ -145,7 +144,7 @@ class GridWorldRewards(RewardFunction):
 
                 # punish evaders for being far from the target to encourage them to move towards it
                 distance_to_target = map_config.distance_to_target(drone.x, drone.y)
-                rewards[drone.name] += (
+                rewards[drone.id] += (
                     map_config.normalise_map_distance(distance_to_target)
                     * self.REWARD_EVADER_FAR_FROM_TARGET
                 )
@@ -154,12 +153,12 @@ class GridWorldRewards(RewardFunction):
                 distance_to_evader = min(
                     (
                         chebyshev_distance(drone.x, drone.y, evader.x, evader.y)
-                        for evader in drones["evaders"]
+                        for evader in evader_drones
                         if not evader.destroyed
                     ),
                     default=0,
                 )
-                rewards[drone.name] += (
+                rewards[drone.id] += (
                     map_config.normalise_map_distance(distance_to_evader)
                     * self.REWARD_PURSUER_FAR_FROM_EVADER
                 )
@@ -167,7 +166,7 @@ class GridWorldRewards(RewardFunction):
         if time_limit_reached:
             for drone in all_drones.values():
                 if drone.is_evader:
-                    rewards[drone.name] += self.REWARD_EVADER_MAX_TIMESTEPS
+                    rewards[drone.id] += self.REWARD_EVADER_MAX_TIMESTEPS
                 else:
-                    rewards[drone.name] += self.REWARD_PURSUER_MAX_TIMESTEPS
+                    rewards[drone.id] += self.REWARD_PURSUER_MAX_TIMESTEPS
         return rewards

@@ -4,11 +4,6 @@ import matplotlib.patches as patches
 import seaborn as sns
 from ray.rllib.callbacks.callbacks import RLlibCallback
 
-from PyADRL.utils.paths import get_experiments_dir, get_model_maps_dir
-
-# TODO: GRID SIZE SHOULD BE DYNAMIC BASED ON MAP CONFIG, NOT HARDCODED
-_RESULTS_DIR = get_experiments_dir()
-
 
 class HeatmapCallback(RLlibCallback):
     def __init__(self):
@@ -17,8 +12,8 @@ class HeatmapCallback(RLlibCallback):
         self.grid_h = 0
         self.target_x = 0
         self.target_y = 0
-        self.model_name = ""
         self.objects = []
+        self.figure_path = None
 
     def on_algorithm_init(
         self,
@@ -32,12 +27,12 @@ class HeatmapCallback(RLlibCallback):
                 "HeatmapCallback requires env_config to be set in the algorithm config"
             )
 
-        self.grid_w = algorithm.config.env_config.get("map_width", 0)
-        self.grid_h = algorithm.config.env_config.get("map_height", 0)
+        self.grid_w = algorithm.config.env_config.get("width", 0)
+        self.grid_h = algorithm.config.env_config.get("height", 0)
         self.target_x = algorithm.config.env_config.get("target_x", 0)
         self.target_y = algorithm.config.env_config.get("target_y", 0)
-        self.model_name = algorithm.config.env_config.get("model_name", "")
         self.objects = algorithm.config.env_config.get("objects", [])
+        self.figure_path = algorithm.config.env_config.get("figure_path")
 
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
@@ -118,21 +113,17 @@ class HeatmapCallback(RLlibCallback):
             print("[HeatmapCallback] No episode states found - nothing to plot.")
             return
 
-        date_str = f"eval_{len(drone_states)}"
-
         # Plot the results
         self._plot_occupancy_heatmap(
             [episode.get("evader_states", {}) for episode in drone_states],
             title="Evader Position Heatmap",
-            filename=get_model_maps_dir(self.model_name)
-            / f"heatmap_evader_{date_str}.png",
+            filename="heatmap_evader",
             color="YlOrRd",
         )
         self._plot_occupancy_heatmap(
             [episode.get("pursuer_states", {}) for episode in drone_states],
             title="Pursuer Position Heatmap",
-            filename=get_model_maps_dir(self.model_name)
-            / f"heatmap_pursuer_{date_str}.png",
+            filename="heatmap_pursuer",
             color="Blues",
         )
 
@@ -145,7 +136,7 @@ class HeatmapCallback(RLlibCallback):
             evader_episode,
             pursuer_episode,
             title="Agent Trace Map (Single Example Episode)",
-            filename=get_model_maps_dir(self.model_name) / f"trace_map_{date_str}.png",
+            filename="trace_map",
         )
 
     def _select_representative_episode(self, evader_episodes, pursuer_episodes):
@@ -215,7 +206,10 @@ class HeatmapCallback(RLlibCallback):
         self._draw_objects(ax)
 
         plt.tight_layout()
-        plt.savefig(filename, dpi=150)
+
+        if self.figure_path:
+            path = self.figure_path / f"{filename}.svg"
+            plt.savefig(path, dpi=150)
         # plt.show()
         plt.close(fig)
         print(f"Heatmap Saved in {filename}")
@@ -352,7 +346,10 @@ class HeatmapCallback(RLlibCallback):
         ax.legend(loc="upper right")
 
         plt.tight_layout()
-        plt.savefig(filename, dpi=150)
+
+        if self.figure_path:
+            path = self.figure_path / f"{filename}.svg"
+            plt.savefig(path, dpi=150)
         plt.close(fig)
         print(f"Actor Traces Saved in {filename}")
 

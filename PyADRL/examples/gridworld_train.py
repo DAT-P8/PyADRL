@@ -1,266 +1,197 @@
-import random
-import grpc
 import ray
-from ray.rllib.algorithms.ppo.ppo import PPOConfig
-from ..envs.ngw_env import NGWEnvironment
-from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
+import time
+import json
+from pathlib import Path
+from collections import defaultdict
+from ray.tune.registry import _global_registry, ENV_CREATOR
 from ..envs.reward_functions.grid_world_rewards import GridWorldRewards
-from ray.tune.registry import register_env
-from ..logger.metricslogger import (
-    MetricsCallback,
-    build_train_iteration_data,
-    build_train,
-    metrics_path,
-    write_metrics,
-)
+from .trainables.alternate_training import _run_alternating_loop
+from .trainables.iterative_training import _run_iterative_loop
+from ..utils.register_env import _register_gridworld_env
+from ..utils.config_builder import _build_ppo_config
+from ..utils.reward_graph import create_reward_graph
+from ..utils.map_load import load_map_dict
 
-import matplotlib.pyplot as plt
-from ..utils.model_save import restore_training, save_model_info, setup_checkpoints_dir
-from ..utils.map_load import load_map_config
+# Callbacks
+from ..logger.metrics import MetricsCallback
+from ..logger.heatmaps import HeatmapCallback
 
-# Probability of sampling an old opponent policy
-P_OLD = 0.3
+# Trainables
+ALTERNATING = "alternate"
+SIMULTANEOUS = "simultaneous"
 
-# Number of alternating stages and PPO iterations per stage
-N_STAGES = 4
-ITERS_PER_STAGE = 20
+DEFAULT_TRAINING = {
+    "name": ALTERNATING,
+    "n_stages": 4,
+    "iters_per_stage": 20,
+}
 
-
-def sample_opponent(pool: list[dict]) -> dict:
-    """With prob P_OLD sample a random old policy, otherwise use the latest."""
-    if len(pool) == 1:
-        return pool[-1]  # most recent
-    elif random.random() < P_OLD:
-        return random.choice(pool[:-1])  # Sample from all but the last policy
-    else:
-        return pool[-1]
+DEFAULT_CONFIG = {
+    # --- Training params ---
+    "lr": 3e-4,
+    "gamma": 0.99,
+    "lambda_": 0.95,
+    "clip_param": 0.2,
+    "vf_loss_coeff": 0.5,
+    "entropy_coeff": 0.01,
+    # --- Architecture params ---
+    "train_batch_size": 10000,
+    "minibatch_size": 512,
+    "num_epochs": 10,
+    # --- Resource params (all in-process to avoid placement group errors) ---
+    "num_learners": 1,
+    "num_env_runners": 4,
+    "num_envs_per_env_runner": 5,
+}
 
 
 def gridworld_train(
     map: str,
-    checkpoint: str | None = None,
-    model_name: str | None = None,
     n_pursuers: int = 2,
     n_evaders: int = 1,
-    training_strategy: str = "alternating",  # "alternating" or "simultaneous"
+    training_config: dict = DEFAULT_TRAINING,
+    model_config: dict = DEFAULT_CONFIG,
+    training_path: Path | None = None,
+    shielding: bool = False,
 ):
-    # If Ray is already initialized from a previous run, shut it down before starting a new one.
     ray.shutdown()
     ray.init()
 
-    map_config = load_map_config(map)
+    map_dict = load_map_dict(map)
 
-    register_env(
-        "gridworld",
-        lambda cfg: ParallelPettingZooEnv(
-            NGWEnvironment(
-                channel=grpc.insecure_channel("localhost:50051"),
-                map_config=map_config,
-                reward_function=GridWorldRewards(),
-                n_pursuers=n_pursuers,
-                n_evaders=n_evaders,
-            )
-        ),
+    # Only register the environment if it hasn't been registered
+    if not _global_registry.contains(ENV_CREATOR, "gridworld"):
+        _register_gridworld_env(
+            map_dict=map_dict,
+            reward_function=GridWorldRewards(),
+            n_pursuers=n_pursuers,
+            n_evaders=n_evaders,
+            shielding=shielding,
+        )
+
+    figure_path = None
+    model_path = None
+    if training_path:
+        figure_path = training_path / "figures"
+        model_path = training_path / "models"
+
+    timer = Timer()
+    ppo_config = _build_ppo_config(
+        config=model_config,
+        callbacks=[MetricsCallback],
+        env_config=map_dict,
+        n_pursuers=n_pursuers,
+        n_evaders=n_evaders,
+        figure_path=figure_path,
+        metrics_path=training_path,
     )
+    algo = ppo_config.build_algo()
 
-    config: PPOConfig = (
-        PPOConfig()
-        .environment(
-            "gridworld",
-            env_config={
-                "map_width": map_config.width,
-                "map_height": map_config.height,
-                "target_x": map_config.target_x,
-                "target_y": map_config.target_y,
-                "objects": map_config.objects,
-            },
+    if training_config["name"] == SIMULTANEOUS:
+        timer.start()
+        _run_iterative_loop(
+            algo=algo,
+            iterations=training_config["n_iterations"],
+            model_path=model_path,
         )
-        .multi_agent(
-            policies={"pursuer_policy", "evader_policy"},
-            policy_mapping_fn=lambda agent_id, *args, **kwargs: (
-                "pursuer_policy" if "pursuer" in str(agent_id) else "evader_policy"
-            ),
+        timer.stop()
+    elif training_config["name"] == ALTERNATING:
+        timer.start()
+        _run_alternating_loop(
+            algo=algo,
+            n_stages=training_config["n_stages"],
+            iters_per_stage=training_config["iters_per_stage"],
+            model_path=model_path,
         )
-        .learners(
-            num_learners=1,  # Number of parallel learner processes for computing gradients
-        )
-        .env_runners(
-            num_env_runners=4,  # Number of processes/threads that run the environment in parallel
-            num_envs_per_env_runner=5,  # Number of environments per env_runner
-        )
-        .training(
-            train_batch_size=10000,  # Number of timesteps before each gradient update. Larger batches = more stable gradients
-            minibatch_size=512,  # Size of each mini batch for each SGD update
-            num_epochs=10,  # Number of full passes over the train batch per learner. More epochs = more gradient updates per batch
-            lr=3e-4,  # Learning rate for optimization
-            gamma=0.99,  # Discount factor: future rewards are multiplied by gamma
-            lambda_=0.95,  # Balances short-term, low-variance estimates against long-term, high-variance returns in GAE (General Advantage Estimation)
-            clip_param=0.2,  # The PPO clip parameter: Limits how much the policy can change in one update
-            vf_loss_coeff=0.5,  # Weight of the value function loss in the total loss
-            entropy_coeff=0.01,  # Encourage exploration
-        )
-        .callbacks(MetricsCallback)
-        .evaluation(
-            evaluation_num_env_runners=0
-        )  # No separate evaluation environments. >0 = parallel evaluation of policy while training
-    )
-
-    algo = config.build_algo()
-
-    pursuer_pool: list[dict] = []
-    evader_pool: list[dict] = []
-    start_iteration = 0
-    checkpoint_dir = ""
-
-    # TODO: Check this, restore_training only takes a model name now (e.g. checkpoint is just a model_name)
-    train_metrics_path = metrics_path("train")
-    if checkpoint is not None:
-        checkpoint_dir, start_iteration = restore_training(
-            algo, checkpoint, pursuer_pool, evader_pool
-        )
+        timer.stop()
     else:
-        checkpoint_dir = setup_checkpoints_dir(model_name=model_name)
-        print(f"No checkpoint specified. Starting new training run at {checkpoint_dir}")
+        raise ValueError(f"Recieved unkown trainable name {training_config['type']}")
 
-        # This is not needed if model_name is provided
-        extracted_model_name = checkpoint_dir.parent.name
+    if training_path:
+        timer.write_time(training_path)
+    else:
+        timer.print_time()
 
-        # Build training config based on strategy
-        training_config = {}
-        if training_strategy == "alternating":
-            training_config = {
-                "n_stages": N_STAGES,
-                "iters_per_stage": ITERS_PER_STAGE,
-            }
-        elif training_strategy == "simultaneous":
-            training_config = {
-                "n_iterations": ITERS_PER_STAGE,  # Total iterations
-            }
+    # Handle all metric and saving stuff here
+    rewards = get_rewards(training_path)
+    create_reward_graph(rewards=rewards, figure_path=figure_path)
 
-        initial_info = {
-            "map": map,
-            "n_pursuers": n_pursuers,
-            "n_evaders": n_evaders,
-            "training_strategy": training_strategy,
-            "training_config": training_config,
-            "hyperparameters": {
-                "num_learners": config.num_learners,
-                "num_env_runners": config.num_env_runners,
-                "num_envs_per_env_runner": config.num_envs_per_env_runner,
-                "train_batch_size": config.train_batch_size,
-                "minibatch_size": config.minibatch_size,
-                "num_epochs": config.num_epochs,
-                "lr": config.lr,
-                "gamma": config.gamma,
-                "lambda_": config.lambda_,
-                "clip_param": config.clip_param,
-                "vf_loss_coeff": config.vf_loss_coeff,
-                "entropy_coeff": config.entropy_coeff,
-            },
+    # Save final model to easily find it and evaluate it
+    if training_path:
+        final_model = training_path / "final_model"
+        print(f"Saving final model at {final_model}")
+        algo.save(str(final_model))
+        evaluate_model(
+            training_path=training_path,
+            model_config=model_config,
+            map_dict=map_dict,
+            figure_path=figure_path,
+            n_pursuers=n_pursuers,
+            n_evaders=n_evaders,
+        )
+
+
+def evaluate_model(
+    training_path, model_config, map_dict, figure_path, n_pursuers, n_evaders
+):
+    evaluation_duration = 1000
+    model_config["evaluation_num_env_runners"] = 4
+    model_config["evaluation_duration"] = evaluation_duration
+    callbacks = [MetricsCallback, HeatmapCallback]
+    ppo_config = _build_ppo_config(
+        config=model_config,
+        callbacks=callbacks,
+        env_config=map_dict,
+        n_pursuers=n_pursuers,
+        n_evaders=n_evaders,
+        figure_path=figure_path,
+        metrics_path=training_path,
+    )
+
+    algo = ppo_config.build_algo()
+    algo.restore(str(training_path / "final_model"))
+
+    print(f"Evaluating model over {evaluation_duration} episodes")
+    algo.evaluate()
+
+
+class Timer:
+    def start(self) -> None:
+        self.start_time = time.time()
+
+    def stop(self):
+        self.end_time = time.time()
+        self.training_time = self.end_time - self.start_time
+
+    def write_time(self, path: Path):
+        time_info = {
+            "Training start": self.start_time,
+            "Training end": self.end_time,
+            "Training time": self.training_time,
         }
-        save_model_info(extracted_model_name, initial_info)
+        time_file = path / "training_time.json"
+        with open(time_file, "w") as f:
+            json.dump(time_info, f, indent=2)
 
-    rewards = []
-    episodes_data = []
+    def print_time(self):
+        print(f"Training time: {self.training_time}")
 
-    # try/finally ensures Ray always shuts down cleanly even if training crashes
-    try:
-        for k in range(start_iteration, start_iteration + N_STAGES):
-            # for every stage the evader trains against a frozen pursuer, then the pursuer trains against a frozen evader
-            for training_policy, frozen_policy, label, pool, opp_pool in [
-                (
-                    "evader_policy",
-                    "pursuer_policy",
-                    "evader",
-                    evader_pool,
-                    pursuer_pool,
-                ),
-                (
-                    "pursuer_policy",
-                    "evader_policy",
-                    "pursuer",
-                    pursuer_pool,
-                    evader_pool,
-                ),
-            ]:
-                print(f"\nStage {k + 1}: training {label}")
 
-                assert algo.learner_group is not None
+def get_rewards(training_path):
+    # Read the JSON file
+    file_path = training_path / "evaluation_metrics.json"
+    with open(str(file_path), "r") as f:
+        data = json.load(f)
 
-                # assert is needed because algo.config is typed as `AlgorithmConfig | None`
-                assert algo.config is not None
-                # Once the algorithm is built using build_algo(), RLlib locks the config as direct mutation is not intended.
-                # Only solution (i found) is to unfreeze it, change the multi-agent config, then refreeze it
-                algo.config._is_frozen = False
-                # Update the learn_group config
-                algo.learner_group.foreach_learner(
-                    lambda learner, *args: learner.config.multi_agent(
-                        policies_to_train=[training_policy]
-                    )
-                )
-                algo.config._is_frozen = True
+    # Create a dictionary to store rewards by agent
+    rewards_by_agent = defaultdict(list)
 
-                # If pool has past policies, sample and load into frozen policy.
-                if opp_pool:
-                    opp_weights = sample_opponent(opp_pool)
-                    algo.learner_group.set_weights({frozen_policy: opp_weights})
+    # Iterate through each entry and collect rewards
+    for entry in data:
+        mean_rewards = entry.get("mean_rewards", {})
+        for agent_name, reward in mean_rewards.items():
+            rewards_by_agent[agent_name].append(reward)
 
-                for i in range(ITERS_PER_STAGE):
-                    result = algo.train()
-                    mean = result["env_runners"]["agent_episode_returns_mean"]
-                    rewards.append(mean)
-                    iteration_data = build_train_iteration_data(result, i + 1)
-                    episodes_data.extend(iteration_data.get("episodes", []))
-
-                    # Keep a live per-episode log while training is in progress.
-                    write_metrics(train_metrics_path, {"episodes": episodes_data})
-
-                if len(opp_pool) != 0:
-                    algo.learner_group.set_weights({frozen_policy: opp_pool[-1]})
-
-                assert algo.learner_group is not None
-                # put the current training policy weights into the pool for future sampling
-                updated_weights = algo.learner_group.get_weights()[training_policy]
-                pool.append(updated_weights)
-
-                # Save a checkpoint after each full stage (evader+pursuer training)
-                if label == "pursuer":
-                    # {k + 1:05d} for zero padding e.g. stage_00012 instead of stage_12
-                    print(f"Saving stage {k + 1} at {checkpoint_dir}/stage_{k + 1:05d}")
-                    check = f"{checkpoint_dir}/stage_{k + 1:05d}"
-                    algo.save(checkpoint_dir=check)
-    finally:
-        algo.stop()
-        ray.shutdown()
-
-        # Add final aggregate summary after all episodes are complete.
-        write_metrics(
-            train_metrics_path,
-            build_train(episodes_data, final_rewards=rewards[-1] if rewards else {}),
-        )
-
-        iterations = list(range(1, len(rewards) + 1))
-        evader_rewards = [r["evader_2"] for r in rewards]
-        pursuer_0_rewards = [r["pursuer_0"] for r in rewards]
-
-        fig, ax = plt.subplots(figsize=(10, 5))
-
-        ax.plot(
-            iterations, evader_rewards, label="Evader", color="royalblue", linewidth=2
-        )
-        ax.plot(
-            iterations,
-            pursuer_0_rewards,
-            label="Pursuers",
-            color="seagreen",
-            linewidth=2,
-        )
-
-        ax.set_xlabel("Iteration")
-        ax.set_ylabel("Reward")
-        ax.set_title("Mean reward per Iteration")
-        ax.legend()
-        ax.grid(True, linestyle="--", alpha=0.5)
-
-        plt.tight_layout()
-        plt.show()
+    # Convert to regular dict (optional)
+    rewards_by_agent = dict(rewards_by_agent)
+    return rewards_by_agent
