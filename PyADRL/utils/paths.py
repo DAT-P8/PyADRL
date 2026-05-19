@@ -45,4 +45,4 @@ def get_model_dir(model_name: str) -> Path:
 
 def get_checkpoints_dir(model_name: str) -> Path:
     """Gets the path of the model checkpoints folder."""
-    return get_model_dir(model_name) / "checkpoints"
+    return get_model_dir(model_name) / "models"
