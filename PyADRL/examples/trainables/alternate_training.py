@@ -36,10 +36,14 @@ def _run_alternating_loop(
     global_step = 0
     result = {}
 
-    # Pull n_evaders once — needed to compute "full capture" rate during eval.
+    # Pull n_evaders + time_limit once — needed by summarize_evaluation for
+    # capture/ACS normalisation. Read here so the eval-summary call site
+    # doesn't have to know about RLlib config plumbing.
     n_evaders = 1
+    time_limit = 100
     if algo.config is not None and algo.config.env_config is not None:
         n_evaders = algo.config.env_config.get("n_evaders", 1)
+        time_limit = algo.config.env_config.get("time_limit", 100)
 
     pools = {EVADER: [], PURSUER: []}
     train_evader = True
@@ -90,7 +94,9 @@ def _run_alternating_loop(
 
         # Report to Tune so ASHA can prune bad trials early
         if report_to_tune:
-            metrics = summarize_evaluation(eval_result, n_evaders=n_evaders)
+            metrics = summarize_evaluation(
+                eval_result, n_evaders=n_evaders, time_limit=time_limit
+            )
             # global_step tracks total algo.train() calls across all stages.
             # ASHA reads this as time_attr so grace_period/max_t semantics
             # are in real iteration space, not tune.report() call count.

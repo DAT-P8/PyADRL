@@ -51,12 +51,9 @@ N_EVADERS = 1
 # Shielding
 SHIELDING = False
 
-# TODO: change later
 # === Metric selection ===
-# Metric ASHA uses to cull trials during the search. "mean_reward" gives
-# the earliest learning signal (works from iteration 1); capture/breach rates
-# are often zero in early training and provide poor discrimination.
-ASHA_METRIC = "mean_reward"
+# Metric ASHA uses to cull trials during the search.
+ASHA_METRIC = "comb_score"
 
 # Metric used to pick the top-N configs after the search finishes.
 # Options exposed:
@@ -68,10 +65,13 @@ ASHA_METRIC = "mean_reward"
 #   "breach_rate"          - fraction of episodes where an evader reached target
 #   "mean_episode_length"  - average steps per episode
 #   "pursuer_success"      - full_capture_rate - breach_rate
-SELECTION_METRIC = "pursuer_success"
+#   "capture_score"        - (1/|E|) * sum_k k*CR@k — k-weighted partial captures
+#   "score_p"              - capture_score - BR - col_p - bvr_p - oc_p - β*ACS/Tmax
+#   "comb_score"           - score_p - γ*(col_e + bvr_e + oc_e);
+SELECTION_METRIC = "comb_score"
 
 # TODO: ASHA currently prunes too many for iterative training
-NUM_SAMPLES = 20
+NUM_SAMPLES = 36
 MAX_CONCURRENT_TRIALS = 12
 
 
@@ -177,6 +177,8 @@ def gridworld_tune(
 
                 print(f"\n=== Training trail {i + 1} ===")
                 print(f"{SELECTION_METRIC}: {trial.metrics.get(SELECTION_METRIC)}")
+                print(f"score_p: {trial.metrics.get('score_p')}")
+                print(f"capture_score: {trial.metrics.get('capture_score')}")
                 print(f"mean_reward: {trial.metrics.get('mean_reward')}")
                 print(f"full_capture_rate: {trial.metrics.get('full_capture_rate')}")
                 print(f"breach_rate: {trial.metrics.get('breach_rate')}")

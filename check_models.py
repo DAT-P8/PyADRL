@@ -18,7 +18,8 @@ Key checks on completed trainings:
   3. Metric values in valid ranges
   4. Invariant: capture_rate_at_k[n_evaders] + breach_rate <= 1.0
      (env terminates on either event - mutually exclusive)
-  5. No NaN in critical fields
+  5. No NaN in critical fields (incl. comb_score / score_p / capture_score
+     when present — runs predating the composite-score impl just skip these)
   6. mean_rewards dict has both pursuer + evader sides
   7. No catastrophic regression in final eval vs mid-training
 """
@@ -140,7 +141,15 @@ def check_metrics_completed(
         br = entry.get("breach_rate")
         pursuer_r, evader_r = get_agent_rewards(entry)
 
-        for v in (fc, br, pursuer_r, evader_r):
+        # Composite scores: present only when evaluation_metrics.json was
+        # written after the score_p/comb_score impl landed. Treat as
+        # optional — older runs just won't be checked on these fields.
+        comb = entry.get("comb_score")
+        score_p = entry.get("score_p")
+        cap_score = entry.get("capture_score")
+        wacs = entry.get("weighted_acs")
+
+        for v in (fc, br, pursuer_r, evader_r, comb, score_p, cap_score, wacs):
             if isinstance(v, float) and v != v:  # NaN
                 nan_count += 1
 
@@ -148,6 +157,20 @@ def check_metrics_completed(
             out_of_range["full_capture_rate"] += 1
         if br is not None and not (-TOL <= br <= 1.0 + TOL):
             out_of_range["breach_rate"] += 1
+        # capture_score is bounded in [0, 1] — same domain as a rate.
+        if cap_score is not None and not (-TOL <= cap_score <= 1.0 + TOL):
+            out_of_range["capture_score"] += 1
+        # weighted_acs is a time in [0, Tmax*(|E|+1)/2]; we don't know
+        # Tmax here so just sanity-check non-negativity.
+        if wacs is not None and wacs < -TOL:
+            out_of_range["weighted_acs (negative)"] += 1
+        # score_p / comb_score have no natural upper bound but should never
+        # exceed +1 in practice (capture_score caps the positive term at 1).
+        # Catch obviously-broken values (very large magnitudes); the bound
+        # is loose because beta*ACS/Tmax can in theory exceed 1.
+        for name, val in (("score_p", score_p), ("comb_score", comb)):
+            if val is not None and not (-10.0 <= val <= 10.0):
+                out_of_range[name] += 1
 
         if fc is not None and br is not None and fc + br > 1.0 + TOL:
             invariant_violations += 1
@@ -239,7 +262,18 @@ def check_metrics_completed(
     el = last.get("mean_episode_length")
     cs = last.get("mean_capture_step")
     e_oob = last.get("mean_evader_out_of_bounds_rate")
+    comb = last.get("comb_score")
+    score_p = last.get("score_p")
+    cap_score = last.get("capture_score")
     parts = []
+    # Lead with comb_score / score_p / capture_score (the selection-metric
+    # family) when present — these are the numbers the tuner ranked on.
+    if comb is not None:
+        parts.append(f"comb={comb:.3f}")
+    if score_p is not None:
+        parts.append(f"score_p={score_p:.3f}")
+    if cap_score is not None:
+        parts.append(f"cap_score={cap_score:.3f}")
     if fc is not None:
         parts.append(f"capture={fc:.3f}")
     if br is not None:
@@ -280,7 +314,10 @@ def check_metrics_in_progress(
     fc = get_full_capture_rate(last, n_evaders)
     br = last.get("breach_rate")
     p_r, _ = get_agent_rewards(last)
+    comb = last.get("comb_score")
     parts = [f"iter ~{n_done}/{expected_iters} ({pct:.0f}%)"]
+    if comb is not None:
+        parts.append(f"comb={comb:.3f}")
     if fc is not None:
         parts.append(f"capture={fc:.3f}")
     if br is not None:

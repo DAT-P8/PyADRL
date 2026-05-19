@@ -86,7 +86,39 @@ def rate(ids, role_ids, n):
     return len([i for i in ids if i in role_ids]) / n if n > 0 else 0.0
 
 
-def summarize_evaluation(eval_result: dict, n_evaders: int) -> dict:
+def weighted_capture_score(episode_outcomes: list[dict], n_evaders: int) -> float:
+    """capture_score = (1/|E|) * sum_k (k * CR@k).
+
+    Rewards partial captures: an episode catching k evaders
+    contributes k/|E|. Bounded in [0, 1]; 1.0 iff every episode caught every
+    evader.
+    """
+    if n_evaders <= 0 or not episode_outcomes:
+        return 0.0
+    capture_rates = capture_rate_at_k(episode_outcomes)
+    return float(sum(k * v for k, v in capture_rates.items())) / n_evaders
+
+
+def weighted_acs(episode_outcomes: list[dict], n_evaders: int) -> float:
+    """ACS = (1/|E|) * sum_k (k * ACS@k).
+
+    ACS@k = mean timestep of the k-th capture across episodes that had at
+    least k captures. Weighted by k so the
+    aggregation parallels capture_score and composes with it in score_p.
+    """
+    if n_evaders <= 0 or not episode_outcomes:
+        return 0.0
+    mean_steps = mean_capture_steps(episode_outcomes)
+    return float(sum((i + 1) * step for i, step in enumerate(mean_steps))) / n_evaders
+
+
+def summarize_evaluation(
+    eval_result: dict,
+    n_evaders: int,
+    time_limit: int = 100,
+    beta: float = 1.0,
+    gamma: float = 1.0,
+) -> dict:
     """Flatten an algo.evaluate() result into a dict of scalar metrics for tune.report.
 
     Pulls the per-episode outcomes that MetricsCallback logs via
@@ -94,10 +126,21 @@ def summarize_evaluation(eval_result: dict, n_evaders: int) -> dict:
     and aggregates them into single numbers suitable for Tune's metric tracking
     and ASHA scheduling.
 
+    The composite scores follow:
+        score_p   = capture_score - BR - col_p - bvr_p - oc_p - beta*ACS/Tmax
+        comb_score = score_p - gamma*(col_e + bvr_e + oc_e)
+    where capture_score and ACS are weighted across k (see helpers above).
+
     Args:
         eval_result: Return value of algo.evaluate().
-        n_evaders: Number of evaders per episode. Used to determine what counts
-            as a "full" capture (all evaders caught).
+        n_evaders: Number of evaders per episode. Determines what counts as a
+            "full" capture and normalises capture_score / ACS weighting.
+        time_limit: Tmax — episode time limit, used to normalise the ACS term.
+        beta: Weight on the ACS/Tmax penalty in score_p. Larger beta penalises
+            slow captures more strongly.
+        gamma: Weight on the evader-misbehavior penalty in comb_score. Larger
+            gamma more strongly down-ranks trials whose evaders self-destruct
+            (favouring co-evolved pairs where both sides are competent).
 
     Returns:
         Flat dict of scalar metrics. Always contains 'mean_reward' so existing
@@ -126,6 +169,14 @@ def summarize_evaluation(eval_result: dict, n_evaders: int) -> dict:
     breach_rate = 0.0
     mean_episode_length = 0.0
     mean_capture_step = -1.0
+    capture_score = 0.0
+    acs = 0.0
+    col_p = 0.0
+    col_e = 0.0
+    bvr_p = 0.0
+    bvr_e = 0.0
+    oc_p = 0.0
+    oc_e = 0.0
 
     if episode_outcomes:
         capture_rates = capture_rate_at_k(episode_outcomes)
@@ -141,6 +192,50 @@ def summarize_evaluation(eval_result: dict, n_evaders: int) -> dict:
             np.mean([o.get("episode_length", 0) for o in episode_outcomes])
         )
         mean_capture_step = float(mean_capture(episode_outcomes))
+        capture_score = weighted_capture_score(episode_outcomes, n_evaders)
+        acs = weighted_acs(episode_outcomes, n_evaders)
+        # Per-team aggregate rates: mean across episodes of the per-episode
+        # rate (which is itself per-team-averaged in EpisodeOutcome). This
+        # matches the formulas: (1/(M*|team|)) sum_i sum_z indicator(z, i).
+        col_p = float(
+            np.mean(
+                [o.get("pursuer_drone_collision_rate", 0.0) for o in episode_outcomes]
+            )
+        )
+        col_e = float(
+            np.mean(
+                [o.get("evader_drone_collision_rate", 0.0) for o in episode_outcomes]
+            )
+        )
+        bvr_p = float(
+            np.mean(
+                [o.get("pursuer_out_of_bounds_rate", 0.0) for o in episode_outcomes]
+            )
+        )
+        bvr_e = float(
+            np.mean([o.get("evader_out_of_bounds_rate", 0.0) for o in episode_outcomes])
+        )
+        oc_p = float(
+            np.mean(
+                [
+                    o.get("pursuer_obstacle_collision_rate", 0.0)
+                    for o in episode_outcomes
+                ]
+            )
+        )
+        oc_e = float(
+            np.mean(
+                [o.get("evader_obstacle_collision_rate", 0.0) for o in episode_outcomes]
+            )
+        )
+
+    # Composite scores (see docstring).
+    # safe_tmax guards against a misconfigured time_limit=0 producing NaN.
+    safe_tmax = max(int(time_limit), 1)
+    score_p = (
+        capture_score - breach_rate - col_p - bvr_p - oc_p - beta * acs / safe_tmax
+    )
+    comb_score = score_p - gamma * (col_e + bvr_e + oc_e)
 
     return {
         "mean_reward": mean_reward,
@@ -156,6 +251,17 @@ def summarize_evaluation(eval_result: dict, n_evaders: int) -> dict:
         # Composite: positive means pursuers winning, negative means evaders winning.
         # Useful as an ASHA metric when you care about pursuer success specifically.
         "pursuer_success": full_capture_rate - breach_rate,
+        # Composite scoring (capture_score / ACS / per-team penalty rates).
+        "capture_score": capture_score,
+        "weighted_acs": acs,
+        "col_p": col_p,
+        "col_e": col_e,
+        "bvr_p": bvr_p,
+        "bvr_e": bvr_e,
+        "oc_p": oc_p,
+        "oc_e": oc_e,
+        "score_p": score_p,
+        "comb_score": comb_score,
     }
 
 
@@ -173,6 +279,9 @@ class MetricsCallback(RLlibCallback):
         self.metrics_path = None
         self.n_pursuers = 0
         self.n_evaders = 0
+        self.time_limit = 100
+        self.beta = 1.0
+        self.gamma = 1.0
         # Cross-episode buffer — appended on each on_episode_end across all
         # concurrent envs, drained on on_evaluate_start.
         self.episode_outcomes: list[EpisodeOutcome] = []
@@ -207,6 +316,9 @@ class MetricsCallback(RLlibCallback):
         self.metrics_path = algorithm.config.env_config.get("metrics_path")
         self.n_pursuers = algorithm.config.env_config.get("n_pursuers", 0)
         self.n_evaders = algorithm.config.env_config.get("n_evaders", 0)
+        self.time_limit = algorithm.config.env_config.get("time_limit", 100)
+        self.beta = algorithm.config.env_config.get("score_beta", 1.0)
+        self.gamma = algorithm.config.env_config.get("score_gamma", 1.0)
 
     def on_episode_end(
         self,
@@ -479,6 +591,30 @@ class MetricsCallback(RLlibCallback):
         capture_rates = capture_rate_at_k(episode_outcomes)
         average_capture_step = mean_capture(episode_outcomes)
 
+        # Composite scores — same definitions as summarize_evaluation, baked
+        # into evaluation_metrics.json so analysis sees the same
+        # numbers Tune ranked on. β / γ / Tmax come from env_config via
+        # on_algorithm_init; defaults match summarize_evaluation's defaults.
+        capture_score_val = weighted_capture_score(episode_outcomes, self.n_evaders)
+        acs_val = weighted_acs(episode_outcomes, self.n_evaders)
+        breach_rate_val = float(means[0])
+        col_e_val = float(means[2])
+        col_p_val = float(means[3])
+        oc_e_val = float(means[4])
+        oc_p_val = float(means[5])
+        bvr_e_val = float(means[6])
+        bvr_p_val = float(means[7])
+        safe_tmax = max(int(self.time_limit), 1)
+        score_p_val = (
+            capture_score_val
+            - breach_rate_val
+            - col_p_val
+            - bvr_p_val
+            - oc_p_val
+            - self.beta * acs_val / safe_tmax
+        )
+        comb_score_val = score_p_val - self.gamma * (col_e_val + bvr_e_val + oc_e_val)
+
         mean_summary = {
             "timestamp": datetime.now().isoformat(),
             "capture_rate_at_k": capture_rates,
@@ -492,17 +628,22 @@ class MetricsCallback(RLlibCallback):
                     ]
                 )
             ),
-            "breach_rate": float(means[0]),
+            "breach_rate": breach_rate_val,
             "mean_episode_length": float(means[1]),
-            "mean_evader_drone_collision_rate": float(means[2]),
-            "mean_pursuer_drone_collision_rate": float(means[3]),
-            "mean_evader_obstacle_collision_rate": float(means[4]),
-            "mean_pursuer_obstacle_collision_rate": float(means[5]),
-            "mean_evader_out_of_bounds_rate": float(means[6]),
-            "mean_pursuer_out_of_bounds_rate": float(means[7]),
+            "mean_evader_drone_collision_rate": col_e_val,
+            "mean_pursuer_drone_collision_rate": col_p_val,
+            "mean_evader_obstacle_collision_rate": oc_e_val,
+            "mean_pursuer_obstacle_collision_rate": oc_p_val,
+            "mean_evader_out_of_bounds_rate": bvr_e_val,
+            "mean_pursuer_out_of_bounds_rate": bvr_p_val,
             "evader_shield_intervention_rate": float(means[8]),
             "pursuer_shield_intervention_rate": float(means[9]),
             "mean_rewards": rewards_dict,
+            # Composite scoring (matches summarize_evaluation).
+            "capture_score": capture_score_val,
+            "weighted_acs": acs_val,
+            "score_p": score_p_val,
+            "comb_score": comb_score_val,
         }
 
         if self.metrics_path:

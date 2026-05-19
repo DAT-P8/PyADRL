@@ -47,8 +47,10 @@ def _run_iterative_loop(
 ) -> dict:
     # Pull n_evaders once for "full capture".
     n_evaders = 1
+    time_limit = 100
     if algo.config is not None and algo.config.env_config is not None:
         n_evaders = algo.config.env_config.get("n_evaders", 1)
+        time_limit = algo.config.env_config.get("time_limit", 100)
 
     result = {}
     for i in range(1, iterations + 1):
@@ -64,7 +66,9 @@ def _run_iterative_loop(
         if i % eval_interval == 0 or i == iterations:
             eval_result = algo.evaluate()
             if report_to_tune:
-                metrics = summarize_evaluation(eval_result, n_evaders=n_evaders)
+                metrics = summarize_evaluation(
+                    eval_result, n_evaders=n_evaders, time_limit=time_limit
+                )
                 # Include the actual algo.train() iteration count so ASHA can
                 # use it as time_attr. Ray's automatic training_iteration only
                 # counts tune.report() calls, which with eval_interval=5 ticks
