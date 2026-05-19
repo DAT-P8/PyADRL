@@ -2,6 +2,7 @@ from parser import parse_args, log_levels
 import os
 from PyADRL.examples.gridworld_train import gridworld_train
 from PyADRL.utils.logger import Logger
+from PyADRL.utils.path_utils import setup_model_dir
 
 
 def main():
@@ -17,10 +18,7 @@ def main():
                 f"Unknown log level: {args.log_level}. Available log levels: {', '.join(log_levels)}"
             )
 
-    checkpoint = args.restore
-    model_name = args.name if args.name else None
-
-    gridworld_train(args.map, checkpoint=checkpoint, model_name=model_name)
+    gridworld_train(args.map, training_path=setup_model_dir())
 
 
 if __name__ == "__main__":

@@ -39,9 +39,9 @@ DEFAULT_CONFIG = {
     "minibatch_size": 512,
     "num_epochs": 10,
     # --- Resource params (all in-process to avoid placement group errors) ---
-    "num_learners": 1,
-    "num_env_runners": 4,
-    "num_envs_per_env_runner": 5,
+    "num_learners": 0,
+    "num_env_runners": 0,
+    "num_envs_per_env_runner": 10,
 }
 
 
@@ -72,8 +72,11 @@ def gridworld_train(
     figure_path = None
     model_path = None
     if training_path:
+        training_path.mkdir(parents=True, exist_ok=True)
         figure_path = training_path / "figures"
         model_path = training_path / "models"
+        figure_path.mkdir(parents=True, exist_ok=True)
+        model_path.mkdir(parents=True, exist_ok=True)
 
     timer = Timer()
     ppo_config = _build_ppo_config(
@@ -135,7 +138,8 @@ def evaluate_model(
     training_path, model_config, map_dict, figure_path, n_pursuers, n_evaders
 ):
     evaluation_duration = 1000
-    model_config["evaluation_num_env_runners"] = 4
+    model_config = dict(model_config)
+    model_config["evaluation_num_env_runners"] = 1
     model_config["evaluation_duration"] = evaluation_duration
     callbacks = [MetricsCallback, HeatmapCallback]
     ppo_config = _build_ppo_config(
