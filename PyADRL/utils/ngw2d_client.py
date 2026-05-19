@@ -54,7 +54,7 @@ class NGWClient:
         parsed_response = StateResponse.from_dto(res.state_response)
         if parsed_response.error_message is not None:
             raise ValueError(
-                f"Error response from New: {parsed_response.error_message}"
+                f"Error response from Reset: {parsed_response.error_message}"
             )
         if parsed_response.state is None:
             raise ValueError("Received a None state")

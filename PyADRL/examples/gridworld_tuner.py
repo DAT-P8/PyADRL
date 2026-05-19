@@ -11,6 +11,7 @@ from .gridworld_train import gridworld_train
 from ..utils.save_info import save_info, make_strategy_dict
 from ..utils.path_utils import setup_experiment_dirs
 from ..utils.map_load import load_map_dict
+from ..logger.metrics import MetricsCallback
 
 # === Training specifications ===
 # Training types
@@ -20,15 +21,21 @@ SIMULTANEOUS = "simultaneous"
 # Alternating training specifications
 N_STAGES = 8
 ITERS_PER_STAGE = 10
-ALTERNATING_GRACE = N_STAGES * ITERS_PER_STAGE * 2
+# Each stage has 2 halves (train evader, then pursuer), so total algo.train()
+# calls = N_STAGES * ITERS_PER_STAGE * 2. Previous formula had max_t < total,
+# which silently disabled ASHA culling because grace > max_t.
+ALTERNATING_MAX_T = N_STAGES * ITERS_PER_STAGE * 2
+ALTERNATING_GRACE = ALTERNATING_MAX_T // 2
 
 # Simultaneous training specifications
-ITERATIONS = 400
-SIMULTANEOUS_GRACE = ITERATIONS // 2
+# Convergence analysis showed trials reach peak ~70% through training;
+# 250 iterations gives slow-learning configs room to actually converge.
+ITERATIONS = 250
+SIMULTANEOUS_GRACE = 50
 
 
 # === Experiment Configurations ===
-EXPERIMENT_NUM = 1
+EXPERIMENT_NUM = 4
 
 # Amount of hyperparameter configurations we pick for training
 NUM_CONFIGS = 3
@@ -46,12 +53,31 @@ N_EVADERS = 1
 # Shielding
 SHIELDING = False
 
+# === Metric selection ===
+# Metric ASHA uses to cull trials during the search. "mean_reward" gives
+# the earliest learning signal (works from iteration 1); capture/breach rates
+# are often zero in early training and provide poor discrimination.
+ASHA_METRIC = "mean_reward"
+
+# Metric used to pick the top-N configs after the search finishes. This is
+# where you encode what you actually care about — typically a task-grounded
+# metric, not the noisy reward sum. Options exposed by summarize_evaluation:
+#   "mean_reward"          - legacy sum-of-agent-rewards (matches ASHA default)
+#   "pursuer_reward"       - sum of pursuer agents' returns only
+#   "evader_reward"        - sum of evader agents' returns only
+#   "full_capture_rate"    - fraction of episodes where all evaders were caught
+#   "any_capture_rate"     - fraction of episodes with at least one capture
+#   "breach_rate"          - fraction of episodes where an evader reached target
+#   "mean_episode_length"  - average steps per episode
+#   "pursuer_success"      - full_capture_rate - breach_rate
+SELECTION_METRIC = "pursuer_success"
+
 
 def gridworld_tune(
     map: str,
     tuner_dir: str,
-    num_samples: int = 8,
-    max_concurrent_trials: int = 4,
+    num_samples: int = 20,
+    max_concurrent_trials: int = 12,
 ) -> tune.ResultGrid:
     """Run a Ray Tune hyperparameter search over the alternating self-play loop.
 
@@ -75,23 +101,32 @@ def gridworld_tune(
         shielding=SHIELDING,
     )
 
-    # Define what hyperparameter values to try
+    # Define what hyperparameter values to try.
+    # Boundaries narrowed and architecture choices reduced based on analysis
+    # of 32-trial preliminary search (see methodology notes):
+    #   - lr<5e-5 winners never appeared in top performers
+    #   - gamma>0.99 underperformed (winners cluster 0.95-0.985)
+    #   - clip_param<0.15 underperformed
+    #   - train_batch_size=5000 markedly worse (mean 0.08 vs 0.35-0.36 for 10k/20k);
+    #     10k and 20k statistically tied, picked 10k for ~30% per-iteration speedup
+    #   - minibatch_size=512 markedly worse in both short and long trained trials
+    #   - num_epochs={5,20} both underperformed among long-trained trials
     search_space = {
         # --- Training params ---
-        "lr": tune.loguniform(1e-5, 1e-3),
-        "gamma": tune.uniform(0.95, 0.999),
+        "lr": tune.loguniform(5e-5, 1e-3),
+        "gamma": tune.uniform(0.95, 0.99),
         "lambda_": tune.uniform(0.9, 1.0),
-        "clip_param": tune.uniform(0.1, 0.3),
+        "clip_param": tune.uniform(0.15, 0.3),
         "vf_loss_coeff": tune.uniform(0.25, 1.0),
         "entropy_coeff": tune.loguniform(0.001, 0.05),
-        # --- Architecture params ---
-        "train_batch_size": tune.choice([5000, 10000, 20000]),
-        "minibatch_size": tune.choice([256, 512, 1024]),
-        "num_epochs": tune.choice([5, 10, 15, 20]),
+        # --- Architecture params (fixed/narrowed based on data) ---
+        "train_batch_size": 10000,
+        "minibatch_size": tune.choice([256, 1024]),
+        "num_epochs": tune.choice([10, 15]),
         # --- Resource params (all in-process to avoid placement group errors) ---
         "num_learners": 0,
         "num_env_runners": 0,
-        "num_envs_per_env_runner": 10,
+        "num_envs_per_env_runner": 64,
     }
 
     # Define scheduler
@@ -99,26 +134,26 @@ def gridworld_tune(
     max_time = ITERATIONS
     if TRAINING_LOOP == ALTERNATING:
         grace = ALTERNATING_GRACE
-        max_time = N_STAGES * ITERS_PER_STAGE
+        max_time = ALTERNATING_MAX_T
 
     scheduler = ASHAScheduler(
-        metric="mean_reward",
+        time_attr="algo_iteration",
+        metric=ASHA_METRIC,
         mode="max",
         max_t=max_time,
-        # Let each trial finish at least one full phase
         grace_period=grace,
-        # Let top 1/3 trials continue to next stage (rung) while the rest are stopped
         reduction_factor=3,
     )
 
     # Setup tuner
     tuner = tune.Tuner(
-        get_tune_trainable(),
+        get_tune_trainable(callbacks=[MetricsCallback]),
         param_space=search_space,
         tune_config=tune.TuneConfig(
             num_samples=num_samples,
             scheduler=scheduler,
             max_concurrent_trials=max_concurrent_trials,
+            reuse_actors=True,
         ),
         # We likely don't need this, but it's nice to have for safety
         run_config=tune.RunConfig(
@@ -147,7 +182,10 @@ def gridworld_tune(
                     raise ValueError("Trial has missing data")
 
                 print(f"\n=== Training trail {i + 1} ===")
-                print(f"Reward:\n{trial.metrics.get('mean_reward')}")
+                print(f"{SELECTION_METRIC}: {trial.metrics.get(SELECTION_METRIC)}")
+                print(f"mean_reward: {trial.metrics.get('mean_reward')}")
+                print(f"full_capture_rate: {trial.metrics.get('full_capture_rate')}")
+                print(f"breach_rate: {trial.metrics.get('breach_rate')}")
                 print(f"Config:\n{trial.config}")
 
                 for model_num in range(1, TRAIN_PER_CONFIG + 1):
@@ -161,18 +199,86 @@ def gridworld_tune(
                         training_path=training_dir,
                         shielding=SHIELDING,
                     )
-    except RuntimeError:
-        print("\nNo successful trials. Check error logs above for details.")
+    except (RuntimeError, FileExistsError, ValueError) as e:
+        print(f"\nPost-tune step failed: {e}")
+        print(f"Tune results saved at: {tuner_dir}")
 
     ray.shutdown()
     return results
 
 
-def get_best_n(results: ResultGrid, n: int):
-    result_dataframe = results.get_dataframe()
-    top_n_indices = result_dataframe.nlargest(n, "mean_reward").index
-    top_n_results = [results[i] for i in top_n_indices]
-    return top_n_results
+def get_best_n(
+    results: ResultGrid,
+    n: int,
+    metric: str = SELECTION_METRIC,
+    window: int = 5,
+    min_iters: int = 100,
+):
+    """Pick top-N trials by mean of the last `window` reports of `metric`,
+    among trials that reached at least `min_iters` training iterations.
+
+    Why a window: RL evaluation reward is noisy iteration-to-iteration.
+    A trial that hit 0.9 once and dropped to 0.4 should rank below a trial
+    that consistently stayed around 0.75. Averaging the last `window`
+    reports captures stable performance instead of best-single-eval.
+
+    Why a min_iters filter: ASHA culls poor trials early. Their final
+    metric reflects a partially-trained policy, not converged performance.
+    Picking the "best" trial from a mix of converged + half-trained
+    trials systematically biases toward fast-but-shallow learners.
+    With eval_interval=5 in the tune trainable, each report covers 5
+    iterations, so window=5 ≈ 25 iterations of recent history.
+    """
+    import json
+    from pathlib import Path
+
+    def trial_stable_score(trial):
+        """Returns (mean_score_over_window, final_algo_iteration) or None."""
+        if trial.path is None:
+            return None
+        result_file = Path(trial.path) / "result.json"
+        if not result_file.exists():
+            return None
+        with open(result_file) as f:
+            history = [json.loads(line) for line in f if line.strip()]
+        if not history:
+            return None
+        # algo_iteration is the actual algo.train() call count we emit in
+        # the trainable. Ray's auto "training_iteration" only counts
+        # tune.report() calls and lags by a factor of eval_interval.
+        final_iter = history[-1].get("algo_iteration", 0)
+        values = [h.get(metric) for h in history if h.get(metric) is not None]
+        if not values:
+            return None
+        recent = values[-window:]
+        return sum(recent) / len(recent), final_iter
+
+    # Score every trial that produced any data
+    scored = []
+    for trial in results:
+        s = trial_stable_score(trial)
+        if s is None:
+            continue
+        scored.append((trial, s[0], s[1]))
+
+    # Prefer trials that reached min_iters; if we don't have enough,
+    # fall back to all scored trials rather than failing.
+    long_trained = [t for t in scored if t[2] >= min_iters]
+    if len(long_trained) >= n:
+        candidates = long_trained
+        print(
+            f"Selecting top-{n} from {len(long_trained)} long-trained trials "
+            f"(≥{min_iters} iters)"
+        )
+    else:
+        print(
+            f"Warning: only {len(long_trained)} trials reached {min_iters} iters; "
+            f"falling back to all {len(scored)} trials"
+        )
+        candidates = scored
+
+    candidates.sort(key=lambda x: x[1], reverse=True)
+    return [t[0] for t in candidates[:n]]
 
 
 def make_experiment_dirs(n_best, training_config, map):
