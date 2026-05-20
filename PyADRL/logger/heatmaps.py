@@ -470,35 +470,24 @@ class HeatmapCallback(RLlibCallback):
     ):
         fig, ax = plt.subplots(figsize=(8, 8))
 
-        # Fill capture cells purple (below everything else).
-        for cap in capture_positions or []:
-            try:
-                cx, cy = int(cap["x"]), int(cap["y"])
-                ax.add_patch(
-                    patches.Rectangle(
-                        (cx, cy),
-                        1,
-                        1,
-                        facecolor="#9467bd",
-                        edgecolor="none",
-                        alpha=0.6,
-                        zorder=1,
-                    )
-                )
-            except (TypeError, KeyError, ValueError):
-                pass
-
         # Draw the target square
         self._draw_target(ax)
         # Draw objects as solid grey boxes
         self._draw_objects(ax)
+
+        capture_set = set()
+        for cap in capture_positions or []:
+            try:
+                capture_set.add((int(cap["x"]), int(cap["y"])))
+            except (TypeError, KeyError, ValueError):
+                pass
 
         # shield_type -> list of (x, y) across all agents/groups
         shield_positions: dict[str, list[tuple[float, float]]] = {
             k: [] for k in SHIELD_COLORS
         }
 
-        def _plot_group(episode_states, shield_data, unsafe_data, *, color):
+        def _plot_group(episode_states, shield_data, unsafe_data, *, color, use_capture_markers=False):
             plotted_any = False
 
             if not isinstance(episode_states, dict):
@@ -660,9 +649,16 @@ class HeatmapCallback(RLlibCallback):
                     alpha=0.8,
                     zorder=4,
                 )
-                ax.scatter(
-                    xs[-1], ys[-1], marker="x", color=color, s=30, alpha=0.9, zorder=4
-                )
+                last_grid = (int(xs[-1] - 0.5), int(ys[-1] - 0.5))
+                if use_capture_markers and last_grid in capture_set:
+                    ax.scatter(
+                        xs[-1], ys[-1], marker="*", color="yellow", edgecolors="black",
+                        linewidths=0.4, s=120, alpha=1.0, zorder=5,
+                    )
+                else:
+                    ax.scatter(
+                        xs[-1], ys[-1], marker="x", color=color, s=30, alpha=0.9, zorder=4
+                    )
 
                 # Collect shielded positions for overlay after all paths are drawn.
                 # Shield fires when trying to move FROM the previous position,
@@ -683,6 +679,7 @@ class HeatmapCallback(RLlibCallback):
             evader_shield_data,
             evader_unsafe_data,
             color="#d95f02",
+            use_capture_markers=True,
         )
         has_pursuers = _plot_group(
             pursuer_episode_states,
