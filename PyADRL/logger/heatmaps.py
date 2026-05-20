@@ -194,6 +194,16 @@ class HeatmapCallback(RLlibCallback):
             ],
             filename="heatmap_captures",
         )
+        self._plot_shielding_heatmap(
+            [episode.get("evader_states", {}) for episode in drone_states],
+            [episode.get("evader_shield_data", {}) for episode in drone_states],
+            filename="heatmap_shielding_evader",
+        )
+        self._plot_shielding_heatmap(
+            [episode.get("pursuer_states", {}) for episode in drone_states],
+            [episode.get("pursuer_shield_data", {}) for episode in drone_states],
+            filename="heatmap_shielding_pursuer",
+        )
 
         # For trace maps, show one representative episode instead of concatenating paths.
         evader_episodes = [episode.get("evader_states", {}) for episode in drone_states]
@@ -311,6 +321,65 @@ class HeatmapCallback(RLlibCallback):
         # plt.show()
         plt.close(fig)
         print(f"Heatmap Saved in {filename}")
+
+    def _plot_shielding_heatmap(self, episode_states, shield_data, *, filename):
+        grids = {
+            stype: np.zeros((self.grid_h, self.grid_w), dtype=int)
+            for stype in SHIELD_COLORS
+        }
+
+        for ep_idx, ep_states in enumerate(episode_states):
+            if not isinstance(ep_states, dict):
+                continue
+            ep_shields = shield_data[ep_idx] if ep_idx < len(shield_data) else {}
+            if not isinstance(ep_shields, dict):
+                continue
+
+            for agent_id, positions in ep_states.items():
+                shields = ep_shields.get(agent_id, [])
+                for i, (x, y) in enumerate(positions):
+                    stype = shields[i] if i < len(shields) else None
+                    if stype in grids:
+                        px, py = positions[i - 1] if i > 0 else (x, y)
+                        if 0 <= px < self.grid_w and 0 <= py < self.grid_h:
+                            grids[stype][int(py), int(px)] += 1
+
+        if sum(g.sum() for g in grids.values()) == 0:
+            print(f"[HeatmapCallback] No shield activations for {filename}, skipping.")
+            return
+
+        n = len(SHIELD_COLORS)
+        fig, axes = plt.subplots(1, n, figsize=(6 * n, 5))
+        if n == 1:
+            axes = [axes]
+
+        for ax, (stype, _) in zip(axes, SHIELD_COLORS.items()):
+            grid = grids[stype]
+            sns.heatmap(
+                grid,
+                mask=grid == 0,
+                cmap="Reds",
+                linewidths=0.3,
+                linecolor="grey",
+                annot=(self.grid_w <= 20 and self.grid_h <= 20),
+                fmt="d",
+                ax=ax,
+                cbar_kws={"label": "Shield activations"},
+            )
+            ax.set_title(stype.replace("_", " ").title())
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
+            ax.invert_yaxis()
+            self._draw_target(ax)
+            self._draw_objects(ax)
+
+        plt.tight_layout()
+
+        if self.figure_path:
+            path = self.figure_path / f"{filename}.svg"
+            plt.savefig(path, dpi=150)
+        plt.close(fig)
+        print(f"Shielding Heatmap Saved in {filename}")
 
     def _plot_capture_heatmap(self, all_capture_positions, *, filename):
         grid = np.zeros((self.grid_h, self.grid_w), dtype=int)
