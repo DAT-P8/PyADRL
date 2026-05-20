@@ -19,18 +19,17 @@ ALTERNATING = "alternate"
 SIMULTANEOUS = "simultaneous"
 
 # Alternating training specifications
-N_STAGES = 8
+N_STAGES = 10
 ITERS_PER_STAGE = 10
 # Each stage has 2 halves (train evader, then pursuer), so total algo.train()
 # calls = N_STAGES * ITERS_PER_STAGE * 2. Previous formula had max_t < total,
 # which silently disabled ASHA culling because grace > max_t.
 ALTERNATING_MAX_T = N_STAGES * ITERS_PER_STAGE * 2
-ALTERNATING_GRACE = ALTERNATING_MAX_T // 2
+ALTERNATING_GRACE = ITERS_PER_STAGE * 8
 
 # Simultaneous training specifications
-ITERATIONS = 250
-SIMULTANEOUS_GRACE = 50
-
+ITERATIONS = 200
+SIMULTANEOUS_GRACE = 100
 
 # === Experiment Configurations ===
 EXPERIMENT_NUM = 4
@@ -51,12 +50,9 @@ N_EVADERS = 1
 # Shielding
 SHIELDING = False
 
-# TODO: change later
 # === Metric selection ===
-# Metric ASHA uses to cull trials during the search. "mean_reward" gives
-# the earliest learning signal (works from iteration 1); capture/breach rates
-# are often zero in early training and provide poor discrimination.
-ASHA_METRIC = "mean_reward"
+# Metric ASHA uses to cull trials during the search.
+ASHA_METRIC = "comb_score"
 
 # Metric used to pick the top-N configs after the search finishes.
 # Options exposed:
@@ -68,9 +64,11 @@ ASHA_METRIC = "mean_reward"
 #   "breach_rate"          - fraction of episodes where an evader reached target
 #   "mean_episode_length"  - average steps per episode
 #   "pursuer_success"      - full_capture_rate - breach_rate
-SELECTION_METRIC = "pursuer_success"
+#   "capture_score"        - (1/|E|) * sum_k k*CR@k — k-weighted partial captures
+#   "score_p"              - capture_score - BR - col_p - bvr_p - oc_p - β*ACS/Tmax
+#   "comb_score"           - score_p - γ*(col_e + bvr_e + oc_e);
+SELECTION_METRIC = "comb_score"
 
-# TODO: ASHA currently prunes too many for iterative training
 NUM_SAMPLES = 20
 MAX_CONCURRENT_TRIALS = 12
 
@@ -105,18 +103,17 @@ def gridworld_tune(
 
     search_space = {
         # --- Training params ---
-        # TODO: Settle on these final params - could be from "surprising effectiveness of ..." paper
-        "lr": tune.loguniform(5e-5, 1e-3),
-        "gamma": tune.uniform(0.95, 0.99),
-        "lambda_": tune.uniform(0.9, 1.0),
-        "clip_param": tune.uniform(0.15, 0.3),
-        "vf_loss_coeff": tune.uniform(0.25, 1.0),
-        "entropy_coeff": tune.loguniform(0.001, 0.05),
+        "lr": tune.uniform(5e-5, 1e-3),
+        "gamma": 0.99,
+        "lambda_": 0.95,
+        "clip_param": tune.uniform(0.05, 0.2),
+        "vf_loss_coeff": tune.grid_search([0.5, 1]),
+        "entropy_coeff": tune.uniform(0.01, 0.1),
         # --- Architecture params (fixed/narrowed based on data) ---
         "train_batch_size": 10000,
-        # TODO: This is from the paper "surprising effectiveness of..."
-        "minibatch_size": tune.choice([10000]),
-        "num_epochs": tune.choice([10, 15]),
+        "minibatch_size": 10000,
+        # Surprising effectiveness of ... suggests 5 for hard tasks and 10-15 for easy tasks.
+        "num_epochs": tune.grid_search([5, 10, 15]),
         # --- Resource params (all in-process to avoid placement group errors) ---
         "num_learners": 0,
         "num_env_runners": 0,
@@ -136,7 +133,7 @@ def gridworld_tune(
         mode="max",
         max_t=max_time,
         grace_period=grace,
-        reduction_factor=3,
+        reduction_factor=2,
     )
 
     # Setup tuner
@@ -177,6 +174,8 @@ def gridworld_tune(
 
                 print(f"\n=== Training trail {i + 1} ===")
                 print(f"{SELECTION_METRIC}: {trial.metrics.get(SELECTION_METRIC)}")
+                print(f"score_p: {trial.metrics.get('score_p')}")
+                print(f"capture_score: {trial.metrics.get('capture_score')}")
                 print(f"mean_reward: {trial.metrics.get('mean_reward')}")
                 print(f"full_capture_rate: {trial.metrics.get('full_capture_rate')}")
                 print(f"breach_rate: {trial.metrics.get('breach_rate')}")
