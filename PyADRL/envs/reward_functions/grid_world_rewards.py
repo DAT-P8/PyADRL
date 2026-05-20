@@ -24,7 +24,7 @@ class GridWorldRewards(RewardFunction):
     REWARD_PURSUER_TARGET_REACHED = -50  # Punish pursuers for evader in target
     REWARD_PURSUER_ENTERED_TARGET = -50  # Punish pursuers for entering target
     REWARD_PURSUER_FAR_FROM_EVADER = -10  # Multiplier for distance to evader
-    REWARD_PURSUER_DESTROYED = -10
+    REWARD_PURSUER_DESTROYED = -100
     REWARD_PURSUER_OUT_OF_BOUNDS = -200
     REWARD_PURSUER_COLLISION_OBJECT = -200
 
