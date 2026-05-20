@@ -71,10 +71,14 @@ class NGWEnvironment(ParallelEnv):
         # one-hot agent ID, so drones can share a policy but still know who they are
         n_agents = self.n_evaders + self.n_pursuers
 
-        self.n_objects_positions = (
-            len(map_config.get_objects()) * 2
-        )  # x, y for each object
-        self.objects_state = []
+        # Compute normalized object positions once — objects never move
+        objects = map_config.get_objects()
+        self.n_objects_positions = len(objects) * 2  # x, y for each object
+        norm_objects: list[float] = []
+        for (ox, oy) in objects:
+            nx, ny = map_config.normalise_position(ox, oy)
+            norm_objects += [nx, ny]
+        self.norm_objects_obs = norm_objects
 
         target_position = 2  # x and y position of the target
 
@@ -85,7 +89,7 @@ class NGWEnvironment(ParallelEnv):
         self.obs_space = Box(
             low=0.0,
             high=1.0,
-            shape=(n_agent_positions + one_hot + role_bits + target_position,),
+            shape=(n_agent_positions + one_hot + role_bits + target_position + self.n_objects_positions,),
             dtype=np.float32,
         )
 
@@ -107,6 +111,7 @@ class NGWEnvironment(ParallelEnv):
 
         # Include the fixed target position so the observation matches the declared space.
         obs += [self.norm_target_x, self.norm_target_y]
+        obs += self.norm_objects_obs
 
         # Role bits, 1 for pursuer, 0 for evader
         obs += [1.0 for _ in self.drones[PURSUERS]] + [
@@ -167,8 +172,6 @@ class NGWEnvironment(ParallelEnv):
                 self.drones[EVADERS].append(drone)
             else:
                 self.drones[PURSUERS].append(drone)
-
-        self.objects_state = self.newest_state.objects
 
         if len(self.drones[EVADERS]) == 0 or len(self.drones[PURSUERS]) == 0:
             raise ValueError(
