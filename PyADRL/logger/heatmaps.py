@@ -712,9 +712,9 @@ class HeatmapCallback(RLlibCallback):
         ax.set_ylim(0, self.grid_h)
 
         # Boundary grid lines at integer coordinates.
-        ax.set_xticks(np.arange(0, self.grid_w + 1, 1), minor=True)
-        ax.set_yticks(np.arange(0, self.grid_h + 1, 1), minor=True)
-        ax.grid(True, which="minor", linewidth=0.3, alpha=0.4)
+        ax.set_xticks(np.arange(0, self.grid_w + 1, 1))
+        ax.set_yticks(np.arange(0, self.grid_h + 1, 1))
+        ax.grid(True, which="major", linewidth=0.3, color="grey", alpha=1.0)
 
         ax.tick_params(axis="both", which="both", left=False, bottom=False,
                        labelbottom=False, labelleft=False)
@@ -741,7 +741,7 @@ class HeatmapCallback(RLlibCallback):
             1,
             linewidth=2,
             edgecolor="#cc4444",
-            facecolor="#ffdddd",
+            facecolor="none",
             alpha=1.0,
             label="Target",
         )
