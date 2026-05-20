@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
 
 from ray.rllib.callbacks.callbacks import RLlibCallback
@@ -327,18 +328,14 @@ class HeatmapCallback(RLlibCallback):
         fig, ax = plt.subplots(figsize=(8, 6))
         sns.heatmap(
             grid,
-            cmap=color,
+            cmap=self._make_cmap(color),
             linewidths=0.3,
             linecolor="grey",
-            annot=(
-                self.grid_w <= 20 and self.grid_h <= 20
-            ),  # only show numbers if grid is small
-            fmt="d",
+            annot=False,
             ax=ax,
             cbar_kws={"label": "Visit count"},
         )
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
+        ax.tick_params(labelbottom=False, labelleft=False, bottom=False, left=False)
         ax.invert_yaxis()
 
         # Draw the target square
@@ -387,23 +384,22 @@ class HeatmapCallback(RLlibCallback):
             axes = [axes]
 
         for ax, (stype, _) in zip(axes, SHIELD_COLORS.items()):
+            ax.set_facecolor("#dddddd")
             grid = grids[stype]
             sns.heatmap(
                 grid,
                 mask=grid == 0,
-                cmap="Reds",
+                cmap=self._make_cmap("Reds"),
                 vmin=0,
                 vmax=max(1, int(grid.max())),
                 linewidths=0.3,
                 linecolor="grey",
-                annot=(self.grid_w <= 20 and self.grid_h <= 20),
-                fmt="d",
+                annot=False,
                 ax=ax,
                 cbar_kws={"label": "Shield activations"},
             )
             ax.set_title(stype.replace("_", " ").title())
-            ax.set_xlabel("x")
-            ax.set_ylabel("y")
+            ax.tick_params(labelbottom=False, labelleft=False, bottom=False, left=False)
             ax.invert_yaxis()
             self._draw_target(ax)
             self._draw_objects(ax)
@@ -433,16 +429,14 @@ class HeatmapCallback(RLlibCallback):
         fig, ax = plt.subplots(figsize=(8, 6))
         sns.heatmap(
             grid,
-            cmap="Purples",
+            cmap=self._make_cmap("Purples"),
             linewidths=0.3,
             linecolor="grey",
-            annot=(self.grid_w <= 20 and self.grid_h <= 20),
-            fmt="d",
+            annot=False,
             ax=ax,
             cbar_kws={"label": "Capture count"},
         )
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
+        ax.tick_params(labelbottom=False, labelleft=False, bottom=False, left=False)
         ax.invert_yaxis()
 
         self._draw_target(ax)
@@ -469,6 +463,7 @@ class HeatmapCallback(RLlibCallback):
         filename,
     ):
         fig, ax = plt.subplots(figsize=(8, 8))
+        ax.set_facecolor("#dddddd")
 
         # Draw the target square
         self._draw_target(ax)
@@ -713,25 +708,18 @@ class HeatmapCallback(RLlibCallback):
             )
             return
 
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
         ax.set_xlim(0, self.grid_w)
         ax.set_ylim(0, self.grid_h)
-
-        # Label cell indices at centers (0.5, 1.5, ...) while keeping grid on boundaries.
-        x_center_ticks = np.arange(0.5, self.grid_w, 1)
-        y_center_ticks = np.arange(0.5, self.grid_h, 1)
-        ax.set_xticks(x_center_ticks)
-        ax.set_yticks(y_center_ticks)
-        ax.set_xticklabels(np.arange(0, self.grid_w, 1))
-        ax.set_yticklabels(np.arange(0, self.grid_h, 1))
 
         # Boundary grid lines at integer coordinates.
         ax.set_xticks(np.arange(0, self.grid_w + 1, 1), minor=True)
         ax.set_yticks(np.arange(0, self.grid_h + 1, 1), minor=True)
         ax.grid(True, which="minor", linewidth=0.3, alpha=0.4)
 
-        ax.tick_params(axis="both", which="major", pad=8)
+        ax.tick_params(axis="both", which="both", left=False, bottom=False,
+                       labelbottom=False, labelleft=False)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
         ax.set_aspect("equal", adjustable="box")
 
         plt.tight_layout()
@@ -742,15 +730,19 @@ class HeatmapCallback(RLlibCallback):
         plt.close(fig)
         print(f"Actor Traces Saved in {filename}")
 
+    def _make_cmap(self, base_cmap):
+        high = plt.get_cmap(base_cmap)(1.0)
+        return LinearSegmentedColormap.from_list(f"custom_{base_cmap}", ["#dddddd", high])
+
     def _draw_target(self, ax):
         rect = patches.Rectangle(
             (self.target_x, self.target_y),
             1,
             1,
             linewidth=2,
-            edgecolor="green",
-            facecolor="green",
-            alpha=0.3,
+            edgecolor="#cc4444",
+            facecolor="#ffdddd",
+            alpha=1.0,
             label="Target",
         )
         ax.add_patch(rect)
@@ -774,7 +766,7 @@ class HeatmapCallback(RLlibCallback):
                 1,
                 linewidth=1,
                 edgecolor="black",
-                facecolor="grey",
+                facecolor="#8e8e8e",
                 alpha=1.0,
                 label=("Object" if not used_label else None),
                 zorder=5,
