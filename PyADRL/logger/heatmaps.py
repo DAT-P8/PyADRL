@@ -232,7 +232,9 @@ class HeatmapCallback(RLlibCallback):
             ("trace_map_evader_win", "breached"),
         ]
         evader_episodes = [episode.get("evader_states", {}) for episode in drone_states]
-        pursuer_episodes = [episode.get("pursuer_states", {}) for episode in drone_states]
+        pursuer_episodes = [
+            episode.get("pursuer_states", {}) for episode in drone_states
+        ]
 
         for filename, outcome_key in trace_specs:
             idx = self._select_trace_episode(
@@ -390,6 +392,8 @@ class HeatmapCallback(RLlibCallback):
                 grid,
                 mask=grid == 0,
                 cmap="Reds",
+                vmin=0,
+                vmax=max(1, int(grid.max())),
                 linewidths=0.3,
                 linecolor="grey",
                 annot=(self.grid_w <= 20 and self.grid_h <= 20),
