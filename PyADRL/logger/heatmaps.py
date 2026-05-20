@@ -520,10 +520,10 @@ class HeatmapCallback(RLlibCallback):
                 ys = [p[1] + 0.5 for p in cleaned]
 
                 if len(cleaned) == 1:
-                    ax.scatter(xs, ys, color=color, alpha=0.4, s=20)
+                    ax.scatter(xs, ys, color=color, alpha=1.0, s=20)
                 else:
                     n_seg = len(xs) - 1
-                    ax.plot(xs, ys, color=color, alpha=0.4, linewidth=1.5, zorder=2)
+                    ax.plot(xs, ys, color=color, alpha=1.0, linewidth=2.5, zorder=2)
 
                     for i in range(n_seg):
                         dx = xs[i + 1] - xs[i]
@@ -543,9 +543,10 @@ class HeatmapCallback(RLlibCallback):
                                     arrowprops=dict(
                                         arrowstyle="-|>",
                                         color="#2ca02c",
-                                        alpha=0.8,
-                                        lw=1.5,
-                                        mutation_scale=7,
+                                        alpha=1.0,
+                                        lw=2.5,
+                                        mutation_scale=12,
+                                        joinstyle="miter",
                                     ),
                                     zorder=7,
                                 )
@@ -556,7 +557,7 @@ class HeatmapCallback(RLlibCallback):
                                     marker="o",
                                     color="#2ca02c",
                                     s=5,
-                                    alpha=0.8,
+                                    alpha=1.0,
                                     zorder=7,
                                 )
                             # Dashed red arrow: action blocked by shield.
@@ -578,9 +579,10 @@ class HeatmapCallback(RLlibCallback):
                                             [xs[i], ux - nx * head_len],
                                             [ys[i], uy - ny * head_len],
                                             color="#d62728",
-                                            alpha=0.7,
-                                            lw=1.5,
+                                            alpha=1.0,
+                                            lw=2.5,
                                             linestyle="dashed",
+                                            dash_capstyle="butt",
                                             zorder=7,
                                         )
                                         # Solid arrowhead only
@@ -595,9 +597,12 @@ class HeatmapCallback(RLlibCallback):
                                             arrowprops=dict(
                                                 arrowstyle="-|>",
                                                 color="#d62728",
-                                                alpha=0.7,
-                                                lw=1.5,
-                                                mutation_scale=7,
+                                                alpha=1.0,
+                                                lw=2.5,
+                                                mutation_scale=12,
+                                                joinstyle="miter",
+                                                shrinkA=0,
+                                                shrinkB=0,
                                             ),
                                             zorder=7,
                                         )
@@ -605,14 +610,8 @@ class HeatmapCallback(RLlibCallback):
                                         # Drone was stationary — another drone moved into it.
                                         # Mark its position with a red × (no direction to arrow).
                                         ax.scatter(
-                                            xs[i],
-                                            ys[i],
-                                            marker="x",
-                                            color="#d62728",
-                                            s=60,
-                                            linewidths=1.5,
-                                            alpha=0.8,
-                                            zorder=7,
+                                            xs[i], ys[i], marker="x",
+                                            color="#d62728", s=60, linewidths=1.5, alpha=1.0, zorder=7,
                                         )
                                 except (TypeError, ValueError):
                                     pass
@@ -625,9 +624,10 @@ class HeatmapCallback(RLlibCallback):
                                     arrowprops=dict(
                                         arrowstyle="-|>",
                                         color=color,
-                                        alpha=0.4,
-                                        lw=0.5,
-                                        mutation_scale=5,
+                                        alpha=1.0,
+                                        lw=1.5,
+                                        mutation_scale=10,
+                                        joinstyle="miter",
                                     ),
                                     zorder=3,
                                 )
@@ -641,7 +641,7 @@ class HeatmapCallback(RLlibCallback):
                     edgecolors="black",
                     linewidths=0.3,
                     s=28,
-                    alpha=0.8,
+                    alpha=1.0,
                     zorder=4,
                 )
                 last_grid = (int(xs[-1] - 0.5), int(ys[-1] - 0.5))
@@ -652,7 +652,7 @@ class HeatmapCallback(RLlibCallback):
                     )
                 else:
                     ax.scatter(
-                        xs[-1], ys[-1], marker="x", color=color, s=30, alpha=0.9, zorder=4
+                        xs[-1], ys[-1], marker="X", color=color, edgecolors="black", linewidths=0.5, s=30, alpha=1.0, zorder=4
                     )
 
                 # Collect shielded positions for overlay after all paths are drawn.
@@ -697,7 +697,7 @@ class HeatmapCallback(RLlibCallback):
                 edgecolors="black",
                 linewidths=0.4,
                 s=40,
-                alpha=0.9,
+                alpha=1.0,
                 zorder=6,
             )
 
