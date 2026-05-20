@@ -115,9 +115,9 @@ def weighted_acs(episode_outcomes: list[dict], n_evaders: int) -> float:
 def summarize_evaluation(
     eval_result: dict,
     n_evaders: int,
-    time_limit: int = 100,
-    beta: float = 1.0,
-    gamma: float = 1.0,
+    time_limit: int,
+    beta: float,
+    gamma: float,
 ) -> dict:
     """Flatten an algo.evaluate() result into a dict of scalar metrics for tune.report.
 

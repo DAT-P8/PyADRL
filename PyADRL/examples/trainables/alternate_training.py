@@ -95,7 +95,7 @@ def _run_alternating_loop(
         # Report to Tune so ASHA can prune bad trials early
         if report_to_tune:
             metrics = summarize_evaluation(
-                eval_result, n_evaders=n_evaders, time_limit=time_limit
+                eval_result, n_evaders=n_evaders, time_limit=time_limit, beta=1, gamma=1
             )
             # global_step tracks total algo.train() calls across all stages.
             # ASHA reads this as time_attr so grace_period/max_t semantics
