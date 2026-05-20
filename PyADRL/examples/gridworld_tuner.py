@@ -19,18 +19,17 @@ ALTERNATING = "alternate"
 SIMULTANEOUS = "simultaneous"
 
 # Alternating training specifications
-N_STAGES = 8
+N_STAGES = 10
 ITERS_PER_STAGE = 10
 # Each stage has 2 halves (train evader, then pursuer), so total algo.train()
 # calls = N_STAGES * ITERS_PER_STAGE * 2. Previous formula had max_t < total,
 # which silently disabled ASHA culling because grace > max_t.
 ALTERNATING_MAX_T = N_STAGES * ITERS_PER_STAGE * 2
-ALTERNATING_GRACE = ALTERNATING_MAX_T // 2
+ALTERNATING_GRACE = ITERS_PER_STAGE * 8
 
 # Simultaneous training specifications
-ITERATIONS = 250
-SIMULTANEOUS_GRACE = 50
-
+ITERATIONS = 200
+SIMULTANEOUS_GRACE = 100
 
 # === Experiment Configurations ===
 EXPERIMENT_NUM = 4
@@ -70,8 +69,7 @@ ASHA_METRIC = "comb_score"
 #   "comb_score"           - score_p - γ*(col_e + bvr_e + oc_e);
 SELECTION_METRIC = "comb_score"
 
-# TODO: ASHA currently prunes too many for iterative training
-NUM_SAMPLES = 36
+NUM_SAMPLES = 20
 MAX_CONCURRENT_TRIALS = 12
 
 
@@ -105,18 +103,17 @@ def gridworld_tune(
 
     search_space = {
         # --- Training params ---
-        # TODO: Settle on these final params - could be from "surprising effectiveness of ..." paper
-        "lr": tune.loguniform(5e-5, 1e-3),
-        "gamma": tune.uniform(0.95, 0.99),
-        "lambda_": tune.uniform(0.9, 1.0),
-        "clip_param": tune.uniform(0.15, 0.3),
-        "vf_loss_coeff": tune.uniform(0.25, 1.0),
-        "entropy_coeff": tune.loguniform(0.001, 0.05),
+        "lr": tune.uniform(5e-5, 1e-3),
+        "gamma": 0.99,
+        "lambda_": 0.95,
+        "clip_param": tune.uniform(0.05, 0.2),
+        "vf_loss_coeff": tune.grid_search([0.5, 1]),
+        "entropy_coeff": tune.uniform(0.01, 0.1),
         # --- Architecture params (fixed/narrowed based on data) ---
         "train_batch_size": 10000,
-        # TODO: This is from the paper "surprising effectiveness of..."
-        "minibatch_size": tune.choice([10000]),
-        "num_epochs": tune.choice([10, 15]),
+        "minibatch_size": 10000,
+        # Surprising effectiveness of ... suggests 5 for hard tasks and 10-15 for easy tasks.
+        "num_epochs": tune.grid_search([5, 10, 15]),
         # --- Resource params (all in-process to avoid placement group errors) ---
         "num_learners": 0,
         "num_env_runners": 0,
@@ -136,7 +133,7 @@ def gridworld_tune(
         mode="max",
         max_t=max_time,
         grace_period=grace,
-        reduction_factor=3,
+        reduction_factor=2,
     )
 
     # Setup tuner
