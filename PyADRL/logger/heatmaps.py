@@ -26,6 +26,7 @@ class HeatmapCallback(RLlibCallback):
         self.target_y = 0
         self.objects = []
         self.figure_path = None
+        self.n_evaders = 0
 
     def on_algorithm_init(
         self,
@@ -45,6 +46,7 @@ class HeatmapCallback(RLlibCallback):
         self.target_y = algorithm.config.env_config.get("target_y", 0)
         self.objects = algorithm.config.env_config.get("objects", [])
         self.figure_path = algorithm.config.env_config.get("figure_path")
+        self.n_evaders = algorithm.config.env_config.get("n_evaders", 0)
 
     def on_episode_created(self, *, episode, **kwargs):
         episode.custom_data["evader_states"] = {}
@@ -54,6 +56,7 @@ class HeatmapCallback(RLlibCallback):
         episode.custom_data["evader_unsafe_positions"] = {}
         episode.custom_data["pursuer_unsafe_positions"] = {}
         episode.custom_data["capture_positions"] = []
+        episode.custom_data["breached"] = False
 
     def _get_episode_info(self, env, env_index: int):
         if not env or not getattr(env, "_infos", None):
@@ -85,6 +88,16 @@ class HeatmapCallback(RLlibCallback):
         # shield_events are shared across agents, so we only need to scan once.
         step_shield_map: dict[int, str] = {}
         first_agent_info = next(iter(episode_info.values()), {})
+
+        # Detect breach: an evader reached the target this step.
+        try:
+            for event in first_agent_info.get("events", []):
+                if getattr(event, "target_reached_event", None) is not None:
+                    episode.custom_data["breached"] = True
+                    break
+        except Exception:
+            pass
+
         for event in first_agent_info.get("shield_events", []):
             if event.drone_object_collision_event is not None:
                 for did in event.drone_object_collision_event.drone_ids:
@@ -146,6 +159,11 @@ class HeatmapCallback(RLlibCallback):
         if metrics_logger is None:
             return
 
+        capture_positions = episode.custom_data.get("capture_positions", [])
+        breached = episode.custom_data.get("breached", False)
+        n_ev = self.n_evaders or len(episode.custom_data.get("evader_states", {}))
+        pursuer_win = (not breached) and n_ev > 0 and len(capture_positions) >= n_ev
+
         drone_states = {
             "evader_states": episode.custom_data.get("evader_states", {}),
             "pursuer_states": episode.custom_data.get("pursuer_states", {}),
@@ -157,7 +175,9 @@ class HeatmapCallback(RLlibCallback):
             "pursuer_unsafe_positions": episode.custom_data.get(
                 "pursuer_unsafe_positions", {}
             ),
-            "capture_positions": episode.custom_data.get("capture_positions", []),
+            "capture_positions": capture_positions,
+            "breached": breached,
+            "pursuer_win": pursuer_win,
         }
         metrics_logger.log_value("drone_states", drone_states, reduce="item_series")
 
@@ -205,73 +225,84 @@ class HeatmapCallback(RLlibCallback):
             filename="heatmap_shielding_pursuer",
         )
 
-        # For trace maps, show one representative episode instead of concatenating paths.
-        evader_episodes = [episode.get("evader_states", {}) for episode in drone_states]
-        pursuer_episodes = [
-            episode.get("pursuer_states", {}) for episode in drone_states
+        # Three trace maps: longest, pursuer win, evader win (breach).
+        trace_specs = [
+            ("trace_map", None),
+            ("trace_map_pursuer_win", "pursuer_win"),
+            ("trace_map_evader_win", "breached"),
         ]
-        evader_episode, pursuer_episode, best_idx = self._select_representative_episode(
-            evader_episodes,
-            pursuer_episodes,
-        )
-        evader_shield = (
-            drone_states[best_idx].get("evader_shield_data", {})
-            if best_idx >= 0
-            else {}
-        )
-        pursuer_shield = (
-            drone_states[best_idx].get("pursuer_shield_data", {})
-            if best_idx >= 0
-            else {}
-        )
-        evader_unsafe = (
-            drone_states[best_idx].get("evader_unsafe_positions", {})
-            if best_idx >= 0
-            else {}
-        )
-        pursuer_unsafe = (
-            drone_states[best_idx].get("pursuer_unsafe_positions", {})
-            if best_idx >= 0
-            else {}
-        )
-        capture_positions = (
-            drone_states[best_idx].get("capture_positions", []) if best_idx >= 0 else []
-        )
-        self._plot_trace_map(
-            evader_episode,
-            pursuer_episode,
-            evader_shield_data=evader_shield,
-            pursuer_shield_data=pursuer_shield,
-            evader_unsafe_data=evader_unsafe,
-            pursuer_unsafe_data=pursuer_unsafe,
-            capture_positions=capture_positions,
-            filename="trace_map",
-        )
+        evader_episodes = [episode.get("evader_states", {}) for episode in drone_states]
+        pursuer_episodes = [episode.get("pursuer_states", {}) for episode in drone_states]
 
-    def _select_representative_episode(self, evader_episodes, pursuer_episodes):
+        for filename, outcome_key in trace_specs:
+            idx = self._select_trace_episode(
+                evader_episodes, pursuer_episodes, drone_states, outcome_key
+            )
+            if idx < 0:
+                if outcome_key is not None:
+                    print(
+                        f"[HeatmapCallback] No episode with {outcome_key}=True found,"
+                        f" skipping {filename}."
+                    )
+                continue
+            self._plot_trace_map(
+                evader_episodes[idx],
+                pursuer_episodes[idx],
+                evader_shield_data=drone_states[idx].get("evader_shield_data", {}),
+                pursuer_shield_data=drone_states[idx].get("pursuer_shield_data", {}),
+                evader_unsafe_data=drone_states[idx].get("evader_unsafe_positions", {}),
+                pursuer_unsafe_data=drone_states[idx].get(
+                    "pursuer_unsafe_positions", {}
+                ),
+                capture_positions=drone_states[idx].get("capture_positions", []),
+                filename=filename,
+            )
+
+    def _select_trace_episode(
+        self,
+        evader_episodes: list,
+        pursuer_episodes: list,
+        drone_states: list,
+        outcome_key: str | None,
+    ) -> int:
+        """Return the index of the best episode for a trace map.
+
+        If outcome_key is None, pick the longest episode overall.
+        If outcome_key is 'pursuer_win' or 'breached', restrict to episodes
+        where that flag is True, then pick the longest among them.
+        Returns -1 if no suitable episode exists.
+        """
         best_idx = -1
         best_score = -1
-        n = min(len(evader_episodes), len(pursuer_episodes))
+        n = min(len(evader_episodes), len(pursuer_episodes), len(drone_states))
 
         for idx in range(n):
-            ev = evader_episodes[idx]
-            pu = pursuer_episodes[idx]
-            if not isinstance(ev, dict) or not isinstance(pu, dict):
+            try:
+                if outcome_key is not None and not drone_states[idx].get(
+                    outcome_key, False
+                ):
+                    continue
+
+                ev = evader_episodes[idx]
+                pu = pursuer_episodes[idx]
+                if not isinstance(ev, dict) or not isinstance(pu, dict):
+                    continue
+
+                ev_len = sum(
+                    len(path) for path in ev.values() if isinstance(path, list)
+                )
+                pu_len = sum(
+                    len(path) for path in pu.values() if isinstance(path, list)
+                )
+                score = ev_len + pu_len
+
+                if score > best_score:
+                    best_score = score
+                    best_idx = idx
+            except Exception:
                 continue
 
-            ev_len = sum(len(path) for path in ev.values() if isinstance(path, list))
-            pu_len = sum(len(path) for path in pu.values() if isinstance(path, list))
-            score = pu_len + ev_len
-
-            # choose the episode with the longest combined trajectory length
-            if score > best_score:
-                best_score = score
-                best_idx = idx
-
-        if best_idx < 0:
-            return {}, {}, -1
-
-        return evader_episodes[best_idx], pursuer_episodes[best_idx], best_idx
+        return best_idx
 
     # PLOTTING METHODS
     def _plot_occupancy_heatmap(self, episode_states, *, filename, color):
