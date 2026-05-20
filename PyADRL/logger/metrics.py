@@ -17,7 +17,7 @@ class EpisodeOutcome:
     pursuer_drone_collision_rate: float = 0.0
     evader_obstacle_collision_rate: float = 0.0
     pursuer_obstacle_collision_rate: float = 0.0
-    pursuer_entered_target_count: int = 0
+    pursuer_entered_target_rate: float = 0.0
     pursuer_out_of_bounds_rate: float = 0.0
     evader_out_of_bounds_rate: float = 0.0
     pursuer_shield_intervention_rate: float = 0.0
@@ -358,7 +358,11 @@ class MetricsCallback(RLlibCallback):
             pursuer_obstacle_collision_rate=rate(
                 state["drone_object_collision_ids"], pursuer_ids, n_pursuers
             ),
-            pursuer_entered_target_count=state["pursuer_entered_target_count"],
+            pursuer_entered_target_rate=state["pursuer_entered_target_count"]
+            / n_pursuers
+            / timestep
+            if timestep > 0 and n_pursuers > 0
+            else 0.0,
             evader_out_of_bounds_rate=rate(
                 state["drone_out_of_bounds_ids"], evader_ids, n_evaders
             ),
@@ -608,6 +612,11 @@ class MetricsCallback(RLlibCallback):
         pursuer_shield_intervention_rate = float(
             np.mean([o["pursuer_shield_intervention_rate"] for o in episode_outcomes])
         )
+        pursuer_entered_target_rate_val = float(
+            np.mean(
+                [o.get("pursuer_entered_target_rate", 0.0) for o in episode_outcomes]
+            )
+        )
 
         score_p_val = (
             capture_score_val
@@ -642,6 +651,7 @@ class MetricsCallback(RLlibCallback):
             "mean_pursuer_out_of_bounds_rate": bvr_p_val,
             "evader_shield_intervention_rate": evader_shield_intervention_rate,
             "pursuer_shield_intervention_rate": pursuer_shield_intervention_rate,
+            "mean_pursuer_entered_target_rate": pursuer_entered_target_rate_val,
             "mean_rewards": rewards_dict,
             # Composite scoring (matches summarize_evaluation).
             "capture_score": capture_score_val,
