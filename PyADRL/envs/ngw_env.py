@@ -75,7 +75,7 @@ class NGWEnvironment(ParallelEnv):
         objects = map_config.get_objects()
         self.n_objects_positions = len(objects) * 2  # x, y for each object
         norm_objects: list[float] = []
-        for (ox, oy) in objects:
+        for ox, oy in objects:
             nx, ny = map_config.normalise_position(ox, oy)
             norm_objects += [nx, ny]
         self.norm_objects_obs = norm_objects
@@ -89,7 +89,13 @@ class NGWEnvironment(ParallelEnv):
         self.obs_space = Box(
             low=0.0,
             high=1.0,
-            shape=(n_agent_positions + one_hot + role_bits + target_position + self.n_objects_positions,),
+            shape=(
+                n_agent_positions
+                + one_hot
+                + role_bits
+                + target_position
+                + self.n_objects_positions,
+            ),
             dtype=np.float32,
         )
 
