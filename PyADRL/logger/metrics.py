@@ -568,25 +568,6 @@ class MetricsCallback(RLlibCallback):
             print("No episode outcomes to evaluate.")
             return
 
-        outcomes_array = np.array(
-            [
-                [
-                    float(outcome["breached"]),
-                    outcome["episode_length"],
-                    outcome["evader_drone_collision_rate"],
-                    outcome["pursuer_drone_collision_rate"],
-                    outcome["evader_obstacle_collision_rate"],
-                    outcome["pursuer_obstacle_collision_rate"],
-                    outcome["evader_out_of_bounds_rate"],
-                    outcome["pursuer_out_of_bounds_rate"],
-                    outcome["evader_shield_intervention_rate"],
-                    outcome["pursuer_shield_intervention_rate"],
-                ]
-                for outcome in episode_outcomes
-            ]
-        )
-
-        means = np.mean(outcomes_array, axis=0)
         mean_steps = mean_capture_steps(episode_outcomes)
         capture_rates = capture_rate_at_k(episode_outcomes)
         average_capture_step = mean_capture(episode_outcomes)
@@ -597,14 +578,19 @@ class MetricsCallback(RLlibCallback):
         # on_algorithm_init; defaults match summarize_evaluation's defaults.
         capture_score_val = weighted_capture_score(episode_outcomes, self.n_evaders)
         acs_val = weighted_acs(episode_outcomes, self.n_evaders)
-        breach_rate_val = float(means[0])
-        col_e_val = float(means[2])
-        col_p_val = float(means[3])
-        oc_e_val = float(means[4])
-        oc_p_val = float(means[5])
-        bvr_e_val = float(means[6])
-        bvr_p_val = float(means[7])
         safe_tmax = max(int(self.time_limit), 1)
+
+        breach_rate_val = float(np.mean([o["breached"] for o in episode_outcomes]))
+        col_e_val = float(np.mean([o["evader_drone_collision_rate"] for o in episode_outcomes]))
+        col_p_val = float(np.mean([o["pursuer_drone_collision_rate"] for o in episode_outcomes]))
+        oc_e_val = float(np.mean([o["evader_obstacle_collision_rate"] for o in episode_outcomes]))
+        oc_p_val = float(np.mean([o["pursuer_obstacle_collision_rate"] for o in episode_outcomes]))
+        bvr_e_val = float(np.mean([o["evader_out_of_bounds_rate"] for o in episode_outcomes]))
+        bvr_p_val = float(np.mean([o["pursuer_out_of_bounds_rate"] for o in episode_outcomes]))
+        mean_episode_length = float(np.mean([o["episode_length"] for o in episode_outcomes]))
+        evader_shield_intervention_rate = float(np.mean([o["evader_shield_intervention_rate"] for o in episode_outcomes]))
+        pursuer_shield_intervention_rate = float(np.mean([o["pursuer_shield_intervention_rate"] for o in episode_outcomes]))
+
         score_p_val = (
             capture_score_val
             - breach_rate_val
@@ -629,15 +615,15 @@ class MetricsCallback(RLlibCallback):
                 )
             ),
             "breach_rate": breach_rate_val,
-            "mean_episode_length": float(means[1]),
+            "mean_episode_length": mean_episode_length,
             "mean_evader_drone_collision_rate": col_e_val,
             "mean_pursuer_drone_collision_rate": col_p_val,
             "mean_evader_obstacle_collision_rate": oc_e_val,
             "mean_pursuer_obstacle_collision_rate": oc_p_val,
             "mean_evader_out_of_bounds_rate": bvr_e_val,
             "mean_pursuer_out_of_bounds_rate": bvr_p_val,
-            "evader_shield_intervention_rate": float(means[8]),
-            "pursuer_shield_intervention_rate": float(means[9]),
+            "evader_shield_intervention_rate": evader_shield_intervention_rate,
+            "pursuer_shield_intervention_rate": pursuer_shield_intervention_rate,
             "mean_rewards": rewards_dict,
             # Composite scoring (matches summarize_evaluation).
             "capture_score": capture_score_val,
