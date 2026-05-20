@@ -17,7 +17,7 @@ class EpisodeOutcome:
     pursuer_drone_collision_rate: float = 0.0
     evader_obstacle_collision_rate: float = 0.0
     pursuer_obstacle_collision_rate: float = 0.0
-    pursuer_entered_target_count: int = 0
+    pursuer_entered_target_rate: float = 0.0
     pursuer_out_of_bounds_rate: float = 0.0
     evader_out_of_bounds_rate: float = 0.0
     pursuer_shield_intervention_rate: float = 0.0
@@ -246,7 +246,11 @@ class MetricsCallback(RLlibCallback):
             pursuer_obstacle_collision_rate=rate(
                 state["drone_object_collision_ids"], pursuer_ids, n_pursuers
             ),
-            pursuer_entered_target_count=state["pursuer_entered_target_count"],
+            pursuer_entered_target_rate=state["pursuer_entered_target_count"]
+            / n_pursuers
+            / timestep
+            if timestep > 0 and n_pursuers > 0
+            else 0.0,
             evader_out_of_bounds_rate=rate(
                 state["drone_out_of_bounds_ids"], evader_ids, n_evaders
             ),
@@ -469,6 +473,7 @@ class MetricsCallback(RLlibCallback):
                     outcome["pursuer_out_of_bounds_rate"],
                     outcome["evader_shield_intervention_rate"],
                     outcome["pursuer_shield_intervention_rate"],
+                    outcome.get("pursuer_entered_target_rate", 0.0),
                 ]
                 for outcome in episode_outcomes
             ]
@@ -484,14 +489,6 @@ class MetricsCallback(RLlibCallback):
             "capture_rate_at_k": capture_rates,
             "mean_capture_step_at_k": mean_steps,
             "mean_capture_step": average_capture_step,
-            "mean_pursuer_entered_target_count": float(
-                np.mean(
-                    [
-                        outcome.get("pursuer_entered_target_count", 0)
-                        for outcome in episode_outcomes
-                    ]
-                )
-            ),
             "breach_rate": float(means[0]),
             "mean_episode_length": float(means[1]),
             "mean_evader_drone_collision_rate": float(means[2]),
@@ -502,6 +499,7 @@ class MetricsCallback(RLlibCallback):
             "mean_pursuer_out_of_bounds_rate": float(means[7]),
             "evader_shield_intervention_rate": float(means[8]),
             "pursuer_shield_intervention_rate": float(means[9]),
+            "mean_pursuer_entered_target_rate": float(means[10]),
             "mean_rewards": rewards_dict,
         }
 
