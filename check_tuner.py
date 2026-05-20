@@ -174,7 +174,9 @@ def summarize_trial(trial_dir: Path, window: int, metric: str, now: float) -> di
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument(
         "path",
         type=Path,
@@ -228,9 +230,7 @@ def main() -> int:
         f"Trials: {n_total} total — "
         f"{n_active} active, {n_idle} idle, {n_done} done, {n_empty} no reports"
     )
-    print(
-        f"Ranking by mean of '{args.metric}' over last {args.window} reports."
-    )
+    print(f"Ranking by mean of '{args.metric}' over last {args.window} reports.")
     if n_missing_metric:
         print(
             f"NOTE: {n_missing_metric}/{n_reporting} reporting trials have no "

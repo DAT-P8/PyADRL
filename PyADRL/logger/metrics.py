@@ -581,15 +581,33 @@ class MetricsCallback(RLlibCallback):
         safe_tmax = max(int(self.time_limit), 1)
 
         breach_rate_val = float(np.mean([o["breached"] for o in episode_outcomes]))
-        col_e_val = float(np.mean([o["evader_drone_collision_rate"] for o in episode_outcomes]))
-        col_p_val = float(np.mean([o["pursuer_drone_collision_rate"] for o in episode_outcomes]))
-        oc_e_val = float(np.mean([o["evader_obstacle_collision_rate"] for o in episode_outcomes]))
-        oc_p_val = float(np.mean([o["pursuer_obstacle_collision_rate"] for o in episode_outcomes]))
-        bvr_e_val = float(np.mean([o["evader_out_of_bounds_rate"] for o in episode_outcomes]))
-        bvr_p_val = float(np.mean([o["pursuer_out_of_bounds_rate"] for o in episode_outcomes]))
-        mean_episode_length = float(np.mean([o["episode_length"] for o in episode_outcomes]))
-        evader_shield_intervention_rate = float(np.mean([o["evader_shield_intervention_rate"] for o in episode_outcomes]))
-        pursuer_shield_intervention_rate = float(np.mean([o["pursuer_shield_intervention_rate"] for o in episode_outcomes]))
+        col_e_val = float(
+            np.mean([o["evader_drone_collision_rate"] for o in episode_outcomes])
+        )
+        col_p_val = float(
+            np.mean([o["pursuer_drone_collision_rate"] for o in episode_outcomes])
+        )
+        oc_e_val = float(
+            np.mean([o["evader_obstacle_collision_rate"] for o in episode_outcomes])
+        )
+        oc_p_val = float(
+            np.mean([o["pursuer_obstacle_collision_rate"] for o in episode_outcomes])
+        )
+        bvr_e_val = float(
+            np.mean([o["evader_out_of_bounds_rate"] for o in episode_outcomes])
+        )
+        bvr_p_val = float(
+            np.mean([o["pursuer_out_of_bounds_rate"] for o in episode_outcomes])
+        )
+        mean_episode_length = float(
+            np.mean([o["episode_length"] for o in episode_outcomes])
+        )
+        evader_shield_intervention_rate = float(
+            np.mean([o["evader_shield_intervention_rate"] for o in episode_outcomes])
+        )
+        pursuer_shield_intervention_rate = float(
+            np.mean([o["pursuer_shield_intervention_rate"] for o in episode_outcomes])
+        )
 
         score_p_val = (
             capture_score_val
