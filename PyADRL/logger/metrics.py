@@ -671,6 +671,7 @@ class MetricsCallback(RLlibCallback):
 
         if self.metrics_path:
             results_dir = self.metrics_path / "evaluation_metrics.json"
+            self.metrics_path.mkdir(parents=True, exist_ok=True)  # Add this
 
             # Load existing metrics or create new list
             metrics_list = []
