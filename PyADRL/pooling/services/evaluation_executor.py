@@ -1,13 +1,11 @@
 from abc import ABCMeta, abstractmethod
 from logging import Logger
-from pathlib import Path
 from typing import override
 
 from PyADRL.logger.heatmaps import HeatmapCallback
 from PyADRL.logger.metrics import MetricsCallback
 from PyADRL.pooling.models.experiment_config import ExperimentConfig
 from PyADRL.pooling.models.training import Training
-from PyADRL.pooling.services import map_service
 from PyADRL.pooling.services.map_service import MapService
 from PyADRL.utils import config_builder
 
