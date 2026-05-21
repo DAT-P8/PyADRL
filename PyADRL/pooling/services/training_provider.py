@@ -5,6 +5,7 @@ from typing import override
 
 from PyADRL.pooling.models.training import Training
 
+
 class TrainingProvider(metaclass=ABCMeta):
     @abstractmethod
     def get_trainings(self, path: Path) -> list[Training]:
@@ -18,7 +19,7 @@ class FSTrainingProvider(TrainingProvider):
     @override
     def get_trainings(self, path: Path) -> list[Training]:
         trainings: list[Training] = []
-        
+
         for train_dir in path.iterdir():
             if not train_dir.is_dir():
                 continue

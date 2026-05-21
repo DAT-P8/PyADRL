@@ -1,5 +1,6 @@
 from pathlib import Path
 
+
 class Training:
     def __init__(self, name: str, training_location: Path) -> None:
         self.name = name

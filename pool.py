@@ -12,9 +12,8 @@ from PyADRL.pooling.service_configuration import (
     Container,
 )
 from PyADRL.utils import map_load
-from PyADRL.pooling.services.experiment_provider import (
-    ExperimentProvider
-)
+from PyADRL.pooling.services.experiment_provider import ExperimentProvider
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Example CLI parser")
@@ -25,9 +24,8 @@ def parse_args() -> argparse.Namespace:
         type=str,
         required=True,
         default=None,
-        help="Please specify experiment to run. E.g. 'experiment_6'"
+        help="Please specify experiment to run. E.g. 'experiment_6'",
     )
-
 
     parser.add_argument(
         "--map",
@@ -36,8 +34,9 @@ def parse_args() -> argparse.Namespace:
         required=False,
         help=f"Map name, maps are found in PyADRL/examples/maps. Maps: {get_maps()}",
     )
-    
+
     return parser.parse_args()
+
 
 @inject
 def main(
@@ -65,7 +64,11 @@ def main(
     if experiment is None:
         raise Exception(f"Did not find experiment with name: {pool_config.experiment}")
 
-    confs = [(config, training) for config in experiment.configs for training in config.trainings]
+    confs = [
+        (config, training)
+        for config in experiment.configs
+        for training in config.trainings
+    ]
     combinations = [(c1, t1, c2, t2) for c1, t1 in confs for c2, t2 in confs]
 
     for c1, t1, c2, t2 in combinations:

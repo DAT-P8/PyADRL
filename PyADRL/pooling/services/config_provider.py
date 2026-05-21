@@ -8,6 +8,7 @@ from PyADRL.pooling.services.training_provider import TrainingProvider
 
 from ..models.experiment_config import ExperimentConfig
 
+
 class ExperimentConfigProvider(metaclass=ABCMeta):
     @abstractmethod
     def get_configs(self, path: Path) -> list[ExperimentConfig]:
@@ -27,7 +28,7 @@ class FSExperimentConfigProvider(ExperimentConfigProvider):
         for file in path.iterdir():
             if not file.is_dir():
                 continue
-        
+
             with open(file / "model-info.json", "r") as f:
                 model_info: dict[str, Any] = json.load(f)
 
