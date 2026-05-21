@@ -102,14 +102,31 @@ def weighted_capture_score(episode_outcomes: list[dict], n_evaders: int) -> floa
 def weighted_acs(episode_outcomes: list[dict], n_evaders: int) -> float:
     """ACS = (1/|E|) * sum_k (k * ACS@k).
 
-    ACS@k = mean timestep of the k-th capture across episodes that had at
-    least k captures. Weighted by k so the
-    aggregation parallels capture_score and composes with it in score_p.
+    ACS@k = mean step of the k-th capture across ALL episodes, substituting
+    the episode's own termination step (episode_length) for episodes that
+    never reached a k-th capture.
+
+    Substituting episode_length (not Tmax) ensures:
+      - Timeouts (no capture, no breach) pay full ACS = Tmax — closes the
+        "do-nothing" loophole where passive trials evaded the timing penalty.
+      - Breach episodes pay only proportional to their actual length, so the
+        existing -breach_rate term in score_p is not double-counted.
+      - Note that if we have more evaders we punish models that are passive
+        by more than 1 potentially. With E=1 we are normalized between [0,1],
+        but not with E<1.
     """
     if n_evaders <= 0 or not episode_outcomes:
         return 0.0
-    mean_steps = mean_capture_steps(episode_outcomes)
-    return float(sum((i + 1) * step for i, step in enumerate(mean_steps))) / n_evaders
+    total = 0.0
+    for k in range(n_evaders):
+        values = [
+            o["capture_steps"][k]
+            if len(o.get("capture_steps", [])) > k
+            else o.get("episode_length", 0)
+            for o in episode_outcomes
+        ]
+        total += (k + 1) * float(np.mean(values))
+    return total / n_evaders
 
 
 def summarize_evaluation(
@@ -633,14 +650,6 @@ class MetricsCallback(RLlibCallback):
             "capture_rate_at_k": capture_rates,
             "mean_capture_step_at_k": mean_steps,
             "mean_capture_step": average_capture_step,
-            "mean_pursuer_entered_target_count": float(
-                np.mean(
-                    [
-                        outcome.get("pursuer_entered_target_count", 0)
-                        for outcome in episode_outcomes
-                    ]
-                )
-            ),
             "breach_rate": breach_rate_val,
             "mean_episode_length": mean_episode_length,
             "mean_evader_drone_collision_rate": col_e_val,
