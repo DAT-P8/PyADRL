@@ -482,7 +482,14 @@ class HeatmapCallback(RLlibCallback):
             k: [] for k in SHIELD_COLORS
         }
 
-        def _plot_group(episode_states, shield_data, unsafe_data, *, color, use_capture_markers=False):
+        def _plot_group(
+            episode_states,
+            shield_data,
+            unsafe_data,
+            *,
+            color,
+            use_capture_markers=False,
+        ):
             plotted_any = False
 
             if not isinstance(episode_states, dict):
@@ -610,8 +617,14 @@ class HeatmapCallback(RLlibCallback):
                                         # Drone was stationary — another drone moved into it.
                                         # Mark its position with a red × (no direction to arrow).
                                         ax.scatter(
-                                            xs[i], ys[i], marker="x",
-                                            color="#d62728", s=60, linewidths=1.5, alpha=1.0, zorder=7,
+                                            xs[i],
+                                            ys[i],
+                                            marker="x",
+                                            color="#d62728",
+                                            s=60,
+                                            linewidths=1.5,
+                                            alpha=1.0,
+                                            zorder=7,
                                         )
                                 except (TypeError, ValueError):
                                     pass
@@ -647,12 +660,27 @@ class HeatmapCallback(RLlibCallback):
                 last_grid = (int(xs[-1] - 0.5), int(ys[-1] - 0.5))
                 if use_capture_markers and last_grid in capture_set:
                     ax.scatter(
-                        xs[-1], ys[-1], marker="*", color="yellow", edgecolors="black",
-                        linewidths=0.4, s=120, alpha=1.0, zorder=20,
+                        xs[-1],
+                        ys[-1],
+                        marker="*",
+                        color="yellow",
+                        edgecolors="black",
+                        linewidths=0.4,
+                        s=120,
+                        alpha=1.0,
+                        zorder=20,
                     )
                 else:
                     ax.scatter(
-                        xs[-1], ys[-1], marker="X", color=color, edgecolors="black", linewidths=0.5, s=30, alpha=1.0, zorder=11
+                        xs[-1],
+                        ys[-1],
+                        marker="X",
+                        color=color,
+                        edgecolors="black",
+                        linewidths=0.5,
+                        s=30,
+                        alpha=1.0,
+                        zorder=11,
                     )
 
                 # Collect shielded positions for overlay after all paths are drawn.
@@ -716,8 +744,14 @@ class HeatmapCallback(RLlibCallback):
         ax.set_yticks(np.arange(0, self.grid_h + 1, 1))
         ax.grid(True, which="major", linewidth=0.3, color="grey", alpha=1.0)
 
-        ax.tick_params(axis="both", which="both", left=False, bottom=False,
-                       labelbottom=False, labelleft=False)
+        ax.tick_params(
+            axis="both",
+            which="both",
+            left=False,
+            bottom=False,
+            labelbottom=False,
+            labelleft=False,
+        )
         for spine in ax.spines.values():
             spine.set_visible(False)
         ax.set_aspect("equal", adjustable="box")
@@ -732,7 +766,9 @@ class HeatmapCallback(RLlibCallback):
 
     def _make_cmap(self, base_cmap):
         high = plt.get_cmap(base_cmap)(1.0)
-        return LinearSegmentedColormap.from_list(f"custom_{base_cmap}", ["#dddddd", high])
+        return LinearSegmentedColormap.from_list(
+            f"custom_{base_cmap}", ["#dddddd", high]
+        )
 
     def _draw_target(self, ax):
         rect = patches.Rectangle(
