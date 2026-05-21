@@ -554,11 +554,11 @@ class HeatmapCallback(RLlibCallback):
                                 ax.scatter(
                                     xs[i],
                                     ys[i],
-                                    marker="o",
+                                    marker="x",
                                     color="#2ca02c",
-                                    s=5,
+                                    s=20,
                                     alpha=1.0,
-                                    zorder=7,
+                                    zorder=12,
                                 )
                             # Dashed red arrow: action blocked by shield.
                             # Draw shaft and head separately — FancyArrowPatch with linestyle="dashed"
@@ -648,11 +648,11 @@ class HeatmapCallback(RLlibCallback):
                 if use_capture_markers and last_grid in capture_set:
                     ax.scatter(
                         xs[-1], ys[-1], marker="*", color="yellow", edgecolors="black",
-                        linewidths=0.4, s=120, alpha=1.0, zorder=5,
+                        linewidths=0.4, s=120, alpha=1.0, zorder=20,
                     )
                 else:
                     ax.scatter(
-                        xs[-1], ys[-1], marker="X", color=color, edgecolors="black", linewidths=0.5, s=30, alpha=1.0, zorder=4
+                        xs[-1], ys[-1], marker="X", color=color, edgecolors="black", linewidths=0.5, s=30, alpha=1.0, zorder=11
                     )
 
                 # Collect shielded positions for overlay after all paths are drawn.
@@ -698,7 +698,7 @@ class HeatmapCallback(RLlibCallback):
                 linewidths=0.4,
                 s=40,
                 alpha=1.0,
-                zorder=6,
+                zorder=10,
             )
 
         if not (has_evaders or has_pursuers):
