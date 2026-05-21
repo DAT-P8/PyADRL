@@ -3,7 +3,6 @@ from PyADRL.utils.paths import get_experiments_dir
 from PyADRL.utils.save_info import save_info
 from PyADRL.examples.gridworld_train import gridworld_train
 
-# TODO: måske move them to another file
 hyperparameter1 = {
     "lr": 3e-4,
     "gamma": 0.99,
@@ -65,6 +64,7 @@ TRAINING_CONFIG = {
 def main() -> None:
     experiment_dir = get_experiments_dir() / EXPERIMENT_NAME
     if experiment_dir.exists():
+        # Prevent overwriting existing experiments :)
         raise FileExistsError(
             f"Experiment '{EXPERIMENT_NAME}' already exists at {experiment_dir}. Choose a different name."
         )
