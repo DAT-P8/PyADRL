@@ -43,14 +43,14 @@ class RayEvaluationExecutor(EvaluationExecutor):
         map2 = self.map_service.get_from_name(c2.model_info["map"])
         assert map1 is not None, f"did not find map of: {c1.model_info['map']}"
         assert map2 is not None, f"did not find map of: {c2.model_info['map']}"
-  
+
         n_pursuers = int(c1.model_info["n_pursuers"])
         n_evaders = int(c1.model_info["n_evaders"])
 
         assert n_pursuers == int(c2.model_info["n_pursuers"])
         assert n_evaders == int(c2.model_info["n_evaders"])
-        
-        map_dict = map_load.load_map_dict(c1.model_info['map'])
+
+        map_dict = map_load.load_map_dict(c1.model_info["map"])
         # only register the environment if it hasn't been registered
         _register_gridworld_env(
             map_dict=map_dict,
@@ -60,11 +60,24 @@ class RayEvaluationExecutor(EvaluationExecutor):
             shielding=False,
         )
 
-
         o1 = "[" + str.join(", ", [f"({o.x}, {o.y})" for o in map1.objects]) + "]"
         o2 = "[" + str.join(", ", [f"({o.x}, {o.y})" for o in map2.objects]) + "]"
-        self.logger.debug("map1 D: (%s, %s), T: (%s, %s), O: %s", map1.width, map1.height, map1.target_x, map1.target_y, o1)
-        self.logger.debug("map2 D: (%s, %s), T: (%s, %s), O: %s", map2.width, map2.height, map2.target_x, map2.target_y, o2)
+        self.logger.debug(
+            "map1 D: (%s, %s), T: (%s, %s), O: %s",
+            map1.width,
+            map1.height,
+            map1.target_x,
+            map1.target_y,
+            o1,
+        )
+        self.logger.debug(
+            "map2 D: (%s, %s), T: (%s, %s), O: %s",
+            map2.width,
+            map2.height,
+            map2.target_x,
+            map2.target_y,
+            o2,
+        )
         self.logger.debug("map1 %s", c1.model_info["map"])
         self.logger.debug("map2 %s", c2.model_info["map"])
 

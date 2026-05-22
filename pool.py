@@ -1,17 +1,12 @@
 import logging
 from PyADRL.pooling.services.evaluation_executor import EvaluationExecutor
-from PyADRL.utils.register_env import _register_gridworld_env
-from ray.tune.registry import _global_registry, ENV_CREATOR
-from PyADRL.envs.reward_functions.grid_world_rewards import GridWorldRewards
 from PyADRL.pooling.models.pool_config import PoolConfig
-from parser import get_maps
 import argparse
 import ray
 from dependency_injector.wiring import Provide, inject
 from PyADRL.pooling.service_configuration import (
     Container,
 )
-from PyADRL.utils import map_load
 from PyADRL.pooling.services.experiment_provider import ExperimentProvider
 
 
