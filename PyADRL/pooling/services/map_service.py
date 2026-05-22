@@ -39,9 +39,9 @@ class MapService:
             for file in maps_dir.iterdir():
                 fname = file.name
                 if "." in fname:
-                    fname = name.split(".")[0]
+                    fname = fname.split(".")[0]
 
-                if file.is_dir() and fname != name:
+                if file.is_dir() or fname != name:
                     continue
 
                 with open(file, "r") as f:
@@ -51,6 +51,7 @@ class MapService:
                 height: int = int(raw_object["height"])
                 target_x: int = int(raw_object["target_x"])
                 target_y: int = int(raw_object["target_y"])
+
                 objects = [
                     MapObject(x=int(o["x"]), y=int(o["y"]))
                     for o in list(raw_object["objects"])
