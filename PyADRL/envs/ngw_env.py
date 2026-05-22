@@ -310,7 +310,7 @@ class NGWEnvironment(ParallelEnv):
     def _get_infos(self, alt_state: State | None = None):
         if self.newest_state is None:
             raise Exception("Newest state is None, can't get infos")
-        
+
         infos = {a: {} for a in self.agents}
         for d in self.drones[EVADERS] + self.drones[PURSUERS]:
             if d.name in infos:
@@ -344,6 +344,9 @@ class NGWEnvironment(ParallelEnv):
                         for ds in self.drones[EVADERS]:
                             if ds.id == d.id and ds.is_evader:
                                 # add the position where the evader was captured
-                                infos[d.name]["capture_position"] = {"x": ds.x, "y": ds.y}
+                                infos[d.name]["capture_position"] = {
+                                    "x": ds.x,
+                                    "y": ds.y,
+                                }
                                 break
         return infos
