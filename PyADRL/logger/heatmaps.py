@@ -346,7 +346,9 @@ class HeatmapCallback(RLlibCallback):
         plt.tight_layout()
 
         if self.figure_path:
+            self.figure_path.mkdir(parents=True, exist_ok=True)
             path = self.figure_path / f"{filename}.svg"
+
             plt.savefig(path, dpi=150)
         # plt.show()
         plt.close(fig)
