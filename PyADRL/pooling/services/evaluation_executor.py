@@ -98,9 +98,9 @@ class RayEvaluationExecutor(EvaluationExecutor):
         self.logger.debug("Building algo2: %s", c2.name + "-" + t2.name)
 
         shallow_c_dict = {k: v for k, v in c2.model_info.items()}
-        shallow_c_dict["evaluation_duration"] = 1000  # extra iterations
+        shallow_c_dict["evaluation_duration"] = 1_000  # extra iterations
         ppo_config2 = config_builder._build_ppo_config(
-            config=c2.model_info,
+            config=shallow_c_dict,
             callbacks=callbacks,
             env_config={
                 "width": map2.width,
