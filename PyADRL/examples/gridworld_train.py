@@ -53,6 +53,7 @@ def gridworld_train(
     model_config: dict = DEFAULT_CONFIG,
     training_path: Path | None = None,
     shielding: bool = False,
+    seed: int | None = None,
 ):
     ray.shutdown()
     ray.init()
@@ -87,6 +88,7 @@ def gridworld_train(
         n_evaders=n_evaders,
         figure_path=figure_path,
         metrics_path=training_path,
+        seed=seed,
     )
     algo = ppo_config.build_algo()
 
