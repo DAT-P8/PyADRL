@@ -60,27 +60,6 @@ class RayEvaluationExecutor(EvaluationExecutor):
             shielding=False,
         )
 
-        o1 = "[" + str.join(", ", [f"({o.x}, {o.y})" for o in map1.objects]) + "]"
-        o2 = "[" + str.join(", ", [f"({o.x}, {o.y})" for o in map2.objects]) + "]"
-        self.logger.debug(
-            "map1 D: (%s, %s), T: (%s, %s), O: %s",
-            map1.width,
-            map1.height,
-            map1.target_x,
-            map1.target_y,
-            o1,
-        )
-        self.logger.debug(
-            "map2 D: (%s, %s), T: (%s, %s), O: %s",
-            map2.width,
-            map2.height,
-            map2.target_x,
-            map2.target_y,
-            o2,
-        )
-        self.logger.debug("map1 %s", c1.model_info["map"])
-        self.logger.debug("map2 %s", c2.model_info["map"])
-
         fig_path = t1.eval_pool_path / (c2.name + "-" + t2.name)
 
         ppo_config1 = config_builder._build_ppo_config(
