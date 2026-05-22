@@ -27,7 +27,6 @@ class Container(containers.DeclarativeContainer):
     logger = providers.Singleton(lambda: logging.getLogger("default"))
     pool_config = providers.Factory(
         PoolConfig,
-        map=config.map,
         experiment=config.experiment,
         n_pursuers=config.n_pursuers,
         n_evaders=config.n_evaders,

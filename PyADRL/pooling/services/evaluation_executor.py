@@ -1,4 +1,6 @@
 from abc import ABCMeta, abstractmethod
+from PyADRL.envs.reward_functions.grid_world_rewards import GridWorldRewards
+from PyADRL.utils.register_env import _register_gridworld_env
 from logging import Logger
 from typing import override
 
@@ -7,7 +9,7 @@ from PyADRL.logger.metrics import MetricsCallback
 from PyADRL.pooling.models.experiment_config import ExperimentConfig
 from PyADRL.pooling.models.training import Training
 from PyADRL.pooling.services.map_service import MapService
-from PyADRL.utils import config_builder
+from PyADRL.utils import config_builder, map_load
 
 
 class EvaluationExecutor(metaclass=ABCMeta):
@@ -42,6 +44,22 @@ class RayEvaluationExecutor(EvaluationExecutor):
         assert map1 is not None, f"did not find map of: {c1.model_info['map']}"
         assert map2 is not None, f"did not find map of: {c2.model_info['map']}"
 
+        n_pursuers = int(c1.model_info["n_pursuers"])
+        n_evaders = int(c1.model_info["n_evaders"])
+
+        assert n_pursuers == int(c2.model_info["n_pursuers"])
+        assert n_evaders == int(c2.model_info["n_evaders"])
+
+        map_dict = map_load.load_map_dict(c1.model_info["map"])
+        # only register the environment if it hasn't been registered
+        _register_gridworld_env(
+            map_dict=map_dict,
+            reward_function=GridWorldRewards(),
+            n_pursuers=n_pursuers,
+            n_evaders=n_evaders,
+            shielding=False,
+        )
+
         fig_path = t1.eval_pool_path / (c2.name + "-" + t2.name)
 
         ppo_config1 = config_builder._build_ppo_config(
@@ -54,10 +72,10 @@ class RayEvaluationExecutor(EvaluationExecutor):
                 "target_y": map1.target_y,
                 "objects": map1.objects,
                 "figure_path": fig_path,
-                "n_evaders": 2,
+                "n_evaders": n_evaders,
             },
-            n_pursuers=2,
-            n_evaders=1,
+            n_pursuers=n_pursuers,
+            n_evaders=n_evaders,
             figure_path=fig_path,
             metrics_path=fig_path,
         )
@@ -80,9 +98,9 @@ class RayEvaluationExecutor(EvaluationExecutor):
         self.logger.debug("Building algo2: %s", c2.name + "-" + t2.name)
 
         shallow_c_dict = {k: v for k, v in c2.model_info.items()}
-        shallow_c_dict["evaluation_duration"] = 1000  # extra iterations
+        shallow_c_dict["evaluation_duration"] = 1_000  # extra iterations
         ppo_config2 = config_builder._build_ppo_config(
-            config=c2.model_info,
+            config=shallow_c_dict,
             callbacks=callbacks,
             env_config={
                 "width": map2.width,
@@ -91,10 +109,10 @@ class RayEvaluationExecutor(EvaluationExecutor):
                 "target_y": map2.target_y,
                 "objects": map2.objects,
                 "figure_path": fig_path,
-                "n_evaders": 2,
+                "n_evaders": n_evaders,
             },
-            n_pursuers=2,
-            n_evaders=1,
+            n_pursuers=n_pursuers,
+            n_evaders=n_evaders,
             figure_path=fig_path,
             metrics_path=fig_path,
         )
