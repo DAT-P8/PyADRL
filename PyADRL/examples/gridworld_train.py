@@ -55,8 +55,8 @@ def gridworld_train(
     shielding: bool = False,
     seed: int | None = None,
 ):
-    ray.shutdown()
-    ray.init()
+    if not ray.is_initialized():
+        ray.init()
 
     map_dict = load_map_dict(map)
 
