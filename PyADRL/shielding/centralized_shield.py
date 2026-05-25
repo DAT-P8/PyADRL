@@ -238,4 +238,4 @@ class CentralizedShield(Shield):
             )
             return [action for _, action, _ in drone_actions.values()], alt_state
 
-        raise Exception(f"Exceeded maximum iteration of {self.max_depth}")
+        return actions, None
