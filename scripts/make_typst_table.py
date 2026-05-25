@@ -1,10 +1,15 @@
 from __future__ import annotations
+from logging import Logger, log
+import logging
+from dependency_injector.wiring import Provide, inject
 
 import argparse
 import sys
 from pathlib import Path
 
 from PyADRL.pool_metrics.models.evaluation_result import EvaluationPoolMetrics, EvaluationResult, combine
+from PyADRL.pool_metrics.services.metrics_finder import MetricsFinder
+from scripts.default_container import DefaultContainer
 
 SCRIPT_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_ROOT.parent
@@ -13,21 +18,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 DEFAULT_OUTPUT = Path("average_table.typst")
 
 
-def _short_name(pool: EvaluationPoolMetrics) -> str:
-    import re
-
-    cfg_match = re.search(r"(\d+)", pool.pursuer_config)
-    trg_match = re.search(r"(\d+)", pool.pursuer_training)
-    if cfg_match and trg_match:
-        return f"c{int(cfg_match.group(1))}_t{int(trg_match.group(1))}"
-    return f"{pool.pursuer_config}_{pool.pursuer_training}".strip("_")
-
-
-def _map_row(pool: EvaluationPoolMetrics) -> dict:
-    result: EvaluationResult = combine(pool.metrics)
-
+def _map_row(name: str, result: EvaluationResult) -> dict:
     return {
-        "name": _short_name(pool),
+        "name": name,
         "CR@1": result.capture_rate_at_k["1"],
         "ACS@1": result.mean_capture_step,
         "BR": result.breach_rate,
@@ -114,32 +107,58 @@ def build_typst_table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def generate_table(pools: list[EvaluationPoolMetrics], output: Path = DEFAULT_OUTPUT) -> None:
-    rows = [_map_row(p) for p in pools]
+def generate_table(pools: dict[str, EvaluationResult], output: Path = DEFAULT_OUTPUT) -> None:
+    rows = [_map_row(k, p) for k, p in pools.items()]
     typst = build_typst_table(rows)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(typst, encoding="utf-8")
     print(f"Wrote typst table to {output}")
 
 
-def main(argv: list[str] | None = None) -> int:
+@inject
+def main(
+    logger: Logger = Provide[DefaultContainer.logger],
+    metrics_finder: MetricsFinder = Provide[DefaultContainer.metrics_finder],
+) -> int:
     parser = argparse.ArgumentParser(
         description="Generate a Typst table from EvaluationPoolMetrics"
     )
     parser.add_argument(
         "--output",
+        "-o",
         help=f"Output typst file (default: {DEFAULT_OUTPUT})",
     )
-    args = parser.parse_args(argv)
+    args = parser.parse_args()
 
     output = Path(args.output) if args.output else DEFAULT_OUTPUT
 
     # Obtain pools from your source here.
-    pools: list[EvaluationPoolMetrics] = []  # TODO: populate from your source
+    pools: list[EvaluationPoolMetrics] = metrics_finder.scan_for_metrics()
 
-    generate_table(pools, output)
+    results: dict[str, list[EvaluationResult]] = {}
+    for p1 in pools:
+        key = f"{p1.experiment_name}-{p1.pursuer_config}-{p1.pursuer_training}"
+
+        if key not in results:
+            results[key] = []
+        ms = results[key]
+
+        for m in p1.metrics:
+            ms.append(m)
+
+    combined_metrics: dict[str, EvaluationResult] = {}
+    for key, value in results.items():
+        logger.info("%s: count(%s)", key, len(value))
+        combined_metrics[key] = combine(value)
+
+    generate_table(combined_metrics, output)
     return 0
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+
+    container = DefaultContainer()
+    container.wire(modules=[__name__])
+
     raise SystemExit(main())

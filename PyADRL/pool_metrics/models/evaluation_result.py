@@ -38,6 +38,9 @@ class EvaluationPoolMetrics(BaseModel):
 
 
 def combine(results: list[EvaluationResult]) -> EvaluationResult:
+    if len(results) == 1:
+        return results[0]
+
     m_mean_capture_step = 0
     m_breach_rate = 0
     m_mean_episode_length = 0
