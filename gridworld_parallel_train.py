@@ -11,45 +11,45 @@ from PyADRL.utils.register_env import _register_gridworld_env
 from PyADRL.utils.save_info import save_info
 
 hyperparameter1 = {
-    "lr": 3e-4,
+    "lr": 6e-4,
     "gamma": 0.99,
     "lambda_": 0.95,
-    "clip_param": 0.2,
+    "clip_param": 0.136083,
     "vf_loss_coeff": 0.5,
-    "entropy_coeff": 0.01,
+    "entropy_coeff": 0.033611,
     "train_batch_size": 10000,
     "minibatch_size": 10000,
-    "num_epochs": 10,
+    "num_epochs": 5,
     "num_learners": 0,
     "num_env_runners": 0,
     "num_envs_per_env_runner": 64,
 }
 
 hyperparameter2 = {
-    "lr": 3e-3,
+    "lr": 1e-3,
     "gamma": 0.99,
     "lambda_": 0.95,
-    "clip_param": 0.2,
-    "vf_loss_coeff": 0.5,
-    "entropy_coeff": 0.01,
+    "clip_param": 0.181324,
+    "vf_loss_coeff": 1.0,
+    "entropy_coeff": 0.087159,
     "train_batch_size": 10000,
     "minibatch_size": 10000,
-    "num_epochs": 10,
+    "num_epochs": 15,
     "num_learners": 0,
     "num_env_runners": 0,
     "num_envs_per_env_runner": 64,
 }
 
 hyperparameter3 = {
-    "lr": 3e-4,
-    "gamma": 0.98,
+    "lr": 7e-4,
+    "gamma": 0.90,
     "lambda_": 0.95,
-    "clip_param": 0.2,
+    "clip_param": 0.081495,
     "vf_loss_coeff": 0.5,
-    "entropy_coeff": 0.01,
+    "entropy_coeff": 0.089127,
     "train_batch_size": 10000,
     "minibatch_size": 10000,
-    "num_epochs": 10,
+    "num_epochs": 15,
     "num_learners": 0,
     "num_env_runners": 0,
     "num_envs_per_env_runner": 64,
@@ -58,13 +58,13 @@ hyperparameter3 = {
 CONFIGS = [hyperparameter1, hyperparameter2, hyperparameter3]
 SEEDS = [42, 67, 1337]
 MAP = "map"
-EXPERIMENT_NAME = "experiment_1"
+EXPERIMENT_NAME = "experiment_5"
 N_PURSUERS = 2
 N_EVADERS = 1
-SHIELDING = False
+SHIELDING = True
 TRAINING_CONFIG = {
     "name": "simultaneous",
-    "n_iterations": 3,
+    "n_iterations": 200,
 }
 
 
