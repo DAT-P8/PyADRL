@@ -4,7 +4,6 @@ from dependency_injector import containers, providers
 from dependency_injector.wiring import Provide, inject
 
 from PyADRL.pool_metrics.models.evaluation_result import combine
-from PyADRL.pool_metrics.plot import plot_heatmap
 from PyADRL.pool_metrics.services.metrics_finder import MetricsFinder
 from PyADRL.pooling.services.config_provider import FSExperimentConfigProvider
 from PyADRL.pooling.services.experiment_provider import FSExperimentProvider
