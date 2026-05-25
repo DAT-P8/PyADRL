@@ -30,7 +30,7 @@ class MetricsFinder:
                             with open(metrics_fp, "r", encoding="utf-8") as f:
                                 data = json.load(f)
 
-                            split_metric_fp = str(metrics_fp).split("-")
+                            split_file_name = str(file.name).split("-")
 
                             results: list[EvaluationResult] = [
                                 EvaluationResult(**d) for d in data
@@ -39,8 +39,8 @@ class MetricsFinder:
                                 experiment_name=experiment.name,
                                 pursuer_config=config.name,
                                 pursuer_training=training.name,
-                                evader_config=split_metric_fp[0],
-                                evader_training=split_metric_fp[1],
+                                evader_config=split_file_name[0],
+                                evader_training=split_file_name[1],
                                 metrics=results,
                             )
                             ms.append(metrics)
