@@ -127,8 +127,8 @@ def combine(results: list[EvaluationResult]) -> EvaluationResult:
             while len(n_mean_capture_step_at_k) - 1 < key:
                 n_mean_capture_step_at_k.append((0, 0))
 
-            sum, count = n_mean_capture_step_at_k[key]
-            n_mean_capture_step_at_k[key] = (sum + value, count + 1)
+            summed, count = n_mean_capture_step_at_k[key]
+            n_mean_capture_step_at_k[key] = (summed + value, count + 1)
 
     for key, value in m_capture_rate_at_k.items():
         m_capture_rate_at_k[key] = value / n_capture_rate_at_k[key]
@@ -136,11 +136,11 @@ def combine(results: list[EvaluationResult]) -> EvaluationResult:
     for key, value in m_mean_rewards.items():
         m_mean_rewards[key] = value / n_mean_rewards[key]
 
-    for sum, count in n_mean_capture_step_at_k:
+    for summed, count in n_mean_capture_step_at_k:
         if count == 0:
             m_mean_capture_step_at_k.append(-1)
         else:
-            m_mean_capture_step_at_k.append(sum / count)
+            m_mean_capture_step_at_k.append(summed / count)
 
     return EvaluationResult(
         timestamp=datetime.now(),
