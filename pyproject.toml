@@ -29,7 +29,6 @@ dependencies = [
   "lz4",
   "seaborn",
   "dependency-injector",
-  "pydantic",
 ]
 
 
