@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+import numpy as np
 from PyADRL.envs.reward_functions.grid_world_rewards import GridWorldRewards
 from PyADRL.utils.register_env import _register_gridworld_env
 from logging import Logger
@@ -134,14 +135,15 @@ class RayEvaluationExecutor(EvaluationExecutor):
         algo2.learner_group.set_weights({f"{self.evader_key}_policy": evader_weights})
 
         assert algo2.config is not None
-        assert algo2.config.num_env_runners is not None
 
-        # make sure to sync weights with remote workers
-        if algo2.env_runner_group is not None and algo2.config.num_env_runners > 0:
-            algo2.env_runner_group.sync_weights(
-                from_worker_or_learner_group=algo2.learner_group,
-                policies=[f"{self.evader_key}_policy"],
-            )
+        # Propagate the transplanted evader weights to *all* runner groups
+        # (learner, training env_runners, eval env_runners, and the local
+        # env_runner). The previous approach -- setting weights only on
+        # learner_group and then conditionally syncing to env_runner_group --
+        # silently no-op'd on configs with num_env_runners == 0 and never
+        # touched the eval env_runner group that algo2.evaluate() actually
+        # uses, so the rollout kept using t2's restored evader.
+        algo2.set_weights({f"{self.evader_key}_policy": evader_weights})
 
         # this is *magic*
         algo2.config._is_frozen = False
@@ -151,6 +153,19 @@ class RayEvaluationExecutor(EvaluationExecutor):
             lambda learner, *_args: learner.config.multi_agent(
                 policies_to_train=[f"{self.pursuer_key}_policy"]
             )
+        )
+
+        # Guard against the transplant silently failing to reach the rollout
+        # worker. Without this, a regression in set_weights propagation would
+        # collapse every (c1, c2) pair to a (c2, c2) self-play and the bug
+        # would only show up as suspicious metrics downstream.
+        runner_weights = algo2.env_runner.get_weights(
+            [f"{self.evader_key}_policy"]
+        )[f"{self.evader_key}_policy"]
+        flat_runner = np.concatenate([np.asarray(v).ravel() for v in runner_weights.values()])
+        flat_source = np.concatenate([np.asarray(v).ravel() for v in evader_weights.values()])
+        assert np.allclose(flat_runner, flat_source), (
+            "Evader weights did not propagate to env_runner; eval would use the wrong policy"
         )
 
         eval_result = algo2.evaluate()
