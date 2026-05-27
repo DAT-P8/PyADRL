@@ -37,10 +37,10 @@ class MetricsFinder:
                             ]
                             metrics = EvaluationPoolMetrics(
                                 experiment_name=experiment.name,
-                                pursuer_config=config.name,
-                                pursuer_training=training.name,
-                                evader_config=split_file_name[0],
-                                evader_training=split_file_name[1],
+                                pursuer_config=split_file_name[0],
+                                pursuer_training=split_file_name[1],
+                                evader_config=config.name,
+                                evader_training=training.name,
                                 metrics=results,
                             )
                             ms.append(metrics)

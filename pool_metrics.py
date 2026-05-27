@@ -1,4 +1,6 @@
 import logging
+import math
+import re
 
 from dependency_injector import containers, providers
 from dependency_injector.wiring import Provide, inject
@@ -29,15 +31,24 @@ class PoolMetricsContainer(containers.DeclarativeContainer):
 
 @inject
 def main(
-    _: logging.Logger = Provide[PoolMetricsContainer.logger],
+    logger: logging.Logger = Provide[PoolMetricsContainer.logger],
     metrics_finder: MetricsFinder = Provide[PoolMetricsContainer.metrics_finder],
 ) -> int:
     ms = metrics_finder.scan_for_metrics()
 
-    combined_metrics = combine([metric for results in ms for metric in results.metrics])
+    combined_metrics = [metric for r in ms for metric in r.metrics if re.match(r"a$", r.experiment_name) and re.match(r"c[1-3]$", r.pursuer_config)]
+    
+    comb_scores = [m.comb_score for m in combined_metrics]
+    comb_scores.sort()
 
-    with open("combined_metrics.json", "w") as f:
-        f.write(combined_metrics.model_dump_json(indent=2))
+    for m in comb_scores:
+        logger.info("score: %s", m)
+
+    logger.info("max: %s", max(comb_scores))
+    logger.info("min: %s", min(comb_scores))
+    logger.info("mean: %s", sum(comb_scores) / len(comb_scores))
+    logger.info("median: %s", comb_scores[math.ceil(len(comb_scores) / 2)])
+
 
     return 0
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from logging import Logger, log
 import logging
+import re
 from dependency_injector.wiring import Provide, inject
 
 import argparse
@@ -114,6 +115,25 @@ def generate_table(pools: dict[str, EvaluationResult], output: Path = DEFAULT_OU
     output.write_text(typst, encoding="utf-8")
     print(f"Wrote typst table to {output}")
 
+def get_number(text: str):
+    return int(re.search("[0-9]+", text).group())
+
+def get_type_conf(name: str, experiment: str):
+    if re.match(r"s[1-3]$", name):
+        return "s"
+    if re.match(r"ss[1-3]$", name):
+        return "ss"
+    if re.match(r"sa[1-3]$", name):
+        return "sa"
+    if re.match(r"a[1-3]$", name):
+        return "a"
+    if re.match(r"l[1-3]$", name):
+        return "l"
+    if re.match(r"c[1-3]$", name):
+        return experiment[0]
+    raise Exception("did not recognize type")
+
+
 
 @inject
 def main(
@@ -133,18 +153,18 @@ def main(
     output = Path(args.output) if args.output else DEFAULT_OUTPUT
 
     # Obtain pools from your source here.
-    pools: list[EvaluationPoolMetrics] = metrics_finder.scan_for_metrics()
-
+    pools: list[EvaluationPoolMetrics] = [m for m in metrics_finder.scan_for_metrics() if re.match(r'(long-v-all)$', m.experiment_name)]
+    
     results: dict[str, list[EvaluationResult]] = {}
-    for p1 in pools:
-        key = f"{p1.experiment_name}-{p1.pursuer_config}-{p1.pursuer_training}"
+    for pool in pools:
+        key = f"{get_type_conf(pool.pursuer_config, pool.experiment_name)}-c{get_number(pool.pursuer_config)}-t{get_number(pool.pursuer_training)}-{get_type_conf(pool.evader_config, pool.experiment_name)}"
 
         if key not in results:
             results[key] = []
-        ms = results[key]
 
-        for m in p1.metrics:
-            ms.append(m)
+        metrics = results[key]
+        metrics.extend(pool.metrics)
+
 
     combined_metrics: dict[str, EvaluationResult] = {}
     for key, value in results.items():

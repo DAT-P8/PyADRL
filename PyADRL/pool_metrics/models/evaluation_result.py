@@ -141,7 +141,7 @@ def combine(results: list[EvaluationResult]) -> EvaluationResult:
 
     for summed, count in n_mean_capture_step_at_k:
         if count == 0:
-            m_mean_capture_step_at_k.append(-1)
+            m_mean_capture_step_at_k.append(0)
         else:
             m_mean_capture_step_at_k.append(summed / count)
 
