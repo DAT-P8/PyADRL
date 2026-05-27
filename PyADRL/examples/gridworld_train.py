@@ -22,7 +22,7 @@ SIMULTANEOUS = "simultaneous"
 
 DEFAULT_TRAINING = {
     "name": ALTERNATING,
-    "n_stages": 4,
+    "n_stages": 20,
     "iters_per_stage": 20,
 }
 
@@ -36,7 +36,7 @@ DEFAULT_CONFIG = {
     "entropy_coeff": 0.01,
     # --- Architecture params ---
     "train_batch_size": 10000,
-    "minibatch_size": 512,
+    "minibatch_size": 10000,
     "num_epochs": 10,
     # --- Resource params (all in-process to avoid placement group errors) ---
     "num_learners": 0,
@@ -52,7 +52,7 @@ def gridworld_train(
     training_config: dict = DEFAULT_TRAINING,
     model_config: dict = DEFAULT_CONFIG,
     training_path: Path | None = None,
-    shielding: bool = False,
+    shielding: bool = True,
 ):
     ray.shutdown()
     ray.init()

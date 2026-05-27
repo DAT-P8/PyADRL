@@ -19,20 +19,20 @@ ALTERNATING = "alternate"
 SIMULTANEOUS = "simultaneous"
 
 # Alternating training specifications
-N_STAGES = 10
-ITERS_PER_STAGE = 10
+N_STAGES = 20
+ITERS_PER_STAGE = 20
 # Each stage has 2 halves (train evader, then pursuer), so total algo.train()
 # calls = N_STAGES * ITERS_PER_STAGE * 2. Previous formula had max_t < total,
 # which silently disabled ASHA culling because grace > max_t.
 ALTERNATING_MAX_T = N_STAGES * ITERS_PER_STAGE * 2
-ALTERNATING_GRACE = ITERS_PER_STAGE * 8
+ALTERNATING_GRACE = 400
 
 # Simultaneous training specifications
-ITERATIONS = 200
-SIMULTANEOUS_GRACE = 100
+ITERATIONS = 400
+SIMULTANEOUS_GRACE = 200
 
 # === Experiment Configurations ===
-EXPERIMENT_NUM = 4
+EXPERIMENT_NUM = 11
 
 # Amount of hyperparameter configurations we pick for training
 NUM_CONFIGS = 3
@@ -41,14 +41,14 @@ NUM_CONFIGS = 3
 TRAIN_PER_CONFIG = 3
 
 # Training loop used
-TRAINING_LOOP = SIMULTANEOUS
+TRAINING_LOOP = ALTERNATING
 
 # Agents
 N_PURSUERS = 2
 N_EVADERS = 1
 
 # Shielding
-SHIELDING = False
+SHIELDING = True
 
 # === Metric selection ===
 # Metric ASHA uses to cull trials during the search.
@@ -69,8 +69,8 @@ ASHA_METRIC = "comb_score"
 #   "comb_score"           - score_p - γ*(col_e + bvr_e + oc_e);
 SELECTION_METRIC = "comb_score"
 
-NUM_SAMPLES = 20
-MAX_CONCURRENT_TRIALS = 12
+NUM_SAMPLES = 1
+MAX_CONCURRENT_TRIALS = 18
 
 
 def gridworld_tune(
@@ -103,17 +103,16 @@ def gridworld_tune(
 
     search_space = {
         # --- Training params ---
-        "lr": tune.uniform(5e-5, 1e-3),
+        "lr": tune.grid_search([3e-3, 3e-4, 3e-5]),
         "gamma": 0.99,
         "lambda_": 0.95,
-        "clip_param": tune.uniform(0.05, 0.2),
-        "vf_loss_coeff": tune.grid_search([0.5, 1]),
-        "entropy_coeff": tune.uniform(0.01, 0.1),
-        # --- Architecture params (fixed/narrowed based on data) ---
+        "clip_param": 0.2,
+        "vf_loss_coeff": 0.5,
+        "entropy_coeff": 0.01,
+        # --- Architecture params ---
         "train_batch_size": 10000,
-        "minibatch_size": 10000,
-        # Surprising effectiveness of ... suggests 5 for hard tasks and 10-15 for easy tasks.
-        "num_epochs": tune.grid_search([5, 10, 15]),
+        "minibatch_size": tune.grid_search([500, 1000, 5000]),
+        "num_epochs": tune.grid_search([5, 15]),
         # --- Resource params (all in-process to avoid placement group errors) ---
         "num_learners": 0,
         "num_env_runners": 0,
