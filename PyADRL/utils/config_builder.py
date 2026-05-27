@@ -12,6 +12,7 @@ def _build_ppo_config(
     n_evaders: int = 1,
     figure_path: Path | None = None,
     metrics_path: Path | None = None,
+    seed: int | None = None,
 ) -> PPOConfig:
     """Build a PPOConfig with the given hyperparameters."""
     if figure_path:
@@ -66,4 +67,5 @@ def _build_ppo_config(
             },
         )
         .callbacks(callbacks)
+        .debugging(seed=seed)
     )
