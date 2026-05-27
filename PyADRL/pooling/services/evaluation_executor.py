@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+import gc
 import numpy as np
 from PyADRL.envs.reward_functions.grid_world_rewards import GridWorldRewards
 from PyADRL.utils.register_env import _register_gridworld_env
@@ -94,6 +95,11 @@ class RayEvaluationExecutor(EvaluationExecutor):
 
         # need to stop this one before loading algo2
         algo1.stop()
+        del algo1
+        # Ray nags ("please gc.collect()") if algo1's workers are still in
+        # Python's reference graph when algo2 spins up. Force collection at
+        # the handoff so the next build_algo() has clean resource slots.
+        gc.collect()
 
         # --- Build and restore algo2 (pursuer side) ---
         self.logger.debug("Building algo2: %s", c2.name + "-" + t2.name)
@@ -171,4 +177,6 @@ class RayEvaluationExecutor(EvaluationExecutor):
         eval_result = algo2.evaluate()
 
         algo2.stop()
+        del algo2
+        gc.collect()
         return eval_result
