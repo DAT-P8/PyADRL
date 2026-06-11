@@ -251,10 +251,35 @@ class NGWEnvironment(ParallelEnv):
                         drone.y = drone_state.y
 
         time_limit_reached = self.timestep >= self.time_limit
+
+        # Rewards must see BOTH event streams:
+        #   - self.newest_state.events: what actually happened after the
+        #     shield's (possibly replaced) actions were executed — this is
+        #     the ONLY place captures (pursuer-evader collisions),
+        #     target_reached, and pursuer_entered_target events exist. The
+        #     shield never generates these event types.
+        #   - alt_state.events: the shield's counterfactual events for the
+        #     unsafe actions the agents *chose* (OOB / object collision /
+        #     same-team collision), so agents are still penalised for
+        #     picking unsafe actions even though the shield replaced them.
+        #
+        # The previous code used alt_state.events INSTEAD of the real
+        # events whenever the shield was active (i.e. on every step of a
+        # shielded run), so shielded training never paid out capture or
+        # breach rewards at all.
+        #
+        # Double-counting is not a concern: every event in alt_state.events
+        # refers to a drone whose original action was replaced, and its
+        # executed replacement is shield-safe, so the real event stream
+        # cannot contain the same crash for that drone. The reward function
+        # also aggregates event participants into sets, which dedupes any
+        # residual overlap.
+        reward_events = list(self.newest_state.events)
+        if alt_state is not None:
+            reward_events += alt_state.events
+
         rewards = self.reward_function.calculate_rewards(
-            events=alt_state.events
-            if alt_state is not None
-            else self.newest_state.events,
+            events=reward_events,
             drones=[drone for drone in self.newest_state.drone_states],
             map_config=self.map_config,
             time_limit_reached=time_limit_reached,

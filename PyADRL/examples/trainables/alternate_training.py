@@ -1,10 +1,11 @@
 import random
+import numpy as np
 import torch
 from pathlib import Path
 from ray import tune
 from ray.rllib.callbacks.callbacks import RLlibCallback
 from ...utils.config_builder import _build_ppo_config
-from ...logger.metrics import summarize_evaluation
+from ...logger.metrics import summarize_evaluation, extract_entropies
 
 
 EVADER = "evader"
@@ -35,6 +36,11 @@ def _run_alternating_loop(
     """
     global_step = 0
     result = {}
+
+    # Last seen mean policy entropy per module. Updated every algo.train()
+    # call; only the policy being trained that stage produces a fresh value,
+    # so the frozen side carries its value from its own last training phase.
+    last_entropy: dict[str, float] = {}
 
     # Pull n_evaders + time_limit once — needed by summarize_evaluation for
     # capture/ACS normalisation. Read here so the eval-summary call site
@@ -69,18 +75,13 @@ def _run_alternating_loop(
         # If pool has past policies, sample and load into frozen policy.
         if any(pools[frozen]):
             opp_weights = sample_opponent(pools[frozen])
-            algo.learner_group.set_weights({f"{frozen}_policy": opp_weights})
-            # Sync weights to env runners so rollouts use the correct opponent.
-            if algo.env_runner_group is not None and algo.config.num_env_runners > 0:
-                algo.env_runner_group.sync_weights(
-                    from_worker_or_learner_group=algo.learner_group,
-                    policies=[f"{frozen}_policy"],
-                )
+            _set_policy_weights(algo, f"{frozen}_policy", opp_weights)
 
         # Train stage
         for i in range(iters_per_stage):
             result = algo.train()
             global_step += 1
+            last_entropy.update(extract_entropies(result))
 
         assert algo.learner_group is not None
         updated_weights = algo.learner_group.get_weights()[f"{training}_policy"]
@@ -88,9 +89,15 @@ def _run_alternating_loop(
 
         # Change weights of frozen policy back to the most trained ones
         if len(pools[frozen]) != 0:
-            algo.learner_group.set_weights({f"{frozen}_policy": pools[frozen][-1]})
+            _set_policy_weights(algo, f"{frozen}_policy", pools[frozen][-1])
         print(f"Evaluating stage {k + 1}: {training}")
         eval_result = algo.evaluate()
+
+        if last_entropy:
+            print(
+                "Policy entropy (max=ln(9)~2.20): "
+                + ", ".join(f"{p}={e:.3f}" for p, e in sorted(last_entropy.items()))
+            )
 
         # Report to Tune so ASHA can prune bad trials early
         if report_to_tune:
@@ -101,6 +108,11 @@ def _run_alternating_loop(
             # ASHA reads this as time_attr so grace_period/max_t semantics
             # are in real iteration space, not tune.report() call count.
             metrics["algo_iteration"] = global_step
+            # Per-policy mean action entropy — lands in result.json, the Tune
+            # progress table, and TensorBoard (entropy_pursuer_policy /
+            # entropy_evader_policy). See extract_entropies for how to read it.
+            for pid, ent in last_entropy.items():
+                metrics[f"entropy_{pid}"] = ent
             tune.report(metrics=metrics)
 
         # Save a checkpoint after each full stage (evader+pursuer training)
@@ -161,6 +173,42 @@ def alternate_trainable(
 # ---------------------------------------------------------------------------
 # Utils
 # ---------------------------------------------------------------------------
+def _set_policy_weights(algo, policy_id: str, weights: dict) -> None:
+    """Set one policy's weights and propagate them to ALL runner groups.
+
+    The previous approach — `algo.learner_group.set_weights(...)` followed by
+    a sync gated on `num_env_runners > 0` — silently no-op'd on in-process
+    configs (num_env_runners == 0): the learner copy was updated but the
+    local env runner that actually collects rollouts never received the
+    weights, and `algo.train()` only re-syncs the modules it just trained
+    (the frozen policy is never among them). Net effect: opponent-pool
+    sampling and the post-stage restore had zero influence on rollouts, and
+    self-play silently degraded to always-vs-latest.
+
+    `algo.set_weights(...)` routes through `Algorithm.set_state`, which sets
+    the LearnerGroup state and then syncs weights to the training env
+    runners (remote AND local) and the eval env runners. We verify the
+    propagation reached the local rollout worker, mirroring the guard used
+    in the pool-evaluation executor.
+    """
+    algo.set_weights({policy_id: weights})
+
+    # Guard against the weights silently failing to reach the rollout
+    # worker. Compare only the parameters both copies share: env-runner
+    # modules can be inference-only and hold a subset of the learner params.
+    runner_weights = algo.env_runner.get_weights([policy_id])[policy_id]
+    common_keys = [k for k in runner_weights if k in weights]
+    assert common_keys, (
+        f"No overlapping parameter names between learner and env-runner "
+        f"copies of {policy_id}; cannot verify weight propagation"
+    )
+    for k in common_keys:
+        assert np.allclose(np.asarray(runner_weights[k]), np.asarray(weights[k])), (
+            f"Weights for {policy_id} ({k}) did not propagate to the env "
+            f"runner; rollouts would use a stale opponent"
+        )
+
+
 def sample_opponent(pool: list[dict], p_old: float = 0.3) -> dict:
     """With prob P_OLD sample a random old policy, otherwise use the latest."""
     if len(pool) == 1:

@@ -24,6 +24,34 @@ class EpisodeOutcome:
     evader_shield_intervention_rate: float = 0.0
 
 
+def extract_entropies(train_result: dict) -> dict[str, float]:
+    """Pull per-policy mean entropy out of an `algo.train()` result.
+
+    RLlib's PPO learner (new API stack) logs the mean entropy of the action
+    distribution over the training batch for every module it updated, under
+    result["learners"][module_id]["entropy"]. Only modules in
+    `policies_to_train` appear — a frozen opponent gets no learner pass and
+    therefore no entropy entry, so callers should cache the last seen value
+    per policy across stages.
+
+    Interpretation for a Discrete(9) action space:
+      max entropy = ln(9) ~= 2.20 (uniform random policy)
+      healthy run: starts near max, settles around ~0.3-0.8
+      < ~0.05 early in training: premature collapse to a deterministic
+        policy (check reward scale / entropy_coeff)
+      pinned near 2.2 at the end: policy never sharpened (entropy_coeff
+        too high, or no learnable signal)
+    """
+    out: dict[str, float] = {}
+    for module_id, stats in (train_result.get("learners") or {}).items():
+        if module_id == "__all_modules__" or not isinstance(stats, dict):
+            continue
+        ent = stats.get("entropy")
+        if ent is not None:
+            out[module_id] = float(ent)
+    return out
+
+
 def extract_episode_metrics(infos) -> dict | None:
     if not isinstance(infos, dict):
         return None

@@ -1,4 +1,5 @@
 import ray
+from ray.exceptions import RayError
 from ray import tune
 from ray.tune import ResultGrid
 from ray.rllib.callbacks.callbacks import RLlibCallback
@@ -72,6 +73,54 @@ SELECTION_METRIC = "comb_score"
 NUM_SAMPLES = 1
 MAX_CONCURRENT_TRIALS = 18
 
+# CPUs reserved per post-tune training task. Each training is fully
+# in-process (num_learners=0, num_env_runners=0), so it needs ~1 core for
+# sampling/learning plus headroom for torch intra-op threads. Keep
+# NUM_CONFIGS * TRAIN_PER_CONFIG * TRAIN_TASK_NUM_CPUS comfortably below the
+# cluster CPU count: the final evaluate_model() inside each training spawns
+# a nested eval env-runner actor that needs a free CPU to schedule — if the
+# tasks reserve everything, those actors deadlock waiting for resources.
+# (9 tasks x 2 CPUs = 18 of 32 on a 7950X, leaving 14 for nested actors.)
+TRAIN_TASK_NUM_CPUS = 2
+
+
+@ray.remote(
+    num_cpus=TRAIN_TASK_NUM_CPUS,
+    # Workers inherit the desktop environment; force a non-GUI matplotlib
+    # backend so the reward-graph/heatmap savefig calls don't try to open
+    # windows from 9 concurrent processes.
+    runtime_env={"env_vars": {"MPLBACKEND": "Agg"}},
+)
+def _train_one_model(
+    map: str,
+    training_config: dict,
+    model_config: dict,
+    training_dir,
+    shielding: bool,
+) -> str:
+    """Run one full post-tune training as a Ray task so all
+    NUM_CONFIGS x TRAIN_PER_CONFIG trainings execute in parallel."""
+    import torch
+
+    # Match the CPU reservation; without this each task spawns a thread pool
+    # sized to all logical cores and the 9 tasks thrash each other.
+    torch.set_num_threads(TRAIN_TASK_NUM_CPUS)
+    try:
+        torch.set_num_interop_threads(1)
+    except RuntimeError:
+        pass  # already set in this worker (Ray reuses worker processes)
+
+    gridworld_train(
+        map=map,
+        n_pursuers=N_PURSUERS,
+        n_evaders=N_EVADERS,
+        training_config=training_config,
+        model_config=model_config,
+        training_path=training_dir,
+        shielding=shielding,
+    )
+    return str(training_dir)
+
 
 def gridworld_tune(
     map: str,
@@ -103,7 +152,7 @@ def gridworld_tune(
 
     search_space = {
         # --- Training params ---
-        "lr": tune.grid_search([3e-3, 3e-4, 3e-5]),
+        "lr": tune.grid_search([3e-3, 3e-4]),
         "gamma": 0.99,
         "lambda_": 0.95,
         "clip_param": 0.2,
@@ -111,8 +160,8 @@ def gridworld_tune(
         "entropy_coeff": 0.01,
         # --- Architecture params ---
         "train_batch_size": 10000,
-        "minibatch_size": tune.grid_search([500, 1000, 5000]),
-        "num_epochs": tune.grid_search([5, 15]),
+        "minibatch_size": tune.grid_search([250, 500, 1000]),
+        "num_epochs": tune.grid_search([5, 10, 15]),
         # --- Resource params (all in-process to avoid placement group errors) ---
         "num_learners": 0,
         "num_env_runners": 0,
@@ -167,6 +216,7 @@ def gridworld_tune(
         if n_best is not None:
             # Write n_best configs to file in case of error
             experiment_dirs = make_experiment_dirs(n_best, training_config, map)
+            pending = []
             for i, (trial, config_dir) in enumerate(zip(n_best, experiment_dirs)):
                 if trial.config is None or trial.metrics is None:
                     raise ValueError("Trial has missing data")
@@ -180,18 +230,32 @@ def gridworld_tune(
                 print(f"breach_rate: {trial.metrics.get('breach_rate')}")
                 print(f"Config:\n{trial.config}")
 
+                # Launch all trainings for this config without waiting —
+                # ray.get below gathers them. With NUM_CONFIGS=3 and
+                # TRAIN_PER_CONFIG=3 this runs all 9 trainings in parallel
+                # instead of back-to-back.
                 for model_num in range(1, TRAIN_PER_CONFIG + 1):
                     training_dir = config_dir / f"training_{model_num}"
-                    gridworld_train(
-                        map=map,
-                        n_pursuers=N_PURSUERS,
-                        n_evaders=N_EVADERS,
-                        training_config=training_config,
-                        model_config=trial.config,
-                        training_path=training_dir,
-                        shielding=SHIELDING,
+                    pending.append(
+                        _train_one_model.remote(
+                            map,
+                            training_config,
+                            trial.config,
+                            training_dir,
+                            SHIELDING,
+                        )
                     )
-    except (RuntimeError, FileExistsError, ValueError) as e:
+
+            # Surface progress (and failures) as trainings finish rather
+            # than blocking silently on all of them at once.
+            total = len(pending)
+            while pending:
+                done, pending = ray.wait(pending, num_returns=1)
+                finished_dir = ray.get(done[0])  # re-raises task errors here
+                print(
+                    f"Finished training {total - len(pending)}/{total}: {finished_dir}"
+                )
+    except (RuntimeError, FileExistsError, ValueError, RayError) as e:
         print(f"\nPost-tune step failed: {e}")
         print(f"Tune results saved at: {tuner_dir}")
 

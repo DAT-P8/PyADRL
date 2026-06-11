@@ -3,7 +3,7 @@ from ray import tune
 from pathlib import Path
 from ...utils.config_builder import _build_ppo_config
 from ray.rllib.callbacks.callbacks import RLlibCallback
-from ...logger.metrics import summarize_evaluation
+from ...logger.metrics import summarize_evaluation, extract_entropies
 
 
 def iterative_trainable(
@@ -53,9 +53,13 @@ def _run_iterative_loop(
         time_limit = algo.config.env_config.get("time_limit", 100)
 
     result = {}
+    # Last seen mean policy entropy per module (both policies train every
+    # iteration in the simultaneous loop, so this is always fresh).
+    last_entropy: dict[str, float] = {}
     for i in range(1, iterations + 1):
         print(f"Training iteration {i}")
         result = algo.train()
+        last_entropy.update(extract_entropies(result))
 
         if model_path:
             model_name = model_path / f"iteration_{i}"
@@ -65,6 +69,11 @@ def _run_iterative_loop(
         # iteration so the final reported metric reflects the final model).
         if i % eval_interval == 0 or i == iterations:
             eval_result = algo.evaluate()
+            if last_entropy:
+                print(
+                    "Policy entropy (max=ln(9)~2.20): "
+                    + ", ".join(f"{p}={e:.3f}" for p, e in sorted(last_entropy.items()))
+                )
             if report_to_tune:
                 metrics = summarize_evaluation(
                     eval_result,
@@ -78,5 +87,8 @@ def _run_iterative_loop(
                 # counts tune.report() calls, which with eval_interval=5 ticks
                 # 5x slower than real iterations — would break grace_period.
                 metrics["algo_iteration"] = i
+                # Per-policy mean action entropy (see extract_entropies).
+                for pid, ent in last_entropy.items():
+                    metrics[f"entropy_{pid}"] = ent
                 tune.report(metrics=metrics)
     return result

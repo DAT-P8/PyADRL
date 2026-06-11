@@ -54,8 +54,13 @@ def gridworld_train(
     training_path: Path | None = None,
     shielding: bool = True,
 ):
-    ray.shutdown()
-    ray.init()
+    # Do NOT tear down / restart Ray here. This function is called in two
+    # contexts: standalone (train.py — no cluster yet, so init) and from
+    # inside a Ray task for the parallel post-tune trainings (cluster
+    # already up — calling ray.shutdown() there would disconnect the worker
+    # from the cluster mid-flight).
+    if not ray.is_initialized():
+        ray.init()
 
     map_dict = load_map_dict(map)
 
