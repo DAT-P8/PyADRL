@@ -33,7 +33,7 @@ ITERATIONS = 400
 SIMULTANEOUS_GRACE = 200
 
 # === Experiment Configurations ===
-EXPERIMENT_NUM = 11
+EXPERIMENT_NUM = 16
 
 # Amount of hyperparameter configurations we pick for training
 NUM_CONFIGS = 3
@@ -42,14 +42,14 @@ NUM_CONFIGS = 3
 TRAIN_PER_CONFIG = 3
 
 # Training loop used
-TRAINING_LOOP = ALTERNATING
+TRAINING_LOOP = SIMULTANEOUS
 
 # Agents
 N_PURSUERS = 2
 N_EVADERS = 1
 
 # Shielding
-SHIELDING = True
+SHIELDING = False
 
 # === Metric selection ===
 # Metric ASHA uses to cull trials during the search.

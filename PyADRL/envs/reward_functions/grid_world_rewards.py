@@ -5,43 +5,15 @@ from ...utils.chebeshyv import chebyshev_distance
 
 
 class GridWorldRewards(RewardFunction):
-    # === Reward scale rationale ===
-    # With time_limit=100, any per-step term accumulates ~100x. The old
-    # shaping multiplier of -10 could contribute up to -1000 per episode,
-    # dwarfing the +/-200 terminal events by 5x — PPO's advantage estimates
-    # were dominated by the dense shaping gradient and the actual game
-    # outcome (capture / breach) was a rounding error. Budget now:
-    #
-    #   terminal task events:   +/-100..200  (dominant signal)
-    #   safety violations:      -100..-150   (dying is bad, comparable to
-    #                                         being caught; not so large
-    #                                         that fear of crashing
-    #                                         overrides playing the game)
-    #   per-step shaping:       -0.5 * normalized distance per step
-    #                           => worst case -50/episode, typical -15..-30
-    #                           (a tie-breaker, ~25% of a terminal event)
-    #   timeout:                -50 pursuers only (timeout IS pursuer
-    #                           failure; the evader already has breach
-    #                           upside and distance shaping pressure, and
-    #                           punishing it for surviving muddied the
-    #                           adversarial structure)
-    #
-    # If you later want shaping with zero policy-bias, convert the distance
-    # terms to potential-based shaping (gamma*phi(s') - phi(s)). That needs
-    # previous-step positions, which requires per-env state — note the
-    # current RewardFunction instance is SHARED across all vectorized envs
-    # via the register_env closure, so the state must live in the env, not
-    # in this class.
-
     # Rewards for evader
-    REWARD_EVADER_MAX_TIMESTEPS = 0  # surviving to timeout is a draw, not a loss
+    REWARD_EVADER_MAX_TIMESTEPS = -50
     REWARD_EVADER_TARGET_REACHED_SELF = 200  # reward for reaching target yourself
     REWARD_EVADER_TARGET_REACHED_OTHERS = 20  # reward for helping reach target
     REWARD_EVADER_CAUGHT = -100
-    REWARD_EVADER_FAR_FROM_TARGET = -0.5  # Multiplier for distance to target
+    REWARD_EVADER_FAR_FROM_TARGET = -10  # Muiltiplier for distance to target
     REWARD_EVADER_DESTROYED = -100
-    REWARD_EVADER_OUT_OF_BOUNDS = -150
-    REWARD_EVADER_COLLISION_OBJECT = -150
+    REWARD_EVADER_OUT_OF_BOUNDS = -200
+    REWARD_EVADER_COLLISION_OBJECT = -200
 
     # Rewards for pursuers
     REWARD_PURSUER_MAX_TIMESTEPS = (
@@ -51,10 +23,10 @@ class GridWorldRewards(RewardFunction):
     REWARD_PURSUER_CAUGHT_EVADER_OTHERS = 20  # Reward for helping catch the evader
     REWARD_PURSUER_TARGET_REACHED = -50  # Punish pursuers for evader in target
     REWARD_PURSUER_ENTERED_TARGET = -50  # Punish pursuers for entering target
-    REWARD_PURSUER_FAR_FROM_EVADER = -0.5  # Multiplier for distance to evader
+    REWARD_PURSUER_FAR_FROM_EVADER = -10  # Multiplier for distance to evader
     REWARD_PURSUER_DESTROYED = -100
-    REWARD_PURSUER_OUT_OF_BOUNDS = -150
-    REWARD_PURSUER_COLLISION_OBJECT = -150
+    REWARD_PURSUER_OUT_OF_BOUNDS = -200
+    REWARD_PURSUER_COLLISION_OBJECT = -200
 
     def calculate_rewards(
         self,
