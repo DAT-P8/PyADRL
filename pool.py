@@ -1,4 +1,5 @@
 import logging
+import re
 from PyADRL.pooling.services.evaluation_executor import EvaluationExecutor
 from PyADRL.pooling.models.pool_config import PoolConfig
 import argparse
@@ -44,7 +45,13 @@ def main(
         for config in experiment.configs
         for training in config.trainings
     ]
-    combinations = [(c1, t1, c2, t2) for c1, t1 in confs for c2, t2 in confs]
+    combinations = [
+        (c1, t1, c2, t2)
+        for c1, t1 in confs
+        for c2, t2 in confs
+        if (re.match(r"lsm[1,2,3]$", c2.name))
+        or (re.match(r"lsm[1,2,3]$", c1.name))
+    ]
 
     for c1, t1, c2, t2 in combinations:
         evaluation_executor.evaluate_alternating(c1, t1, c2, t2)

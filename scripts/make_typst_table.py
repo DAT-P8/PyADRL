@@ -131,6 +131,8 @@ def get_type_conf(name: str, experiment: str):
         return "l"
     if re.match(r"c[1-3]$", name):
         return experiment[0]
+    if re.match(r"lsm[1-3]$", name):
+        return "lsm"
     raise Exception("did not recognize type")
 
 
@@ -153,7 +155,7 @@ def main(
     output = Path(args.output) if args.output else DEFAULT_OUTPUT
 
     # Obtain pools from your source here.
-    pools: list[EvaluationPoolMetrics] = [m for m in metrics_finder.scan_for_metrics() if re.match(r'(long-v-all)$', m.experiment_name)]
+    pools: list[EvaluationPoolMetrics] = [m for m in metrics_finder.scan_for_metrics() if re.match(r'(lsm-v-all)$', m.experiment_name)]
     
     results: dict[str, list[EvaluationResult]] = {}
     for pool in pools:

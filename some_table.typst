@@ -1,0 +1,79 @@
+
+#figure(
+      table(
+        columns: (auto, auto, auto, auto, auto, auto, auto, auto, auto, auto),
+        align: (left, center, center, center, center, center, center, center, center, center),
+        stroke: 0.4pt,
+        inset: (x: 6pt, y: 4pt),
+
+        // Header row
+        table.header(
+          [*Setting*],
+          [CR\@1 $arrow.t$],
+          [ACS\@1 $arrow.b$],
+          [BR $arrow.b$],
+          [PTR $arrow.b$],
+          [ColRp $arrow.b$],
+          [OCRp $arrow.b$],
+          [BVRp $arrow.b$],
+          [OCRe $arrow.b$],
+          [BVRe $arrow.b$],
+        ),
+    
+
+            // Row 1: alt p vs alt e
+            [sa-a],
+            [$0.31 plus.minus 0.02$],
+            [$18.64 plus.minus 0.63$],
+            [$0.36 plus.minus 0.01$],
+            [$0.05 plus.minus 0.00$],
+            [$0.33 plus.minus 0.00$],
+            [$0.02 plus.minus 0.00$],
+            [$0.00 plus.minus 0.00$],
+            [$0.27 plus.minus 0.02$],
+            [$0.06 plus.minus 0.01$],
+
+
+            // Row 1: alt p vs alt e
+            [a-sa],
+            [$0.48 plus.minus 0.03$],
+            [$9.51 plus.minus 0.14$],
+            [$0.30 plus.minus 0.02$],
+            [$0.04 plus.minus 0.00$],
+            [$0.17 plus.minus 0.02$],
+            [$0.01 plus.minus 0.00$],
+            [$0.00 plus.minus 0.00$],
+            [$0.22 plus.minus 0.01$],
+            [$0.00 plus.minus 0.00$],
+
+
+            // Row 1: alt p vs alt e
+            [ss-s],
+            [$0.48 plus.minus 0.08$],
+            [$17.23 plus.minus 1.57$],
+            [$0.38 plus.minus 0.02$],
+            [$0.05 plus.minus 0.00$],
+            [$0.23 plus.minus 0.04$],
+            [$0.01 plus.minus 0.00$],
+            [$0.00 plus.minus 0.00$],
+            [$0.12 plus.minus 0.06$],
+            [$0.02 plus.minus 0.01$],
+
+
+            // Row 1: alt p vs alt e
+            [s-ss],
+            [$0.64 plus.minus 0.01$],
+            [$9.82 plus.minus 0.41$],
+            [$0.23 plus.minus 0.01$],
+            [$0.03 plus.minus 0.00$],
+            [$0.18 plus.minus 0.02$],
+            [$0.02 plus.minus 0.00$],
+            [$0.00 plus.minus 0.00$],
+            [$0.13 plus.minus 0.01$],
+            [$0.00 plus.minus 0.00$],
+
+
+          ),
+          caption: none,
+        )
+    
