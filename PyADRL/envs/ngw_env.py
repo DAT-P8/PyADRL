@@ -269,32 +269,9 @@ class NGWEnvironment(ParallelEnv):
 
         self.timestep += 1
 
-        infos = {a: {} for a in self.agents}
+        infos = self._get_infos(alt_state)
 
         observations = self._get_obs()
-
-        for d in self.drones[EVADERS] + self.drones[PURSUERS]:
-            if d.name in infos:
-                infos[d.name]["drone_state"] = {
-                    "x": d.x,
-                    "y": d.y,
-                    "destroyed": d.destroyed,
-                }
-                infos[d.name]["events"] = self.newest_state.events
-                if alt_state is not None:
-                    infos[d.name]["shield_events"] = alt_state.events
-                    for unsafe_ds in alt_state.drone_states:
-                        if unsafe_ds.id == d.id and unsafe_ds.is_evader == d.is_evader:
-                            infos[d.name]["unsafe_drone_state"] = {
-                                "x": unsafe_ds.x,
-                                "y": unsafe_ds.y,
-                            }
-                            break
-                if d.is_evader and d.destroyed:
-                    for ds in self.newest_state.drone_states:
-                        if ds.id == d.id and ds.is_evader:
-                            infos[d.name]["capture_position"] = {"x": ds.x, "y": ds.y}
-                            break
 
         name_to_reward: dict[str, float] = {
             name: rewards[name_to_drone[name].id] for name in self.agents
@@ -329,3 +306,47 @@ class NGWEnvironment(ParallelEnv):
             agent_id[i] = 1.0
             one_hot[agent] = agent_id
         return one_hot
+
+    def _get_infos(self, alt_state: State | None = None):
+        if self.newest_state is None:
+            raise Exception("Newest state is None, can't get infos")
+
+        infos = {a: {} for a in self.agents}
+        for d in self.drones[EVADERS] + self.drones[PURSUERS]:
+            if d.name in infos:
+                infos[d.name]["drone_state"] = {
+                    "x": d.x,
+                    "y": d.y,
+                    "destroyed": d.destroyed,
+                }
+                infos[d.name]["events"] = self.newest_state.events
+                if alt_state is not None:
+                    infos[d.name]["shield_events"] = alt_state.events
+                    for unsafe_ds in alt_state.drone_states:
+                        if unsafe_ds.id == d.id and unsafe_ds.is_evader == d.is_evader:
+                            infos[d.name]["unsafe_drone_state"] = {
+                                "x": unsafe_ds.x,
+                                "y": unsafe_ds.y,
+                            }
+                            break
+                if d.is_evader and d.destroyed:
+                    # if evader is destroyed, check if it was captured by a pursuer
+                    captured = any(
+                        event.collision_event is not None
+                        and d.id in event.collision_event.drone_ids
+                        and any(
+                            pid in event.collision_event.drone_ids
+                            for pid in [drone.id for drone in self.drones[PURSUERS]]
+                        )
+                        for event in self.newest_state.events
+                    )
+                    if captured:
+                        for ds in self.drones[EVADERS]:
+                            if ds.id == d.id and ds.is_evader:
+                                # add the position where the evader was captured
+                                infos[d.name]["capture_position"] = {
+                                    "x": ds.x,
+                                    "y": ds.y,
+                                }
+                                break
+        return infos
